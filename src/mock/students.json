@@ -1,0 +1,17 @@
+[
+  { "id": "s1", "name": "Alex Rivera", "email": "alex@school.edu", "password": "pass123", "groupId": "g1", "teacherCode": "ECON2025" },
+  { "id": "s2", "name": "Jordan Lee", "email": "jordan@school.edu", "password": "pass123", "groupId": "g1", "teacherCode": "ECON2025" },
+  { "id": "s3", "name": "Sam Patel", "email": "sam@school.edu", "password": "pass123", "groupId": "g1", "teacherCode": "ECON2025" },
+  { "id": "s4", "name": "Taylor Brooks", "email": "taylor@school.edu", "password": "pass123", "groupId": "g2", "teacherCode": "ECON2025" },
+  { "id": "s5", "name": "Casey Morgan", "email": "casey@school.edu", "password": "pass123", "groupId": "g2", "teacherCode": "ECON2025" },
+  { "id": "s6", "name": "Riley Kim", "email": "riley@school.edu", "password": "pass123", "groupId": "g2", "teacherCode": "ECON2025" },
+  { "id": "s7", "name": "Drew Park", "email": "drew@school.edu", "password": "pass123", "groupId": "g3", "teacherCode": "ECON2025" },
+  { "id": "s8", "name": "Avery Quinn", "email": "avery@school.edu", "password": "pass123", "groupId": "g3", "teacherCode": "ECON2025" },
+  { "id": "s9", "name": "Morgan Chen", "email": "morgan@school.edu", "password": "pass123", "groupId": "g3", "teacherCode": "ECON2025" },
+  { "id": "s10", "name": "Jamie Nguyen", "email": "jamie@school.edu", "password": "pass123", "groupId": "g4", "teacherCode": "SMITH101" },
+  { "id": "s11", "name": "Dakota Ellis", "email": "dakota@school.edu", "password": "pass123", "groupId": "g4", "teacherCode": "SMITH101" },
+  { "id": "s12", "name": "Quinn Torres", "email": "quinn@school.edu", "password": "pass123", "groupId": "g4", "teacherCode": "SMITH101" },
+  { "id": "s13", "name": "Skyler Adams", "email": "skyler@school.edu", "password": "pass123", "groupId": "g5", "teacherCode": "SMITH101" },
+  { "id": "s14", "name": "Reese Harper", "email": "reese@school.edu", "password": "pass123", "groupId": "g5", "teacherCode": "SMITH101" },
+  { "id": "s15", "name": "Charlie Diaz", "email": "charlie@school.edu", "password": "pass123", "groupId": "g5", "teacherCode": "SMITH101" }
+]

@@ -1,0 +1,47 @@
+[
+  {
+    "id": "t1",
+    "code": "ECON2025",
+    "teacherName": "Mr. Harrison",
+    "className": "AP Economics",
+    "school": "Lincoln High",
+    "email": "harrison@school.edu",
+    "password": "teach123",
+    "restrictions": {
+      "maxStocksPerPortfolio": 10,
+      "allowedSectors": [],
+      "blockedTickers": [],
+      "maxDollarsPerStock": 20000
+    }
+  },
+  {
+    "id": "t2",
+    "code": "SMITH101",
+    "teacherName": "Ms. Smith",
+    "className": "Personal Finance",
+    "school": "Westview Academy",
+    "email": "smith@school.edu",
+    "password": "teach123",
+    "restrictions": {
+      "maxStocksPerPortfolio": 8,
+      "allowedSectors": [],
+      "blockedTickers": ["TSLA"],
+      "maxDollarsPerStock": 15000
+    }
+  },
+  {
+    "id": "t3",
+    "code": "FINANCE-A",
+    "teacherName": "Dr. Chen",
+    "className": "Intro to Investing",
+    "school": "Riverside Prep",
+    "email": "chen@school.edu",
+    "password": "teach123",
+    "restrictions": {
+      "maxStocksPerPortfolio": 5,
+      "allowedSectors": [],
+      "blockedTickers": [],
+      "maxDollarsPerStock": 10000
+    }
+  }
+]

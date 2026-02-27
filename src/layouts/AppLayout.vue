@@ -1,0 +1,64 @@
+<template>
+  <div class="min-h-screen bg-base-200 flex">
+    <!-- Mobile overlay -->
+    <div v-if="sidebarOpen" class="fixed inset-0 bg-black/40 z-30 lg:hidden" @click="sidebarOpen = false"></div>
+
+    <!-- Sidebar -->
+    <aside class="fixed lg:sticky top-0 left-0 z-40 h-screen w-56 bg-base-100 border-r border-base-300 flex flex-col transition-transform lg:translate-x-0" :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'">
+      <div class="p-4 border-b border-base-300">
+        <h1 class="text-lg font-bold text-primary">Beat the S&P</h1>
+        <p class="text-xs text-base-content/50">{{ auth.currentUser?.name }}</p>
+      </div>
+      <nav class="flex-1 p-3 space-y-1">
+        <RouterLink to="/home" class="btn btn-ghost btn-sm justify-start w-full gap-2" :class="{ 'btn-active': route.path === '/home' }" @click="sidebarOpen = false">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1h-2z" /></svg>
+          Portfolio
+        </RouterLink>
+        <RouterLink to="/leaderboard" class="btn btn-ghost btn-sm justify-start w-full gap-2" :class="{ 'btn-active': route.path === '/leaderboard' }" @click="sidebarOpen = false">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+          Leaderboard
+        </RouterLink>
+        <RouterLink to="/stocks" class="btn btn-ghost btn-sm justify-start w-full gap-2" :class="{ 'btn-active': route.path === '/stocks' }" @click="sidebarOpen = false">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
+          Stocks
+        </RouterLink>
+      </nav>
+      <div class="p-3 border-t border-base-300">
+        <button class="btn btn-ghost btn-sm w-full justify-start gap-2" @click="handleLogout">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+          Log out
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main content -->
+    <div class="flex-1 min-w-0">
+      <!-- Mobile header -->
+      <div class="lg:hidden sticky top-0 z-20 bg-base-100 border-b border-base-300 px-4 py-2 flex items-center gap-3">
+        <button class="btn btn-ghost btn-sm btn-square" @click="sidebarOpen = !sidebarOpen">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
+        </button>
+        <span class="font-bold text-primary text-sm">Beat the S&P</span>
+      </div>
+      <div class="p-4">
+        <RouterView />
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref } from 'vue'
+import { RouterView, RouterLink, useRoute, useRouter } from 'vue-router'
+import { useAuthStore } from '../stores/auth'
+
+const route = useRoute()
+const router = useRouter()
+const auth = useAuthStore()
+const sidebarOpen = ref(false)
+
+function handleLogout() {
+  auth.logout()
+  router.push('/')
+}
+</script>
