@@ -7,6 +7,8 @@
     "school": "Lincoln High",
     "email": "harrison@school.edu",
     "password": "teach123",
+    "groupMode": "student_choice",
+    "tradeApprovalCode": null,
     "restrictions": {
       "maxStocksPerPortfolio": 10,
       "allowedSectors": [],
@@ -22,6 +24,8 @@
     "school": "Westview Academy",
     "email": "smith@school.edu",
     "password": "teach123",
+    "groupMode": "student_choice",
+    "tradeApprovalCode": null,
     "restrictions": {
       "maxStocksPerPortfolio": 8,
       "allowedSectors": [],
@@ -37,6 +41,8 @@
     "school": "Riverside Prep",
     "email": "chen@school.edu",
     "password": "teach123",
+    "groupMode": "student_choice",
+    "tradeApprovalCode": null,
     "restrictions": {
       "maxStocksPerPortfolio": 5,
       "allowedSectors": [],

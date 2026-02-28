@@ -1,5 +1,26 @@
 <template>
-  <div class="space-y-4">
+  <!-- Unassigned State -->
+  <div v-if="!auth.currentUser?.groupId" class="flex flex-col items-center justify-center py-20 space-y-4">
+    <div class="text-6xl">⏳</div>
+    <h2 class="text-2xl font-bold">Waiting for Group Assignment</h2>
+    <p class="text-base-content/60 text-center max-w-md">Your teacher hasn't assigned you to a group yet. Check back soon or explore the stocks page in the meantime!</p>
+    <RouterLink to="/stocks" class="btn btn-primary">Browse Stocks</RouterLink>
+  </div>
+
+  <!-- Bonus Cash Notification Modal -->
+  <dialog ref="bonusModal" class="modal" :class="{ 'modal-open': showBonusModal }">
+    <div class="modal-box text-center">
+      <div class="text-6xl mb-4">🎉</div>
+      <h3 class="font-bold text-2xl mb-2">Congratulations!</h3>
+      <p class="text-lg text-base-content/70 mb-4">Your team received a bonus of</p>
+      <p class="text-4xl font-bold text-success mb-4">${{ bonusTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</p>
+      <p class="text-base-content/50 mb-6">from your teacher! Use it wisely.</p>
+      <button class="btn btn-primary btn-block" @click="dismissBonus">Awesome!</button>
+    </div>
+    <form method="dialog" class="modal-backdrop" @click="dismissBonus"><button>close</button></form>
+  </dialog>
+
+  <div v-if="auth.currentUser?.groupId" class="space-y-4">
     <!-- Header -->
     <div class="flex items-center justify-between">
       <div>
@@ -89,10 +110,12 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { RouterLink } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
 import { usePortfolioStore } from '../../stores/portfolio'
 import { useHistoricalDataStore } from '../../stores/historicalData'
+import { useNotificationsStore } from '../../stores/notifications'
 import stocksData from '../../mock/stocks.json'
 import PortfolioLineChart from '../../components/charts/PortfolioLineChart.vue'
 import PortfolioPieChart from '../../components/charts/PortfolioPieChart.vue'
@@ -101,9 +124,26 @@ import TimeRangeSelector from '../../components/charts/TimeRangeSelector.vue'
 const auth = useAuthStore()
 const portfolio = usePortfolioStore()
 const histStore = useHistoricalDataStore()
+const notificationsStore = useNotificationsStore()
 
 const timeRange = ref('3M')
 const myGroupId = auth.currentUser?.groupId
+const showBonusModal = ref(false)
+const bonusTotal = ref(0)
+
+onMounted(() => {
+  if (!myGroupId) return
+  const unseen = notificationsStore.getUnseenForGroup(myGroupId)
+  if (unseen.length > 0) {
+    bonusTotal.value = unseen.reduce((sum, n) => sum + n.amount, 0)
+    showBonusModal.value = true
+  }
+})
+
+function dismissBonus() {
+  showBonusModal.value = false
+  if (myGroupId) notificationsStore.markAllSeenForGroup(myGroupId)
+}
 
 const vsSP500 = computed(() => portfolio.totalReturnPct - portfolio.SP500_RETURN_PCT)
 

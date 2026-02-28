@@ -10,7 +10,8 @@ const router = createRouter({
         { path: '', name: 'landing', component: () => import('../views/auth/LandingView.vue') },
         { path: 'signup', name: 'signup', component: () => import('../views/auth/SignupView.vue') },
         { path: 'login', name: 'login', component: () => import('../views/auth/LoginView.vue') },
-        { path: 'teacher-login', name: 'teacher-login', component: () => import('../views/auth/TeacherLoginView.vue') }
+        { path: 'teacher-login', name: 'teacher-login', component: () => import('../views/auth/TeacherLoginView.vue') },
+        { path: 'teacher-signup', name: 'teacher-signup', component: () => import('../views/auth/TeacherSignupView.vue') }
       ]
     },
     {
@@ -57,7 +58,7 @@ router.beforeEach((to) => {
     return { name: 'teacher-dashboard' }
   }
 
-  const authPages = ['landing', 'login', 'signup', 'teacher-login']
+  const authPages = ['landing', 'login', 'signup', 'teacher-login', 'teacher-signup']
   if (authPages.includes(to.name) && isLoggedIn) {
     return userType === 'teacher' ? { name: 'teacher-dashboard' } : { name: 'home' }
   }

@@ -7,6 +7,10 @@
 
     <div class="card bg-base-100 shadow-xl">
       <div class="card-body space-y-4">
+        <GoogleSignInButton @credential="handleGoogleCredential" />
+
+        <div class="divider text-xs">OR</div>
+
         <div v-if="error" class="alert alert-error">
           <span>{{ error }}</span>
         </div>
@@ -23,22 +27,37 @@
 
         <button class="btn btn-primary btn-block" @click="handleLogin" :disabled="!email || !password">Log In</button>
 
+        <div class="divider text-xs"></div>
+        <RouterLink to="/teacher-signup" class="btn btn-outline btn-block btn-sm">Don't have an account? Sign up</RouterLink>
         <RouterLink to="/login" class="btn btn-ghost btn-block btn-sm">Student login instead</RouterLink>
       </div>
     </div>
   </div>
+
+  <GoogleRoleModal
+    :show="showRoleModal"
+    :name="googleName"
+    :email="googleEmail"
+    @select="handleRoleSelect"
+    @close="showRoleModal = false"
+  />
 </template>
 
 <script setup>
 import { ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
+import GoogleSignInButton from '../../components/GoogleSignInButton.vue'
+import GoogleRoleModal from '../../components/GoogleRoleModal.vue'
 
 const router = useRouter()
 const auth = useAuthStore()
 const email = ref('')
 const password = ref('')
 const error = ref('')
+const showRoleModal = ref(false)
+const googleName = ref('')
+const googleEmail = ref('')
 
 function handleLogin() {
   error.value = ''
@@ -48,5 +67,25 @@ function handleLogin() {
     return
   }
   router.push({ name: 'teacher-dashboard' })
+}
+
+function handleGoogleCredential(credential) {
+  const result = auth.googleLogin(credential)
+  if (result.status === 'logged_in') {
+    router.push(result.userType === 'teacher' ? '/teacher' : '/home')
+  } else if (result.status === 'new_user') {
+    googleName.value = result.name
+    googleEmail.value = result.email
+    showRoleModal.value = true
+  }
+}
+
+function handleRoleSelect(role) {
+  showRoleModal.value = false
+  if (role === 'student') {
+    router.push('/signup')
+  } else {
+    router.push('/teacher-signup')
+  }
 }
 </script>

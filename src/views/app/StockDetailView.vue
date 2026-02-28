@@ -82,6 +82,12 @@
             </div>
           </div>
 
+          <!-- Approval Code -->
+          <div v-if="requiresApproval" class="form-control mb-3">
+            <label class="label py-1"><span class="label-text text-sm">Teacher Approval Code</span></label>
+            <input v-model="approvalCode" type="text" class="input input-bordered w-full uppercase" placeholder="Enter approval code" />
+          </div>
+
           <!-- Trade Result -->
           <div v-if="tradeResult" class="alert mb-3" :class="tradeResult.success ? 'alert-success' : 'alert-error'">
             <span>{{ tradeResult.message }}</span>
@@ -212,6 +218,13 @@ const timeRange = ref('1Y')
 const tradeMode = ref('buy')
 const tradeAmount = ref(0)
 const tradeResult = ref(null)
+const approvalCode = ref('')
+
+const requiresApproval = computed(() => {
+  if (!auth.currentUser?.teacherCode) return false
+  const teacher = auth.teachers.find(t => t.code === auth.currentUser.teacherCode)
+  return !!teacher?.tradeApprovalCode
+})
 
 const stock = computed(() =>
   stocksData.find(s => s.ticker === route.params.ticker?.toUpperCase()) || null
@@ -254,6 +267,7 @@ const previewShares = computed(() => {
 
 const canTrade = computed(() => {
   if (!tradeAmount.value || tradeAmount.value <= 0 || !stock.value) return false
+  if (requiresApproval.value && !approvalCode.value.trim()) return false
   if (tradeMode.value === 'buy') return tradeAmount.value <= cashBalance.value
   return tradeAmount.value <= maxSellDollars.value + 0.01
 })
@@ -271,10 +285,11 @@ function executeTrade() {
   if (!stock.value) return
 
   let result
+  const code = approvalCode.value.trim() || undefined
   if (tradeMode.value === 'buy') {
-    result = portfolioStore.buyStock(stock.value.ticker, tradeAmount.value)
+    result = portfolioStore.buyStock(stock.value.ticker, tradeAmount.value, code)
   } else {
-    result = portfolioStore.sellStock(stock.value.ticker, tradeAmount.value)
+    result = portfolioStore.sellStock(stock.value.ticker, tradeAmount.value, code)
   }
 
   if (result.success) {

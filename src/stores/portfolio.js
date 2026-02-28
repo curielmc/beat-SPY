@@ -73,8 +73,16 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     return portfolio.value.holdings.find(h => h.ticker === ticker) || null
   }
 
-  function buyStock(ticker, dollars) {
+  function checkApprovalCode(approvalCode) {
+    if (!auth.currentUser?.teacherCode) return true
+    const teacher = auth.teachers.find(t => t.code === auth.currentUser.teacherCode)
+    if (!teacher?.tradeApprovalCode) return true
+    return teacher.tradeApprovalCode === approvalCode
+  }
+
+  function buyStock(ticker, dollars, approvalCode) {
     if (!auth.currentUser) return { success: false, error: 'Not logged in' }
+    if (!checkApprovalCode(approvalCode)) return { success: false, error: 'Invalid approval code' }
     const groupId = auth.currentUser.groupId
     const p = portfolios.value[groupId]
     if (!p) return { success: false, error: 'Portfolio not found' }
@@ -100,8 +108,9 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     return { success: true, shares, price: stock.price }
   }
 
-  function sellStock(ticker, dollars) {
+  function sellStock(ticker, dollars, approvalCode) {
     if (!auth.currentUser) return { success: false, error: 'Not logged in' }
+    if (!checkApprovalCode(approvalCode)) return { success: false, error: 'Invalid approval code' }
     const groupId = auth.currentUser.groupId
     const p = portfolios.value[groupId]
     if (!p) return { success: false, error: 'Portfolio not found' }
