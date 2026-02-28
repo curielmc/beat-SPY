@@ -130,6 +130,32 @@ export const useTeacherStore = defineStore('teacher', () => {
     }
   }
 
+  function kickStudent(studentId) {
+    const student = auth.students.find(s => s.id === studentId)
+    if (!student) return
+    // Remove from group
+    if (student.groupId) {
+      const group = auth.groups.find(g => g.id === student.groupId)
+      if (group) {
+        group.memberIds = group.memberIds.filter(id => id !== studentId)
+      }
+    }
+    // Block email from re-joining
+    const email = student.email?.toLowerCase()
+    if (email && !auth.blockedEmails.includes(email)) {
+      auth.blockedEmails.push(email)
+      localStorage.setItem('beatspy_blocked_emails', JSON.stringify(auth.blockedEmails))
+    }
+    // Remove student from students array
+    const idx = auth.students.indexOf(student)
+    if (idx !== -1) auth.students.splice(idx, 1)
+    // If the kicked student is currently logged in, log them out
+    if (auth.currentUser?.id === studentId) {
+      auth.currentUser = null
+      localStorage.removeItem('beatspy_user')
+    }
+  }
+
   function awardBonusCash(groupId, amount) {
     const portfolioStore = usePortfolioStore()
     const notificationsStore = useNotificationsStore()
@@ -163,7 +189,7 @@ export const useTeacherStore = defineStore('teacher', () => {
   return {
     currentTeacherData, teacherGroups, teacherStudents, unassignedStudents, rankedGroups,
     updateRestrictions, updateGroupMode, createClassCode,
-    createGroupForTeacher, assignStudentToGroup, moveStudentToGroup,
+    createGroupForTeacher, assignStudentToGroup, moveStudentToGroup, kickStudent,
     awardBonusCash, setTradeApprovalCode, generateApprovalCode
   }
 })

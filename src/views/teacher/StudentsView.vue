@@ -31,10 +31,24 @@
               :disabled="!assignTargets[student.id] || (assignTargets[student.id] === '__new__' && !newGroupNames[student.id]?.trim())"
               @click="handleAssign(student.id)"
             >Assign</button>
+            <button class="btn btn-ghost btn-sm text-error" @click="openKickModal(student)" title="Remove student">✕</button>
           </div>
         </div>
       </div>
     </div>
+
+    <!-- Kick Confirm Modal -->
+    <dialog class="modal" :class="{ 'modal-open': showKickModal }">
+      <div class="modal-box">
+        <h3 class="font-bold text-lg mb-2">Remove Student</h3>
+        <p class="text-base-content/60 mb-4">Are you sure you want to permanently remove <strong>{{ kickStudentName }}</strong> from your class? They will not be able to rejoin with the same email.</p>
+        <div class="modal-action">
+          <button class="btn btn-ghost" @click="showKickModal = false">Cancel</button>
+          <button class="btn btn-error" @click="confirmKick">Remove Permanently</button>
+        </div>
+      </div>
+      <form method="dialog" class="modal-backdrop" @click="showKickModal = false"><button>close</button></form>
+    </dialog>
 
     <!-- Award Cash Modal -->
     <dialog class="modal" :class="{ 'modal-open': showAwardModal }">
@@ -88,6 +102,7 @@
                 <option value="" selected>Move...</option>
                 <option v-for="g in otherGroups(group.id)" :key="g.id" :value="g.id">→ {{ g.name }}</option>
               </select>
+              <button class="btn btn-ghost btn-xs text-error px-1" @click="openKickModal(s)" title="Remove student">✕</button>
             </div>
           </div>
         </div>
@@ -182,6 +197,25 @@ const histStore = useHistoricalDataStore()
 const timeRanges = reactive({})
 const assignTargets = reactive({})
 const newGroupNames = reactive({})
+
+// Kick student
+const showKickModal = ref(false)
+const kickStudentId = ref(null)
+const kickStudentName = ref('')
+
+function openKickModal(student) {
+  kickStudentId.value = student.id
+  kickStudentName.value = student.name
+  showKickModal.value = true
+}
+
+function confirmKick() {
+  if (kickStudentId.value) {
+    teacher.kickStudent(kickStudentId.value)
+  }
+  showKickModal.value = false
+  kickStudentId.value = null
+}
 
 // Award cash
 const showAwardModal = ref(false)

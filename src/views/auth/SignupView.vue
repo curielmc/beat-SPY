@@ -20,7 +20,7 @@
           <input v-model="teacherCode" type="text" placeholder="e.g. ECON2025" class="input input-bordered w-full uppercase" @keyup.enter="validateCode" />
         </div>
         <p v-if="codeError" class="text-error text-sm">Invalid code. Please check with your teacher.</p>
-        <p v-if="validTeacher" class="text-success text-sm">{{ validTeacher.className }} - {{ validTeacher.teacherName }}, {{ validTeacher.school }}</p>
+        <p v-if="validTeacher" class="text-success text-sm">Code accepted!</p>
         <button class="btn btn-primary btn-block" :disabled="!validTeacher" @click="step = isGoogleFlow ? 3 : 2">Continue</button>
       </div>
 
@@ -184,14 +184,15 @@ function completeSignup() {
     }
   }
 
+  let result
   if (isGoogleFlow.value) {
-    auth.googleSignupStudent({
+    result = auth.googleSignupStudent({
       teacherCode: teacherCode.value,
       groupId: isTeacherAssign ? null : selectedGroupId.value,
       newGroupName: isTeacherAssign ? null : (newGroupName.value.trim() || null)
     })
   } else {
-    auth.signup({
+    result = auth.signup({
       name: name.value,
       email: email.value,
       password: password.value,
@@ -199,6 +200,10 @@ function completeSignup() {
       groupId: isTeacherAssign ? null : selectedGroupId.value,
       newGroupName: isTeacherAssign ? null : (newGroupName.value.trim() || null)
     })
+  }
+  if (result?.error) {
+    groupError.value = result.error
+    return
   }
   router.push('/home')
 }

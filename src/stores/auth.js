@@ -16,6 +16,9 @@ export const useAuthStore = defineStore('auth', () => {
   // Temporary Google credential data for signup flows
   const pendingGoogleData = ref(null)
 
+  // Blocked emails (kicked students can't rejoin)
+  const blockedEmails = ref(JSON.parse(localStorage.getItem('beatspy_blocked_emails') || '[]'))
+
   const currentGroup = computed(() => {
     if (!currentUser.value) return null
     return groups.value.find(g => g.id === currentUser.value.groupId) || null
@@ -47,6 +50,10 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   function signup({ name, email, password, teacherCode, groupId, newGroupName }) {
+    // Check if email is blocked
+    if (blockedEmails.value.includes(email.toLowerCase())) {
+      return { error: 'You have been removed from this class and cannot rejoin.' }
+    }
     const id = 's' + (students.value.length + 1)
     const teacher = teachers.value.find(t => t.code === teacherCode.toUpperCase())
     const isTeacherAssign = teacher?.groupMode === 'teacher_assign'
@@ -172,7 +179,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   return {
     currentUser, isLoggedIn, isTeacher, userType, currentGroup, groupMembers,
-    students, groups, teachers, pendingGoogleData,
+    students, groups, teachers, pendingGoogleData, blockedEmails,
     validateTeacherCode, getGroupsForCode, signup, login,
     teacherLogin, teacherSignup, googleLogin, googleSignupStudent, googleSignupTeacher, logout
   }
