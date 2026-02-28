@@ -69,7 +69,7 @@ const success = ref('')
 
 const teacherClasses = computed(() => {
   if (!teacher.currentTeacherData) return []
-  return teacher.teachers
+  return auth.teachers
     .filter(t => t.id === teacher.currentTeacherData.id)
     .map(t => ({
       code: t.code,
