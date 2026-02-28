@@ -8,6 +8,25 @@ export const useAuthStore = defineStore('auth', () => {
   const students = ref([...studentsData])
   const groups = ref([...groupsData])
   const teachers = ref(JSON.parse(JSON.stringify(teachersData)))
+
+  // Restore teacher settings from localStorage (approval codes, group mode, restrictions)
+  const savedTeacherSettings = JSON.parse(localStorage.getItem('beatspy_teacher_settings') || '{}')
+  for (const [teacherId, settings] of Object.entries(savedTeacherSettings)) {
+    const t = teachers.value.find(tc => tc.id === teacherId)
+    if (t) Object.assign(t, settings)
+  }
+
+  function saveTeacherSettings() {
+    const settings = {}
+    teachers.value.forEach(t => {
+      settings[t.id] = {
+        tradeApprovalCode: t.tradeApprovalCode,
+        groupMode: t.groupMode,
+        restrictions: t.restrictions
+      }
+    })
+    localStorage.setItem('beatspy_teacher_settings', JSON.stringify(settings))
+  }
   const currentUser = ref(JSON.parse(localStorage.getItem('beatspy_user') || 'null'))
   const isLoggedIn = computed(() => !!currentUser.value)
   const userType = computed(() => currentUser.value?.userType || null)
@@ -180,7 +199,7 @@ export const useAuthStore = defineStore('auth', () => {
   return {
     currentUser, isLoggedIn, isTeacher, userType, currentGroup, groupMembers,
     students, groups, teachers, pendingGoogleData, blockedEmails,
-    validateTeacherCode, getGroupsForCode, signup, login,
+    validateTeacherCode, getGroupsForCode, saveTeacherSettings, signup, login,
     teacherLogin, teacherSignup, googleLogin, googleSignupStudent, googleSignupTeacher, logout
   }
 })

@@ -43,6 +43,7 @@ export const useTeacherStore = defineStore('teacher', () => {
     const teacher = auth.teachers.find(t => t.id === currentTeacherData.value.id)
     if (teacher) {
       teacher.restrictions = { ...restrictions }
+      auth.saveTeacherSettings()
     }
   }
 
@@ -51,6 +52,7 @@ export const useTeacherStore = defineStore('teacher', () => {
     const teacher = auth.teachers.find(t => t.id === currentTeacherData.value.id)
     if (teacher) {
       teacher.groupMode = mode
+      auth.saveTeacherSettings()
     }
   }
 
@@ -192,6 +194,7 @@ export const useTeacherStore = defineStore('teacher', () => {
     const teacher = auth.teachers.find(t => t.id === currentTeacherData.value.id)
     if (teacher) {
       teacher.tradeApprovalCode = code || null
+      auth.saveTeacherSettings()
     }
   }
 
