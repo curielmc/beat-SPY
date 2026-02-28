@@ -130,6 +130,22 @@ export const useTeacherStore = defineStore('teacher', () => {
     }
   }
 
+  function kickFromGroup(studentId) {
+    const student = auth.students.find(s => s.id === studentId)
+    if (!student) return
+    if (student.groupId) {
+      const group = auth.groups.find(g => g.id === student.groupId)
+      if (group) {
+        group.memberIds = group.memberIds.filter(id => id !== studentId)
+      }
+    }
+    student.groupId = null
+    if (auth.currentUser?.id === studentId) {
+      auth.currentUser.groupId = null
+      localStorage.setItem('beatspy_user', JSON.stringify(auth.currentUser))
+    }
+  }
+
   function kickStudent(studentId) {
     const student = auth.students.find(s => s.id === studentId)
     if (!student) return
@@ -189,7 +205,7 @@ export const useTeacherStore = defineStore('teacher', () => {
   return {
     currentTeacherData, teacherGroups, teacherStudents, unassignedStudents, rankedGroups,
     updateRestrictions, updateGroupMode, createClassCode,
-    createGroupForTeacher, assignStudentToGroup, moveStudentToGroup, kickStudent,
+    createGroupForTeacher, assignStudentToGroup, moveStudentToGroup, kickFromGroup, kickStudent,
     awardBonusCash, setTradeApprovalCode, generateApprovalCode
   }
 })

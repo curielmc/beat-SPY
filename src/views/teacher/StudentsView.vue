@@ -41,10 +41,16 @@
     <dialog class="modal" :class="{ 'modal-open': showKickModal }">
       <div class="modal-box">
         <h3 class="font-bold text-lg mb-2">Remove Student</h3>
-        <p class="text-base-content/60 mb-4">Are you sure you want to permanently remove <strong>{{ kickStudentName }}</strong> from your class? They will not be able to rejoin with the same email.</p>
+        <p class="text-base-content/60 mb-4">What would you like to do with <strong>{{ kickStudentName }}</strong>?</p>
+        <div class="flex flex-col gap-2">
+          <button class="btn btn-warning" @click="confirmKickFromGroup">Kick from Group</button>
+          <p class="text-xs text-base-content/50 text-center">Removes from their group but they can be reassigned or rejoin</p>
+          <div class="divider my-0"></div>
+          <button class="btn btn-error" @click="confirmKick">Remove Permanently</button>
+          <p class="text-xs text-base-content/50 text-center">Removes from the class entirely and blocks their email from rejoining</p>
+        </div>
         <div class="modal-action">
           <button class="btn btn-ghost" @click="showKickModal = false">Cancel</button>
-          <button class="btn btn-error" @click="confirmKick">Remove Permanently</button>
         </div>
       </div>
       <form method="dialog" class="modal-backdrop" @click="showKickModal = false"><button>close</button></form>
@@ -82,10 +88,7 @@
               {{ group.returnPct >= 0 ? '+' : '' }}{{ group.returnPct.toFixed(2) }}%
             </span>
           </div>
-          <div class="flex items-center gap-2">
-            <button class="btn btn-xs btn-success btn-outline" @click.stop="openAwardModal(group)">$ Award Cash</button>
-            <span class="text-sm text-base-content/60">{{ getGroupMembers(group).map(s => s.name.split(' ')[0]).join(', ') }}</span>
-          </div>
+          <span class="text-sm text-base-content/60">{{ getGroupMembers(group).map(s => s.name.split(' ')[0]).join(', ') }}</span>
         </div>
       </div>
       <div class="collapse-content">
@@ -122,6 +125,8 @@
             <div class="stat-value text-lg" :class="group.returnPct >= 0 ? 'text-success' : 'text-error'">{{ group.returnPct >= 0 ? '+' : '' }}{{ group.returnPct.toFixed(2) }}%</div>
           </div>
         </div>
+
+        <button class="btn btn-sm btn-success btn-outline mb-4" @click="openAwardModal(group)">$ Award Bonus Cash</button>
 
         <!-- Performance Chart -->
         <div class="card bg-base-200 mb-4">
@@ -207,6 +212,14 @@ function openKickModal(student) {
   kickStudentId.value = student.id
   kickStudentName.value = student.name
   showKickModal.value = true
+}
+
+function confirmKickFromGroup() {
+  if (kickStudentId.value) {
+    teacher.kickFromGroup(kickStudentId.value)
+  }
+  showKickModal.value = false
+  kickStudentId.value = null
 }
 
 function confirmKick() {
