@@ -88,10 +88,31 @@
         <div class="collapse-title">
           <div class="flex items-center justify-between pr-4">
             <div class="flex items-center gap-2">
-              <span class="font-bold">{{ group.name }}</span>
+              <!-- Inline rename -->
+              <input
+                v-if="editingGroupId === group.id"
+                v-model="editingGroupName"
+                type="text"
+                class="input input-bordered input-sm w-40 font-bold"
+                @blur="saveGroupName(group)"
+                @keydown.enter="$event.target.blur()"
+                @click.stop
+                ref="groupNameInput"
+              />
+              <span v-else class="font-bold cursor-pointer hover:underline" @click.stop="startEditingName(group)">{{ group.name }}</span>
               <span class="badge badge-sm" :class="group.returnPct >= 0 ? 'badge-success' : 'badge-error'">
                 {{ group.returnPct >= 0 ? '+' : '' }}{{ group.returnPct.toFixed(2) }}%
               </span>
+              <!-- Student configure toggle -->
+              <label class="flex items-center gap-1 ml-2" @click.stop>
+                <span class="text-xs text-base-content/60">Student edit</span>
+                <input
+                  type="checkbox"
+                  class="toggle toggle-xs toggle-primary"
+                  :checked="group.allow_student_configure"
+                  @change="toggleStudentConfigure(group, $event.target.checked)"
+                />
+              </label>
             </div>
             <span class="text-sm text-base-content/60">{{ group.memberNames?.join(', ') }}</span>
           </div>
@@ -172,6 +193,7 @@
 <script setup>
 import { reactive, ref, onMounted } from 'vue'
 import { useTeacherStore } from '../../stores/teacher'
+import { supabase } from '../../lib/supabase'
 
 const teacher = useTeacherStore()
 
@@ -180,6 +202,29 @@ const rankedGroups = ref([])
 const groupHoldings = reactive({})
 const assignTargets = reactive({})
 const newGroupNames = reactive({})
+
+// Inline group rename
+const editingGroupId = ref(null)
+const editingGroupName = ref('')
+
+function startEditingName(group) {
+  editingGroupId.value = group.id
+  editingGroupName.value = group.name
+}
+
+async function saveGroupName(group) {
+  const newName = editingGroupName.value.trim()
+  if (newName && newName !== group.name) {
+    await supabase.from('groups').update({ name: newName }).eq('id', group.id)
+    rankedGroups.value = await teacher.getRankedGroups()
+  }
+  editingGroupId.value = null
+}
+
+async function toggleStudentConfigure(group, checked) {
+  await supabase.from('groups').update({ allow_student_configure: checked }).eq('id', group.id)
+  group.allow_student_configure = checked
+}
 
 // Kick student
 const showKickModal = ref(false)

@@ -18,3 +18,17 @@ export async function uploadAvatar(userId, file) {
   const { data } = supabase.storage.from('avatars').getPublicUrl(path)
   return data.publicUrl
 }
+
+export async function uploadGroupAvatar(groupId, file) {
+  const ext = file.name.split('.').pop()
+  const path = `groups/${groupId}/${Date.now()}.${ext}`
+
+  const { error } = await supabase.storage
+    .from('avatars')
+    .upload(path, file, { upsert: true })
+
+  if (error) throw error
+
+  const { data } = supabase.storage.from('avatars').getPublicUrl(path)
+  return data.publicUrl
+}
