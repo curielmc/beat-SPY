@@ -88,6 +88,26 @@
           <button class="btn btn-primary" @click="saveRestrictions">Save Restrictions</button>
         </div>
       </div>
+
+      <!-- Trading Frequency -->
+      <div class="card bg-base-100 shadow">
+        <div class="card-body space-y-4">
+          <h2 class="card-title text-lg">Trading Frequency</h2>
+          <p class="text-sm text-base-content/60">Limit how often students can trade the same stock. This applies per ticker per portfolio.</p>
+
+          <div class="form-control">
+            <label class="label"><span class="label-text">Frequency limit</span></label>
+            <select v-model="form.tradeFrequency" class="select select-bordered w-full">
+              <option value="unlimited">Unlimited (no restriction)</option>
+              <option value="once_per_day">Once per day</option>
+              <option value="once_per_week">Once per week</option>
+              <option value="once_per_month">Once per month</option>
+            </select>
+          </div>
+
+          <button class="btn btn-primary" @click="saveRestrictions">Save Restrictions</button>
+        </div>
+      </div>
     </template>
   </div>
 </template>
@@ -106,7 +126,8 @@ const currentClass = ref(null)
 const form = reactive({
   maxStocksPerPortfolio: 10,
   maxDollarsPerStock: 20000,
-  blockedTickers: []
+  blockedTickers: [],
+  tradeFrequency: 'unlimited'
 })
 
 const groupModeLocal = ref('student_choice')
@@ -124,6 +145,7 @@ onMounted(async () => {
     form.maxStocksPerPortfolio = restrictions.maxStocksPerPortfolio || 10
     form.maxDollarsPerStock = restrictions.maxDollarsPerStock || 20000
     form.blockedTickers = restrictions.blockedTickers || []
+    form.tradeFrequency = restrictions.tradeFrequency || 'unlimited'
   }
 
   loading.value = false
@@ -177,7 +199,8 @@ async function saveRestrictions() {
   await teacher.updateRestrictions(currentClass.value.id, {
     maxStocksPerPortfolio: form.maxStocksPerPortfolio,
     maxDollarsPerStock: form.maxDollarsPerStock,
-    blockedTickers: [...form.blockedTickers]
+    blockedTickers: [...form.blockedTickers],
+    tradeFrequency: form.tradeFrequency
   })
   showSaved('Restrictions saved successfully!')
 }

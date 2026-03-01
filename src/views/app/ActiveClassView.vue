@@ -76,6 +76,10 @@
               <span class="text-base-content/60">Group Mode</span>
               <p class="font-medium capitalize">{{ (membership.class.group_mode || 'none').replace('_', ' ') }}</p>
             </div>
+            <div>
+              <span class="text-base-content/60">Trade Frequency</span>
+              <p class="font-medium">{{ tradeFrequencyLabel }}</p>
+            </div>
           </div>
         </div>
       </div>
@@ -176,6 +180,16 @@ const metrics = [
   { key: 'today', label: 'Today' },
   { key: 'annualized', label: 'Annualized' }
 ]
+
+const tradeFrequencyLabel = computed(() => {
+  const freq = membership.value?.class?.restrictions?.tradeFrequency
+  const labels = {
+    once_per_day: 'Once per day',
+    once_per_week: 'Once per week',
+    once_per_month: 'Once per month'
+  }
+  return labels[freq] || 'Unlimited'
+})
 
 const activeBenchmarkValue = computed(() => benchmarkMetrics.value[activeMetric.value] ?? null)
 

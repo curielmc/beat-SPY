@@ -143,6 +143,46 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     })
   }
 
+  function getFrequencyWindowStart(frequency) {
+    const now = new Date()
+    if (frequency === 'once_per_day') {
+      now.setHours(0, 0, 0, 0)
+    } else if (frequency === 'once_per_week') {
+      now.setDate(now.getDate() - 7)
+    } else if (frequency === 'once_per_month') {
+      now.setMonth(now.getMonth() - 1)
+    } else {
+      return null
+    }
+    return now.toISOString()
+  }
+
+  const frequencyLabels = {
+    once_per_day: 'once per day',
+    once_per_week: 'once per week',
+    once_per_month: 'once per month'
+  }
+
+  async function checkTradeFrequency(ticker, portfolioId, restrictions) {
+    const freq = restrictions?.tradeFrequency
+    if (!freq || freq === 'unlimited') return null
+    const windowStart = getFrequencyWindowStart(freq)
+    if (!windowStart) return null
+
+    const { data } = await supabase
+      .from('trades')
+      .select('id')
+      .eq('portfolio_id', portfolioId)
+      .eq('ticker', ticker)
+      .gte('executed_at', windowStart)
+      .limit(1)
+
+    if (data && data.length > 0) {
+      return `You can only trade ${ticker} ${frequencyLabels[freq]}. Please wait before trading this stock again.`
+    }
+    return null
+  }
+
   async function buyStock(ticker, dollars, approvalCode) {
     if (!auth.currentUser) return { success: false, error: 'Not logged in' }
     if (!portfolio.value) return { success: false, error: 'Portfolio not found' }
@@ -173,6 +213,9 @@ export const usePortfolioStore = defineStore('portfolio', () => {
         if (cls.approval_code && cls.approval_code !== approvalCode) {
           return { success: false, error: 'Invalid approval code' }
         }
+        // Check trade frequency restriction
+        const freqError = await checkTradeFrequency(ticker, portfolioId, cls.restrictions)
+        if (freqError) return { success: false, error: freqError }
       }
     }
 
@@ -264,6 +307,9 @@ export const usePortfolioStore = defineStore('portfolio', () => {
         if (cls.approval_code && cls.approval_code !== approvalCode) {
           return { success: false, error: 'Invalid approval code' }
         }
+        // Check trade frequency restriction
+        const freqError = await checkTradeFrequency(ticker, portfolio.value.id, cls.restrictions)
+        if (freqError) return { success: false, error: freqError }
       }
     }
 
