@@ -69,7 +69,7 @@
 </template>
 
 <script setup>
-import { reactive, ref, computed, onMounted } from 'vue'
+import { reactive, ref, computed, onMounted, watch } from 'vue'
 import { useAuthStore } from '../../stores/auth'
 import { uploadAvatar } from '../../lib/supabase'
 
@@ -117,6 +117,10 @@ let original = {}
 
 onMounted(() => {
   if (auth.profile) loadForm()
+})
+
+watch(() => auth.profile, (newProfile) => {
+  if (newProfile && !form.full_name) loadForm()
 })
 
 function loadForm() {
