@@ -8,6 +8,24 @@ export const useAuthStore = defineStore('auth', () => {
   const loading = ref(true)
   const initialized = ref(false)
 
+  const allMemberships = ref([])
+  const activeClassId = ref(localStorage.getItem('beatspy_active_class') || null)
+
+  function setActiveClass(classId) {
+    activeClassId.value = classId
+    if (classId) {
+      localStorage.setItem('beatspy_active_class', classId)
+    } else {
+      localStorage.removeItem('beatspy_active_class')
+    }
+  }
+
+  const membership = computed(() => {
+    if (!allMemberships.value.length) return null
+    return allMemberships.value.find(m => m.class_id === activeClassId.value)
+      || allMemberships.value[0]
+  })
+
   const isLoggedIn = computed(() => !!currentUser.value)
   const userType = computed(() => profile.value?.role || null)
   const isTeacher = computed(() => profile.value?.role === 'teacher')
@@ -202,16 +220,20 @@ export const useAuthStore = defineStore('auth', () => {
     return data
   }
 
-  // Get current user's class membership
+  // Get current user's class memberships (all classes)
   async function getCurrentMembership() {
     if (!currentUser.value) return null
     const { data, error } = await supabase
       .from('class_memberships')
       .select('*, class:classes(*), group:groups(*)')
       .eq('user_id', currentUser.value.id)
-      .maybeSingle()
     if (error) return null
-    return data
+    allMemberships.value = data || []
+    // Set activeClassId to first if not set or not found
+    if (allMemberships.value.length && !allMemberships.value.find(m => m.class_id === activeClassId.value)) {
+      setActiveClass(allMemberships.value[0].class_id)
+    }
+    return membership.value
   }
 
   // Get group members
@@ -270,6 +292,7 @@ export const useAuthStore = defineStore('auth', () => {
   return {
     currentUser, profile, loading, initialized,
     isLoggedIn, userType, isTeacher, isAdmin,
+    allMemberships, activeClassId, membership, setActiveClass,
     init, fetchProfile, signup, login, signInWithOAuth,
     updateProfile, joinClass, validateClassCode,
     getGroupsForClass, getCurrentMembership, getGroupMembers,

@@ -2,6 +2,21 @@
   <div class="space-y-6">
     <h1 class="text-xl font-bold">Active Class</h1>
 
+    <!-- Multi-class tabs -->
+    <div v-if="auth.allMemberships.length > 0" class="tabs tabs-bordered">
+      <a
+        v-for="m in auth.allMemberships"
+        :key="m.class_id"
+        class="tab"
+        :class="{ 'tab-active': m.class_id === auth.activeClassId }"
+        @click="switchClass(m.class_id)"
+      >
+        {{ (m.class?.name || m.class?.class_name || 'Class').slice(0, 20) }}
+        <span v-if="!m.group_id" class="ml-1" title="No group yet">&#128339;</span>
+      </a>
+      <RouterLink to="/join" class="tab">+</RouterLink>
+    </div>
+
     <div v-if="loading" class="flex justify-center py-12">
       <span class="loading loading-spinner loading-lg"></span>
     </div>
@@ -172,8 +187,7 @@ const sortedGroups = computed(() => {
   })
 })
 
-onMounted(async () => {
-  const m = await auth.getCurrentMembership()
+async function loadClassData(m) {
   membership.value = m
 
   if (!m?.class_id) {
@@ -183,6 +197,10 @@ onMounted(async () => {
   }
 
   loading.value = false
+  teacherName.value = ''
+  groupMembers.value = []
+  groups.value = []
+  leaderboardLoading.value = true
 
   // Fetch teacher name
   if (m.class.teacher_id) {
@@ -201,6 +219,19 @@ onMounted(async () => {
 
   // Leaderboard
   await loadLeaderboard(m.class_id)
+}
+
+async function switchClass(classId) {
+  auth.setActiveClass(classId)
+  loading.value = true
+  leaderboardLoading.value = true
+  const m = auth.membership
+  await loadClassData(m)
+}
+
+onMounted(async () => {
+  const m = await auth.getCurrentMembership()
+  await loadClassData(m)
 })
 
 async function loadLeaderboard(classId) {

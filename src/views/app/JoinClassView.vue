@@ -127,6 +127,9 @@ async function handleJoin(groupId, groupName) {
     return
   }
   joining.value = false
-  router.push('/home')
+  if (result.classData?.id) {
+    auth.setActiveClass(result.classData.id)
+  }
+  router.push('/active-class')
 }
 </script>
