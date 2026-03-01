@@ -26,7 +26,8 @@ const router = createRouter({
         { path: 'feed', name: 'feed', component: () => import('../views/app/FeedView.vue') },
         { path: 'competitions', name: 'competitions', component: () => import('../views/app/CompetitionsView.vue') },
         { path: 'competitions/:id', name: 'competition-detail', component: () => import('../views/app/CompetitionDetailView.vue') },
-        { path: 'join', name: 'join-class', component: () => import('../views/app/JoinClassView.vue') }
+        { path: 'join', name: 'join-class', component: () => import('../views/app/JoinClassView.vue') },
+        { path: 'settings', name: 'profile-settings', component: () => import('../views/app/ProfileSettingsView.vue') }
       ]
     },
     {
