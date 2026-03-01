@@ -3,7 +3,7 @@
     <div class="navbar bg-base-100 shadow-sm">
       <div class="max-w-6xl mx-auto w-full flex items-center">
         <div class="flex-none">
-          <span class="text-lg font-bold text-primary">Beat the S&P</span>
+          <span class="text-lg font-bold text-primary">Beat the S&P 500</span>
           <span class="badge badge-ghost ml-2">Teacher</span>
         </div>
         <div class="flex-1 flex justify-center gap-1">

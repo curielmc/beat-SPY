@@ -10,18 +10,18 @@
         <li class="step" :class="{ 'step-primary': step >= 3 }">Group</li>
       </ul>
 
-      <!-- Step 1: Teacher Code -->
+      <!-- Step 1: Class Code -->
       <div v-if="step === 1" class="space-y-4">
-        <GoogleSignInButton v-if="!isGoogleFlow" @credential="handleGoogleCredential" />
-        <div v-if="!isGoogleFlow" class="divider text-xs">OR</div>
-
         <div class="form-control">
           <label class="label"><span class="label-text">Enter your class code</span></label>
           <input v-model="teacherCode" type="text" placeholder="e.g. ECON2025" class="input input-bordered w-full uppercase" @keyup.enter="validateCode" />
         </div>
         <p v-if="codeError" class="text-error text-sm">Invalid code. Please check with your teacher.</p>
-        <p v-if="validTeacher" class="text-success text-sm">Code accepted!</p>
-        <button class="btn btn-primary btn-block" :disabled="!validTeacher" @click="step = isGoogleFlow ? 3 : 2">Continue</button>
+        <p v-if="validClass" class="text-success text-sm">Code accepted! {{ validClass.class_name }} &mdash; {{ validClass.teacher?.full_name }}</p>
+        <button class="btn btn-primary btn-block" :disabled="!validClass" @click="step = 2">Continue</button>
+
+        <div class="divider text-xs">NO CLASS CODE?</div>
+        <button class="btn btn-ghost btn-block btn-sm" @click="startIndependent">Sign Up Without a Class</button>
       </div>
 
       <!-- Step 2: Student Info -->
@@ -47,29 +47,43 @@
 
       <!-- Step 3: Group -->
       <div v-if="step === 3" class="space-y-4">
-        <!-- Teacher assigns groups -->
-        <template v-if="validTeacher?.groupMode === 'teacher_assign'">
+        <!-- Independent signup (no class) -->
+        <template v-if="isIndependent">
           <div class="alert alert-info">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            <span>You'll get a personal portfolio with $100,000 to invest. No class required!</span>
+          </div>
+          <div class="flex gap-2">
+            <button class="btn btn-ghost flex-1" @click="step = 2">Back</button>
+            <button class="btn btn-primary flex-1" :class="{ 'loading': submitting }" :disabled="submitting" @click="completeSignup">Create Account</button>
+          </div>
+        </template>
+
+        <!-- Teacher assigns groups -->
+        <template v-else-if="validClass?.group_mode === 'teacher_assign'">
+          <div class="alert alert-info">
             <span>Your teacher will assign you to a group. You can start exploring stocks while you wait!</span>
           </div>
           <div class="flex gap-2">
-            <button class="btn btn-ghost flex-1" @click="step = isGoogleFlow ? 1 : 2">Back</button>
-            <button class="btn btn-primary flex-1" @click="completeSignup">Create Account</button>
+            <button class="btn btn-ghost flex-1" @click="step = 2">Back</button>
+            <button class="btn btn-primary flex-1" :class="{ 'loading': submitting }" :disabled="submitting" @click="completeSignup">Create Account</button>
           </div>
         </template>
 
         <!-- Students choose groups -->
         <template v-else>
-          <p class="text-sm text-base-content/70">Join an existing group or create a new one. Groups have up to 3 members.</p>
+          <p class="text-sm text-base-content/70">Join an existing group or create a new one.</p>
+
+          <div v-if="loadingGroups" class="flex justify-center py-4">
+            <span class="loading loading-spinner"></span>
+          </div>
 
           <div v-for="group in availableGroups" :key="group.id" class="card bg-base-200 cursor-pointer hover:bg-base-300 transition-colors" :class="{ 'ring-2 ring-primary': selectedGroupId === group.id }" @click="selectedGroupId = group.id; newGroupName = ''">
             <div class="card-body p-4">
               <div class="flex justify-between items-center">
                 <span class="font-semibold">{{ group.name }}</span>
-                <span class="badge" :class="group.memberIds.length < 3 ? 'badge-success' : 'badge-error'">{{ group.memberIds.length }}/3</span>
+                <span class="badge" :class="(group.memberships?.length || 0) < 3 ? 'badge-success' : 'badge-error'">{{ group.memberships?.length || 0 }}/3</span>
               </div>
-              <p class="text-sm text-base-content/60">{{ getMemberNames(group) }}</p>
+              <p class="text-sm text-base-content/60">{{ getGroupMemberNames(group) }}</p>
             </div>
           </div>
 
@@ -82,8 +96,8 @@
 
           <p v-if="groupError" class="text-error text-sm">{{ groupError }}</p>
           <div class="flex gap-2">
-            <button class="btn btn-ghost flex-1" @click="step = isGoogleFlow ? 1 : 2">Back</button>
-            <button class="btn btn-primary flex-1" :disabled="!selectedGroupId && !newGroupName" @click="completeSignup">Create Account</button>
+            <button class="btn btn-ghost flex-1" @click="step = 2">Back</button>
+            <button class="btn btn-primary flex-1" :class="{ 'loading': submitting }" :disabled="(!selectedGroupId && !newGroupName) || submitting" @click="completeSignup">Create Account</button>
           </div>
         </template>
       </div>
@@ -93,29 +107,20 @@
       </div>
     </div>
   </div>
-
-  <GoogleRoleModal
-    :show="showRoleModal"
-    :name="googleName"
-    :email="googleEmail"
-    @select="handleRoleSelect"
-    @close="showRoleModal = false"
-  />
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
-import GoogleSignInButton from '../../components/GoogleSignInButton.vue'
-import GoogleRoleModal from '../../components/GoogleRoleModal.vue'
+import { supabase } from '../../lib/supabase'
 
 const router = useRouter()
 const auth = useAuthStore()
 
 const step = ref(1)
 const teacherCode = ref('')
-const validTeacher = ref(null)
+const validClass = ref(null)
 const codeError = ref(false)
 const name = ref('')
 const email = ref('')
@@ -124,39 +129,32 @@ const infoError = ref('')
 const selectedGroupId = ref(null)
 const newGroupName = ref('')
 const groupError = ref('')
-const isGoogleFlow = ref(false)
-const showRoleModal = ref(false)
-const googleName = ref('')
-const googleEmail = ref('')
-
-// Pre-fill from pending Google data if redirected from role modal
-if (auth.pendingGoogleData) {
-  name.value = auth.pendingGoogleData.name
-  email.value = auth.pendingGoogleData.email
-  isGoogleFlow.value = true
-}
+const submitting = ref(false)
+const isIndependent = ref(false)
+const availableGroups = ref([])
+const loadingGroups = ref(false)
 
 watch(teacherCode, () => {
   codeError.value = false
-  validTeacher.value = auth.validateTeacherCode(teacherCode.value)
+  validClass.value = null
 })
 
-const availableGroups = computed(() => {
-  if (!validTeacher.value) return []
-  return auth.getGroupsForCode(teacherCode.value)
-})
-
-function getMemberNames(group) {
-  return auth.students.filter(s => group.memberIds.includes(s.id)).map(s => s.name).join(', ')
+async function validateCode() {
+  const result = await auth.validateClassCode(teacherCode.value)
+  if (!result) {
+    codeError.value = true
+    validClass.value = null
+  } else {
+    validClass.value = result
+    codeError.value = false
+    step.value = 2
+  }
 }
 
-function validateCode() {
-  validTeacher.value = auth.validateTeacherCode(teacherCode.value)
-  if (!validTeacher.value) {
-    codeError.value = true
-  } else {
-    step.value = isGoogleFlow.value ? 3 : 2
-  }
+function startIndependent() {
+  isIndependent.value = true
+  validClass.value = null
+  step.value = 2
 }
 
 function validateInfo() {
@@ -165,69 +163,74 @@ function validateInfo() {
   if (password.value.length < 6) { infoError.value = 'Password must be at least 6 characters'; return }
   infoError.value = ''
   step.value = 3
+
+  // Load groups if needed
+  if (validClass.value && validClass.value.group_mode !== 'teacher_assign') {
+    loadGroups()
+  }
 }
 
-function completeSignup() {
-  const isTeacherAssign = validTeacher.value?.groupMode === 'teacher_assign'
+async function loadGroups() {
+  if (!validClass.value) return
+  loadingGroups.value = true
+  availableGroups.value = await auth.getGroupsForClass(validClass.value.id)
+  loadingGroups.value = false
+}
 
-  if (!isTeacherAssign) {
-    if (selectedGroupId.value) {
-      const group = availableGroups.value.find(g => g.id === selectedGroupId.value)
-      if (group && group.memberIds.length >= 3) {
-        groupError.value = 'This group is full. Choose another or create a new one.'
-        return
-      }
-    }
-    if (!selectedGroupId.value && !newGroupName.value.trim()) {
-      groupError.value = 'Select a group or create a new one'
+function getGroupMemberNames(group) {
+  return (group.memberships || [])
+    .map(m => m.profiles?.full_name?.split(' ')[0])
+    .filter(Boolean)
+    .join(', ')
+}
+
+async function completeSignup() {
+  submitting.value = true
+  groupError.value = ''
+
+  // 1. Create the auth account
+  const signupResult = await auth.signup({
+    email: email.value,
+    password: password.value,
+    fullName: name.value,
+    role: 'student'
+  })
+
+  if (signupResult.error) {
+    groupError.value = signupResult.error
+    submitting.value = false
+    return
+  }
+
+  // 2. If independent user, create personal portfolio
+  if (isIndependent.value) {
+    await supabase.from('portfolios').insert({
+      owner_type: 'user',
+      owner_id: auth.currentUser.id,
+      starting_cash: 100000,
+      cash_balance: 100000
+    })
+    submitting.value = false
+    router.push('/home')
+    return
+  }
+
+  // 3. Join class
+  if (validClass.value) {
+    const joinResult = await auth.joinClass(
+      teacherCode.value,
+      selectedGroupId.value,
+      newGroupName.value.trim() || null
+    )
+
+    if (joinResult.error) {
+      groupError.value = joinResult.error
+      submitting.value = false
       return
     }
   }
 
-  let result
-  if (isGoogleFlow.value) {
-    result = auth.googleSignupStudent({
-      teacherCode: teacherCode.value,
-      groupId: isTeacherAssign ? null : selectedGroupId.value,
-      newGroupName: isTeacherAssign ? null : (newGroupName.value.trim() || null)
-    })
-  } else {
-    result = auth.signup({
-      name: name.value,
-      email: email.value,
-      password: password.value,
-      teacherCode: teacherCode.value,
-      groupId: isTeacherAssign ? null : selectedGroupId.value,
-      newGroupName: isTeacherAssign ? null : (newGroupName.value.trim() || null)
-    })
-  }
-  if (result?.error) {
-    groupError.value = result.error
-    return
-  }
+  submitting.value = false
   router.push('/home')
-}
-
-function handleGoogleCredential(credential) {
-  const result = auth.googleLogin(credential)
-  if (result.status === 'logged_in') {
-    router.push(result.userType === 'teacher' ? '/teacher' : '/home')
-  } else if (result.status === 'new_user') {
-    googleName.value = result.name
-    googleEmail.value = result.email
-    showRoleModal.value = true
-  }
-}
-
-function handleRoleSelect(role) {
-  showRoleModal.value = false
-  if (role === 'student') {
-    // Already on signup page, just pre-fill
-    name.value = auth.pendingGoogleData?.name || googleName.value
-    email.value = auth.pendingGoogleData?.email || googleEmail.value
-    isGoogleFlow.value = true
-  } else {
-    router.push('/teacher-signup')
-  }
 }
 </script>

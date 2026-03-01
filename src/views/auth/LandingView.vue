@@ -25,7 +25,7 @@
           :disabled="submitting"
           @click="signUpWithEmail"
         >
-          Create Account
+          Log In / Sign Up
         </button>
 
         <!-- Divider -->
@@ -93,6 +93,19 @@ async function signUpWithEmail() {
   if (password.value.length < 6) { emailError.value = 'Password must be at least 6 characters'; return }
 
   submitting.value = true
+
+  // Try login first (existing user), fall back to signup (new user)
+  const loginResult = await auth.login(email.value, password.value)
+  if (!loginResult.error) {
+    submitting.value = false
+    const role = auth.profile?.role
+    if (role === 'admin') router.push('/admin')
+    else if (role === 'teacher') router.push('/teacher')
+    else router.push('/home')
+    return
+  }
+
+  // Login failed — try signup
   const result = await auth.signup({
     email: email.value,
     password: password.value,

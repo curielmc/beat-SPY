@@ -5,6 +5,13 @@ import App from './App.vue'
 import './style.css'
 
 const app = createApp(App)
-app.use(createPinia())
+const pinia = createPinia()
+app.use(pinia)
 app.use(router)
-app.mount('#app')
+
+// Initialize auth store before mounting
+import { useAuthStore } from './stores/auth'
+const auth = useAuthStore()
+auth.init().then(() => {
+  app.mount('#app')
+})

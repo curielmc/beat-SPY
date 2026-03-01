@@ -1,7 +1,0 @@
-[
-  { "id": "g1", "name": "Bull Market Bandits", "memberIds": ["s1", "s2", "s3"], "teacherCode": "ECON2025" },
-  { "id": "g2", "name": "The Short Sellers", "memberIds": ["s4", "s5", "s6"], "teacherCode": "ECON2025" },
-  { "id": "g3", "name": "Diamond Hands", "memberIds": ["s7", "s8", "s9"], "teacherCode": "ECON2025" },
-  { "id": "g4", "name": "Profit Prophets", "memberIds": ["s10", "s11", "s12"], "teacherCode": "SMITH101" },
-  { "id": "g5", "name": "Hedge Fund Heroes", "memberIds": ["s13", "s14", "s15"], "teacherCode": "SMITH101" }
-]

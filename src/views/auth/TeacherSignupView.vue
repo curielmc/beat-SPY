@@ -11,18 +11,15 @@
 
       <!-- Step 1: Teacher Info -->
       <div v-if="step === 1" class="space-y-4">
-        <GoogleSignInButton v-if="!isGoogleFlow" @credential="handleGoogleCredential" />
-        <div v-if="!isGoogleFlow" class="divider text-xs">OR</div>
-
         <div class="form-control">
           <label class="label"><span class="label-text">Full Name</span></label>
-          <input v-model="name" type="text" placeholder="Your full name" class="input input-bordered w-full" :disabled="isGoogleFlow" />
+          <input v-model="name" type="text" placeholder="Your full name" class="input input-bordered w-full" />
         </div>
         <div class="form-control">
           <label class="label"><span class="label-text">Email</span></label>
-          <input v-model="email" type="email" placeholder="teacher@school.edu" class="input input-bordered w-full" :disabled="isGoogleFlow" />
+          <input v-model="email" type="email" placeholder="teacher@school.edu" class="input input-bordered w-full" />
         </div>
-        <div v-if="!isGoogleFlow" class="form-control">
+        <div class="form-control">
           <label class="label"><span class="label-text">Password</span></label>
           <input v-model="password" type="password" placeholder="Min 6 characters" class="input input-bordered w-full" />
         </div>
@@ -50,7 +47,7 @@
         </div>
 
         <p v-if="error" class="text-error text-sm">{{ error }}</p>
-        <button class="btn btn-primary btn-block" @click="handleSubmit">Create Account</button>
+        <button class="btn btn-primary btn-block" :class="{ 'loading': submitting }" :disabled="submitting" @click="handleSubmit">Create Account</button>
       </div>
 
       <!-- Step 2: Show Generated Code -->
@@ -71,7 +68,7 @@
       </div>
 
       <div class="text-center mt-4">
-        <RouterLink to="/teacher-login" class="link link-primary text-sm">Already have an account? Log in</RouterLink>
+        <RouterLink to="/login" class="link link-primary text-sm">Already have an account? Log in</RouterLink>
       </div>
     </div>
   </div>
@@ -81,10 +78,11 @@
 import { ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
-import GoogleSignInButton from '../../components/GoogleSignInButton.vue'
+import { useTeacherStore } from '../../stores/teacher'
 
 const router = useRouter()
 const auth = useAuthStore()
+const teacherStore = useTeacherStore()
 
 const step = ref(1)
 const name = ref('')
@@ -95,54 +93,50 @@ const className = ref('')
 const error = ref('')
 const generatedCode = ref('')
 const groupMode = ref('student_choice')
-const isGoogleFlow = ref(false)
+const submitting = ref(false)
 
-// Pre-fill from pending Google data if redirected from role modal
-if (auth.pendingGoogleData) {
-  name.value = auth.pendingGoogleData.name
-  email.value = auth.pendingGoogleData.email
-  isGoogleFlow.value = true
-}
-
-function handleGoogleCredential(credential) {
-  const result = auth.googleLogin(credential)
-  if (result.status === 'logged_in') {
-    router.push(result.userType === 'teacher' ? '/teacher' : '/home')
-    return
-  }
-  if (result.status === 'new_user') {
-    name.value = result.name
-    email.value = result.email
-    isGoogleFlow.value = true
-  }
-}
-
-function handleSubmit() {
+async function handleSubmit() {
   error.value = ''
   if (!name.value.trim()) { error.value = 'Name is required'; return }
   if (!email.value.includes('@')) { error.value = 'Enter a valid email'; return }
-  if (!isGoogleFlow.value && password.value.length < 6) { error.value = 'Password must be at least 6 characters'; return }
+  if (password.value.length < 6) { error.value = 'Password must be at least 6 characters'; return }
   if (!school.value.trim()) { error.value = 'School name is required'; return }
   if (!className.value.trim()) { error.value = 'Class name is required'; return }
 
-  let result
-  if (isGoogleFlow.value) {
-    result = auth.googleSignupTeacher({ school: school.value, className: className.value })
-  } else {
-    result = auth.teacherSignup({
-      name: name.value,
-      email: email.value,
-      password: password.value,
-      school: school.value,
-      className: className.value,
-      groupMode: groupMode.value
-    })
+  submitting.value = true
+
+  // 1. Create the auth account
+  const signupResult = await auth.signup({
+    email: email.value,
+    password: password.value,
+    fullName: name.value,
+    role: 'teacher'
+  })
+
+  if (signupResult.error) {
+    error.value = signupResult.error
+    submitting.value = false
+    return
   }
 
-  if (result) {
-    generatedCode.value = result.generatedCode || result.code
-    step.value = 2
+  // 2. Create the class
+  const code = teacherStore.generateClassCode(className.value)
+  const classResult = await teacherStore.createClass({
+    code,
+    className: className.value,
+    school: school.value,
+    groupMode: groupMode.value
+  })
+
+  if (classResult.error) {
+    error.value = classResult.error
+    submitting.value = false
+    return
   }
+
+  generatedCode.value = code
+  submitting.value = false
+  step.value = 2
 }
 
 function goToDashboard() {
