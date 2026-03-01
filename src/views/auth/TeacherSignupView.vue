@@ -12,6 +12,14 @@
       <!-- Step 1: Teacher Info -->
       <div v-if="step === 1" class="space-y-4">
         <div class="form-control">
+          <label class="label"><span class="label-text">Invite Code</span></label>
+          <input v-model="inviteCode" type="text" placeholder="Enter your teacher invite code"
+            class="input input-bordered w-full font-mono tracking-widest uppercase"
+            @input="inviteCode = inviteCode.toUpperCase()" />
+          <label class="label"><span class="label-text-alt text-base-content/50">Contact your administrator to get an invite code.</span></label>
+        </div>
+
+        <div class="form-control">
           <label class="label"><span class="label-text">Full Name</span></label>
           <input v-model="name" type="text" placeholder="Your full name" class="input input-bordered w-full" />
         </div>
@@ -47,7 +55,9 @@
         </div>
 
         <p v-if="error" class="text-error text-sm">{{ error }}</p>
-        <button class="btn btn-primary btn-block" :class="{ 'loading': submitting }" :disabled="submitting" @click="handleSubmit">Create Account</button>
+        <button class="btn btn-primary btn-block" :class="{ 'loading': submitting }" :disabled="submitting" @click="handleSubmit">
+          Create Account
+        </button>
       </div>
 
       <!-- Step 2: Show Generated Code -->
@@ -79,12 +89,14 @@ import { ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
 import { useTeacherStore } from '../../stores/teacher'
+import { supabase } from '../../lib/supabase'
 
 const router = useRouter()
 const auth = useAuthStore()
 const teacherStore = useTeacherStore()
 
 const step = ref(1)
+const inviteCode = ref('')
 const name = ref('')
 const email = ref('')
 const password = ref('')
@@ -97,6 +109,7 @@ const submitting = ref(false)
 
 async function handleSubmit() {
   error.value = ''
+  if (!inviteCode.value.trim()) { error.value = 'Invite code is required'; return }
   if (!name.value.trim()) { error.value = 'Name is required'; return }
   if (!email.value.includes('@')) { error.value = 'Enter a valid email'; return }
   if (password.value.length < 6) { error.value = 'Password must be at least 6 characters'; return }
@@ -105,7 +118,32 @@ async function handleSubmit() {
 
   submitting.value = true
 
-  // 1. Create the auth account
+  // 1. Validate invite code before creating account
+  const { data: codeCheck, error: codeErr } = await supabase
+    .from('teacher_invite_codes')
+    .select('id, is_used, expires_at')
+    .eq('code', inviteCode.value.toUpperCase())
+    .single()
+
+  if (codeErr || !codeCheck) {
+    error.value = 'Invalid invite code. Please check with your administrator.'
+    submitting.value = false
+    return
+  }
+
+  if (codeCheck.is_used) {
+    error.value = 'This invite code has already been used.'
+    submitting.value = false
+    return
+  }
+
+  if (codeCheck.expires_at && new Date(codeCheck.expires_at) < new Date()) {
+    error.value = 'This invite code has expired.'
+    submitting.value = false
+    return
+  }
+
+  // 2. Create the auth account
   const signupResult = await auth.signup({
     email: email.value,
     password: password.value,
@@ -119,7 +157,13 @@ async function handleSubmit() {
     return
   }
 
-  // 2. Create the class
+  // 3. Consume the invite code
+  await supabase.rpc('use_teacher_invite_code', {
+    invite_code: inviteCode.value.toUpperCase(),
+    new_user_id: auth.currentUser.id
+  })
+
+  // 4. Create the class
   const code = teacherStore.generateClassCode(className.value)
   const classResult = await teacherStore.createClass({
     code,
