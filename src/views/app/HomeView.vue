@@ -229,13 +229,20 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="t in portfolioStore.trades.slice(0, 10)" :key="t.id">
-                <td class="text-sm">{{ new Date(t.executed_at).toLocaleDateString() }}</td>
-                <td class="font-mono font-bold">{{ t.ticker }}</td>
-                <td><span class="badge badge-xs" :class="t.side === 'buy' ? 'badge-success' : 'badge-error'">{{ t.side }}</span></td>
-                <td class="text-right font-mono">${{ Number(t.dollars).toFixed(2) }}</td>
-                <td class="text-right font-mono">${{ Number(t.price).toFixed(2) }}</td>
-              </tr>
+              <template v-for="t in portfolioStore.trades.slice(0, 10)" :key="t.id">
+                <tr>
+                  <td class="text-sm">{{ new Date(t.executed_at).toLocaleDateString() }}</td>
+                  <td class="font-mono font-bold">{{ t.ticker }}</td>
+                  <td><span class="badge badge-xs" :class="t.side === 'buy' ? 'badge-success' : 'badge-error'">{{ t.side }}</span></td>
+                  <td class="text-right font-mono">${{ Number(t.dollars).toFixed(2) }}</td>
+                  <td class="text-right font-mono">${{ Number(t.price).toFixed(2) }}</td>
+                </tr>
+                <tr v-if="t.rationale">
+                  <td colspan="5" class="pt-0 pb-2">
+                    <p class="text-xs italic text-base-content/50">"{{ t.rationale }}"</p>
+                  </td>
+                </tr>
+              </template>
             </tbody>
           </table>
         </div>

@@ -89,6 +89,21 @@
         </div>
       </div>
 
+      <!-- Trade Rationale -->
+      <div class="card bg-base-100 shadow">
+        <div class="card-body space-y-4">
+          <h2 class="card-title text-lg">Trade Rationale</h2>
+          <label class="label cursor-pointer justify-start gap-3">
+            <input type="checkbox" v-model="form.requireRationale" class="toggle toggle-primary" />
+            <div>
+              <span class="label-text font-medium">Require students to explain their trades</span>
+              <p class="text-xs text-base-content/50">Students must provide a rationale before buying or selling</p>
+            </div>
+          </label>
+          <button class="btn btn-primary" @click="saveRestrictions">Save Restrictions</button>
+        </div>
+      </div>
+
       <!-- Trading Frequency -->
       <div class="card bg-base-100 shadow">
         <div class="card-body space-y-4">
@@ -127,7 +142,8 @@ const form = reactive({
   maxStocksPerPortfolio: 10,
   maxDollarsPerStock: 20000,
   blockedTickers: [],
-  tradeFrequency: 'unlimited'
+  tradeFrequency: 'unlimited',
+  requireRationale: true
 })
 
 const groupModeLocal = ref('student_choice')
@@ -146,6 +162,7 @@ onMounted(async () => {
     form.maxDollarsPerStock = restrictions.maxDollarsPerStock || 20000
     form.blockedTickers = restrictions.blockedTickers || []
     form.tradeFrequency = restrictions.tradeFrequency || 'unlimited'
+    form.requireRationale = restrictions.requireRationale !== false
   }
 
   loading.value = false
@@ -200,7 +217,8 @@ async function saveRestrictions() {
     maxStocksPerPortfolio: form.maxStocksPerPortfolio,
     maxDollarsPerStock: form.maxDollarsPerStock,
     blockedTickers: [...form.blockedTickers],
-    tradeFrequency: form.tradeFrequency
+    tradeFrequency: form.tradeFrequency,
+    requireRationale: form.requireRationale
   })
   showSaved('Restrictions saved successfully!')
 }

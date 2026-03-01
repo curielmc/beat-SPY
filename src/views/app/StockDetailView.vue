@@ -101,6 +101,25 @@
             </div>
           </div>
 
+          <!-- Trade Rationale -->
+          <div class="form-control mb-3">
+            <label class="label py-1">
+              <span class="label-text text-sm">Why are you making this trade?{{ rationaleRequired ? '' : ' (optional)' }}</span>
+            </label>
+            <textarea
+              v-model="tradeRationale"
+              class="textarea textarea-bordered w-full"
+              rows="2"
+              maxlength="300"
+              placeholder="e.g. Strong earnings beat, oversold RSI, sector rotation..."
+            ></textarea>
+            <label v-if="tradeRationale.length > 0" class="label py-0.5">
+              <span></span>
+              <span class="label-text-alt">{{ tradeRationale.length }}/300</span>
+            </label>
+            <p v-if="rationaleError" class="text-error text-xs mt-1">{{ rationaleError }}</p>
+          </div>
+
           <!-- Approval Code -->
           <div v-if="requiresApproval" class="form-control mb-3">
             <label class="label py-1"><span class="label-text text-sm">Teacher Approval Code</span></label>
@@ -303,6 +322,9 @@ const tradeMode = ref('buy')
 const tradeAmount = ref(0)
 const tradeResult = ref(null)
 const approvalCode = ref('')
+const tradeRationale = ref('')
+const rationaleError = ref('')
+const rationaleRequired = ref(true)
 const executing = ref(false)
 const requiresApproval = ref(false)
 const membership = ref(null)
@@ -340,11 +362,12 @@ onMounted(async () => {
   quote.value = quoteData
   companyProfile.value = profileData
 
-  // Check if approval is required
+  // Check if approval is required and rationale settings
   membership.value = await auth.getCurrentMembership()
   if (membership.value?.class?.approval_code) {
     requiresApproval.value = true
   }
+  rationaleRequired.value = membership.value?.class?.restrictions?.requireRationale !== false
 
   loading.value = false
 
@@ -435,7 +458,14 @@ function setQuickAmount(pct) {
 async function executeTrade() {
   tradeResult.value = null
   compRuleErrors.value = []
+  rationaleError.value = ''
   if (!quote.value) return
+
+  // Client-side rationale validation
+  if (rationaleRequired.value && !tradeRationale.value.trim()) {
+    rationaleError.value = 'Please explain your reasoning before trading'
+    return
+  }
 
   // Validate competition rules if in a competition
   if (activeComp.value) {
@@ -454,12 +484,13 @@ async function executeTrade() {
 
   executing.value = true
   const code = approvalCode.value.trim() || undefined
+  const rationale = tradeRationale.value.trim() || undefined
   let result
 
   if (tradeMode.value === 'buy') {
-    result = await portfolioStore.buyStock(ticker, tradeAmount.value, code)
+    result = await portfolioStore.buyStock(ticker, tradeAmount.value, code, rationale)
   } else {
-    result = await portfolioStore.sellStock(ticker, tradeAmount.value, code)
+    result = await portfolioStore.sellStock(ticker, tradeAmount.value, code, rationale)
   }
 
   executing.value = false
@@ -471,6 +502,7 @@ async function executeTrade() {
       message: `${action} ${result.shares.toFixed(4)} shares of ${ticker} at $${result.price.toFixed(2)}`
     }
     tradeAmount.value = 0
+    tradeRationale.value = ''
     // Refresh quote
     quote.value = await market.fetchQuote(ticker)
     setTimeout(() => { tradeResult.value = null }, 5000)

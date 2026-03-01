@@ -183,7 +183,7 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     return null
   }
 
-  async function buyStock(ticker, dollars, approvalCode) {
+  async function buyStock(ticker, dollars, approvalCode, rationale) {
     if (!auth.currentUser) return { success: false, error: 'Not logged in' }
     if (!portfolio.value) return { success: false, error: 'Portfolio not found' }
     if (dollars <= 0) return { success: false, error: 'Amount must be positive' }
@@ -204,7 +204,7 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     const shares = dollars / price
     const portfolioId = portfolio.value.id
 
-    // Check approval code
+    // Check approval code and restrictions
     if (approvalCode !== undefined) {
       // Validate against class
       const membership = await auth.getCurrentMembership()
@@ -216,6 +216,11 @@ export const usePortfolioStore = defineStore('portfolio', () => {
         // Check trade frequency restriction
         const freqError = await checkTradeFrequency(ticker, portfolioId, cls.restrictions)
         if (freqError) return { success: false, error: freqError }
+        // Check rationale requirement (default: required)
+        const requireRationale = cls.restrictions?.requireRationale !== false
+        if (requireRationale && (!rationale || !rationale.trim())) {
+          return { success: false, error: 'Please explain your reasoning before trading' }
+        }
       }
     }
 
@@ -223,7 +228,8 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     const { error: tradeError } = await supabase.from('trades').insert({
       portfolio_id: portfolioId,
       user_id: auth.currentUser.id,
-      ticker, side: 'buy', dollars, shares, price
+      ticker, side: 'buy', dollars, shares, price,
+      rationale: rationale?.trim() || null
     })
     if (tradeError) return { success: false, error: tradeError.message }
 
@@ -278,7 +284,7 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     return { success: true, shares, price }
   }
 
-  async function sellStock(ticker, dollars, approvalCode) {
+  async function sellStock(ticker, dollars, approvalCode, rationale) {
     if (!auth.currentUser) return { success: false, error: 'Not logged in' }
     if (!portfolio.value) return { success: false, error: 'Portfolio not found' }
     if (dollars <= 0) return { success: false, error: 'Amount must be positive' }
@@ -299,7 +305,7 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     const sharesToSell = dollars / price
     if (sharesToSell > existing.shares + 0.0001) return { success: false, error: 'Not enough shares' }
 
-    // Check approval code
+    // Check approval code and restrictions
     if (approvalCode !== undefined) {
       const membership = await auth.getCurrentMembership()
       if (membership?.class) {
@@ -310,6 +316,11 @@ export const usePortfolioStore = defineStore('portfolio', () => {
         // Check trade frequency restriction
         const freqError = await checkTradeFrequency(ticker, portfolio.value.id, cls.restrictions)
         if (freqError) return { success: false, error: freqError }
+        // Check rationale requirement (default: required)
+        const requireRationale = cls.restrictions?.requireRationale !== false
+        if (requireRationale && (!rationale || !rationale.trim())) {
+          return { success: false, error: 'Please explain your reasoning before trading' }
+        }
       }
     }
 
@@ -319,7 +330,8 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     await supabase.from('trades').insert({
       portfolio_id: portfolioId,
       user_id: auth.currentUser.id,
-      ticker, side: 'sell', dollars, shares: sharesToSell, price
+      ticker, side: 'sell', dollars, shares: sharesToSell, price,
+      rationale: rationale?.trim() || null
     })
 
     // Update or remove holding

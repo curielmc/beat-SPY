@@ -329,6 +329,25 @@
                 </table>
               </div>
 
+              <!-- Trade Rationale -->
+              <div class="form-control">
+                <label class="label py-1">
+                  <span class="label-text text-sm">Why are you making this trade?{{ basketRationaleRequired ? '' : ' (optional)' }}</span>
+                </label>
+                <textarea
+                  v-model="basketRationale"
+                  class="textarea textarea-bordered w-full"
+                  rows="2"
+                  maxlength="300"
+                  placeholder="e.g. Strong earnings beat, oversold RSI, sector rotation..."
+                ></textarea>
+                <label v-if="basketRationale.length > 0" class="label py-0.5">
+                  <span></span>
+                  <span class="label-text-alt">{{ basketRationale.length }}/300</span>
+                </label>
+                <p v-if="basketRationaleError" class="text-error text-xs mt-1">{{ basketRationaleError }}</p>
+              </div>
+
               <!-- Approval code -->
               <div v-if="requiresApproval" class="form-control">
                 <label class="label py-1"><span class="label-text text-sm">Teacher Approval Code</span></label>
@@ -453,6 +472,9 @@ const deleteModal = ref(null)
 // Buy basket state
 const basketBuyAmount = ref(0)
 const basketApprovalCode = ref('')
+const basketRationale = ref('')
+const basketRationaleError = ref('')
+const basketRationaleRequired = ref(true)
 const basketBuyProgress = ref(null)
 const basketBuyResult = ref(null)
 const requiresApproval = ref(false)
@@ -482,11 +504,12 @@ const basketPreview = computed(() => {
 
 onMounted(async () => {
   basketsStore.loadMyBaskets()
-  // Check approval requirement
+  // Check approval requirement and rationale settings
   const membership = await auth.getCurrentMembership()
   if (membership?.class?.approval_code) {
     requiresApproval.value = true
   }
+  basketRationaleRequired.value = membership?.class?.restrictions?.requireRationale !== false
 })
 
 const sectorOptions = [
@@ -789,8 +812,15 @@ function collapseBasket() {
 }
 
 async function executeBuyBasket() {
+  basketRationaleError.value = ''
   const stocks = basketStocks.value.filter(s => s.price)
   if (stocks.length === 0) return
+
+  // Client-side rationale validation
+  if (basketRationaleRequired.value && !basketRationale.value.trim()) {
+    basketRationaleError.value = 'Please explain your reasoning before trading'
+    return
+  }
 
   const perStock = basketBuyAmount.value / stocks.length
   basketBuyProgress.value = { current: 0, total: stocks.length }
@@ -799,10 +829,11 @@ async function executeBuyBasket() {
   let successes = 0
   let failures = []
   const code = basketApprovalCode.value.trim() || undefined
+  const rationale = basketRationale.value.trim() || undefined
 
   for (let i = 0; i < stocks.length; i++) {
     basketBuyProgress.value = { current: i + 1, total: stocks.length }
-    const result = await portfolioStore.buyStock(stocks[i].symbol, perStock, code)
+    const result = await portfolioStore.buyStock(stocks[i].symbol, perStock, code, rationale)
     if (result.success) {
       successes++
     } else {
@@ -825,5 +856,6 @@ async function executeBuyBasket() {
   }
 
   basketBuyAmount.value = 0
+  basketRationale.value = ''
 }
 </script>
