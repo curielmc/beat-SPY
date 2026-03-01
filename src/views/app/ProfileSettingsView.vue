@@ -92,7 +92,7 @@ async function onAvatarSelected(e) {
   error.value = ''
 
   try {
-    const url = await uploadAvatar(auth.user.id, file)
+    const url = await uploadAvatar(auth.profile.id, file)
     form.avatar_url = url
   } catch (err) {
     error.value = 'Failed to upload avatar. ' + (err.message || '')
