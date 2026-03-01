@@ -241,6 +241,42 @@
         </div>
       </div>
     </div>
+
+    <!-- Charts Section -->
+    <div v-if="portfolioStore.holdings.length > 0" class="space-y-4">
+      <!-- Performance Line Chart -->
+      <div class="card bg-base-100 shadow">
+        <div class="card-body p-4">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="font-semibold">Performance vs {{ portfolioStore.benchmarkTicker }}</h3>
+            <TimeRangeSelector v-model="chartTimeRange" />
+          </div>
+          <div v-if="chartsLoading" class="flex justify-center py-8">
+            <span class="loading loading-spinner loading-md"></span>
+          </div>
+          <PortfolioLineChart
+            v-else-if="performanceDatasets.length > 0"
+            :datasets="performanceDatasets"
+            :time-range="chartTimeRange"
+            :show-percentage="true"
+          />
+        </div>
+      </div>
+
+      <!-- Sector + Country Pie Charts -->
+      <div class="grid grid-cols-2 gap-3">
+        <PortfolioPieChart
+          v-if="sectorSegments.length > 0"
+          :segments="sectorSegments"
+          title="Sector Allocation"
+        />
+        <PortfolioPieChart
+          v-if="countrySegments.length > 0"
+          :segments="countrySegments"
+          title="Country Allocation"
+        />
+      </div>
+    </div>
   </div>
 </template>
 
@@ -250,6 +286,10 @@ import { RouterLink } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
 import { usePortfolioStore } from '../../stores/portfolio'
 import { supabase } from '../../lib/supabase'
+import { getHistoricalDaily, getBatchProfiles } from '../../services/fmpApi'
+import PortfolioLineChart from '../../components/charts/PortfolioLineChart.vue'
+import PortfolioPieChart from '../../components/charts/PortfolioPieChart.vue'
+import TimeRangeSelector from '../../components/charts/TimeRangeSelector.vue'
 
 const auth = useAuthStore()
 const portfolioStore = usePortfolioStore()
@@ -269,6 +309,13 @@ const settingsForm = ref({ name: '', description: '', benchmark: '', isPublic: t
 
 const vsSP500 = computed(() => portfolioStore.totalReturnPct - portfolioStore.benchmarkReturnPct)
 const isIndependent = computed(() => membership.value?.group_id === 'personal')
+
+// Charts state
+const chartTimeRange = ref('3M')
+const chartsLoading = ref(false)
+const performanceDatasets = ref([])
+const sectorSegments = ref([])
+const countrySegments = ref([])
 
 onMounted(async () => {
   // Get current membership
@@ -313,7 +360,132 @@ onMounted(async () => {
   }
 
   loading.value = false
+
+  // Load charts after portfolio data is ready
+  if (portfolioStore.holdings.length > 0) {
+    loadCharts()
+  }
 })
+
+async function loadCharts() {
+  if (portfolioStore.holdings.length === 0) return
+  chartsLoading.value = true
+  try {
+    // --- Performance Line Chart ---
+    // Build portfolio value over time from trade history
+    const trades = [...portfolioStore.trades].sort(
+      (a, b) => new Date(a.executed_at) - new Date(b.executed_at)
+    )
+    const startCash = portfolioStore.startingCash
+
+    // Compute running portfolio value at each trade date
+    const portfolioHistory = []
+    let runningCash = startCash
+    const holdingsMap = {} // ticker -> shares
+
+    // Add starting point
+    if (trades.length > 0) {
+      const firstDate = new Date(trades[0].executed_at)
+      portfolioHistory.push({ date: firstDate, value: startCash })
+    }
+
+    for (const t of trades) {
+      const date = new Date(t.executed_at)
+      if (t.side === 'buy') {
+        runningCash -= Number(t.dollars)
+        holdingsMap[t.ticker] = (holdingsMap[t.ticker] || 0) + Number(t.shares)
+      } else {
+        runningCash += Number(t.dollars)
+        holdingsMap[t.ticker] = (holdingsMap[t.ticker] || 0) - Number(t.shares)
+      }
+      // Estimate portfolio value at trade time using trade prices
+      let holdingsValue = 0
+      for (const [ticker, shares] of Object.entries(holdingsMap)) {
+        if (shares <= 0) continue
+        // Use the trade price as approximation for that date
+        const price = t.ticker === ticker ? Number(t.price) : (portfolioStore.holdings.find(h => h.ticker === ticker)?.currentPrice || 0)
+        holdingsValue += shares * price
+      }
+      portfolioHistory.push({ date, value: runningCash + holdingsValue })
+    }
+
+    // Add current value as last point
+    if (portfolioHistory.length > 0) {
+      portfolioHistory.push({ date: new Date(), value: portfolioStore.totalMarketValue })
+    }
+
+    // Fetch SPY historical prices
+    const firstTradeDate = trades.length > 0
+      ? new Date(trades[0].executed_at).toISOString().split('T')[0]
+      : new Date(Date.now() - 90 * 86400000).toISOString().split('T')[0]
+    const today = new Date().toISOString().split('T')[0]
+
+    let spyHistory = []
+    try {
+      const spyData = await getHistoricalDaily('SPY', firstTradeDate, today)
+      // spyData is newest-first, reverse it
+      spyHistory = [...spyData].reverse().map(d => ({
+        date: new Date(d.date),
+        value: d.close
+      }))
+    } catch (e) {
+      console.warn('Failed to fetch SPY history:', e)
+    }
+
+    // Normalize SPY to same starting value as portfolio
+    if (spyHistory.length > 0) {
+      const spyBaseline = spyHistory[0].value
+      spyHistory = spyHistory.map(d => ({
+        date: d.date,
+        value: (d.value / spyBaseline) * startCash
+      }))
+    }
+
+    const datasets = []
+    if (portfolioHistory.length > 1) {
+      datasets.push({ label: 'My Portfolio', data: portfolioHistory, color: 'primary' })
+    }
+    if (spyHistory.length > 0) {
+      datasets.push({ label: 'S&P 500', data: spyHistory, color: 'sp500' })
+    }
+    performanceDatasets.value = datasets
+
+    // --- Sector & Country Pie Charts ---
+    const tickers = portfolioStore.holdings.map(h => h.ticker)
+    let profiles = []
+    try {
+      profiles = await getBatchProfiles(tickers)
+    } catch (e) {
+      console.warn('Failed to fetch profiles for charts:', e)
+    }
+
+    const profileMap = {}
+    for (const p of (profiles || [])) {
+      profileMap[p.symbol] = p
+    }
+
+    // Build sector segments
+    const sectorMap = {}
+    const countryMap = {}
+    for (const h of portfolioStore.holdings) {
+      const profile = profileMap[h.ticker]
+      const sector = profile?.sector || 'Unknown'
+      const country = profile?.country || 'Unknown'
+      sectorMap[sector] = (sectorMap[sector] || 0) + h.marketValue
+      countryMap[country] = (countryMap[country] || 0) + h.marketValue
+    }
+
+    sectorSegments.value = Object.entries(sectorMap)
+      .map(([label, value]) => ({ label, value }))
+      .sort((a, b) => b.value - a.value)
+
+    countrySegments.value = Object.entries(countryMap)
+      .map(([label, value]) => ({ label, value }))
+      .sort((a, b) => b.value - a.value)
+  } finally {
+    chartsLoading.value = false
+  }
+}
 
 async function handleStartInvesting() {
   creatingPortfolio.value = true
