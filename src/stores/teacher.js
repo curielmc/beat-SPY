@@ -18,11 +18,10 @@ export const useTeacherStore = defineStore('teacher', () => {
     if (!auth.currentUser) return
     loading.value = true
     try {
-      // Fetch teacher's classes
+      // Fetch all classes (any teacher can manage any class)
       const { data: classData } = await supabase
         .from('classes')
         .select('*')
-        .eq('teacher_id', auth.currentUser.id)
       classes.value = classData || []
 
       if (classes.value.length === 0) {
