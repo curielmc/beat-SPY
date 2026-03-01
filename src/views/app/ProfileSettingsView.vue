@@ -9,7 +9,7 @@
     <template v-else>
       <!-- Avatar -->
       <div class="flex items-center gap-4">
-        <div class="avatar placeholder cursor-pointer" @click="$refs.avatarInput.click()">
+        <div :class="['avatar cursor-pointer', !(avatarPreview || form.avatar_url) && 'placeholder']" @click="$refs.avatarInput.click()">
           <div class="bg-primary text-primary-content rounded-full w-16 h-16 relative group">
             <img v-if="avatarPreview || form.avatar_url" :src="avatarPreview || form.avatar_url" :alt="auth.profile.full_name" class="rounded-full object-cover w-full h-full" />
             <span v-else class="text-2xl">{{ (auth.profile.full_name || '?')[0].toUpperCase() }}</span>
