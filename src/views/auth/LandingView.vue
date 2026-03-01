@@ -3,8 +3,8 @@
 
     <!-- Hero -->
     <div class="space-y-2">
-      <h1 class="text-4xl font-bold text-primary">Beat the S&P</h1>
-      <p class="text-base-content/60 text-sm">Build a portfolio. Compete with your class. Outperform the market.</p>
+      <h1 class="text-4xl font-bold text-primary">Beat the S&P 500</h1>
+      <p class="text-base-content/60 text-sm">Learn investing by doing. Build a portfolio and see if you can beat the market's toughest benchmark.</p>
     </div>
 
     <!-- Primary card: sign-up actions -->
