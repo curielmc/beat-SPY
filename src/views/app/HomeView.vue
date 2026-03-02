@@ -180,7 +180,7 @@
         <div class="flex items-center justify-between mb-2">
           <h3 class="font-semibold">Portfolio Settings</h3>
           <div class="flex items-center gap-2">
-            <template v-if="isPersonalPortfolio">
+            <template v-if="activeTab === 'personal'">
               <button class="btn btn-xs btn-error btn-outline" @click="showResetConfirm = true">Reset</button>
               <button class="btn btn-xs btn-outline" @click="showCloseConfirm = true">Close</button>
             </template>
