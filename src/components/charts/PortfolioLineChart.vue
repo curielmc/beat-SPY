@@ -21,6 +21,7 @@ import {
 import 'chartjs-adapter-date-fns'
 
 ChartJS.register(LineElement, PointElement, LinearScale, TimeScale, Title, Tooltip, Legend, Filler)
+ChartJS.defaults.color = "#ffffff"
 
 const props = defineProps({
   datasets: Array,
