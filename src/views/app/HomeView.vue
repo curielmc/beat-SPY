@@ -202,14 +202,13 @@
             </div>
           </div>
 
-          <!-- Benchmark -->
+          <!-- Benchmark (locked to SPY) -->
           <div class="form-control">
             <label class="label py-1"><span class="label-text text-xs">Benchmark Index</span></label>
-            <div class="flex gap-2">
-              <input v-model="settingsForm.benchmark" type="text" class="input input-bordered input-sm flex-1 font-mono uppercase" placeholder="SPY" />
-              <button class="btn btn-sm btn-outline" @click="saveBenchmark" :disabled="!settingsForm.benchmark">Update</button>
+            <div class="flex gap-2 items-center">
+              <span class="input input-bordered input-sm flex-1 font-mono uppercase bg-base-200 flex items-center px-3 text-base-content/60">SPY</span>
+              <span class="text-xs text-base-content/40">S&P 500 proxy (fixed)</span>
             </div>
-            <p class="text-xs text-base-content/40 mt-1">Enter any ETF/index ticker (e.g. SPY, QQQ, IWM, DIA)</p>
           </div>
 
           <!-- Visibility -->
