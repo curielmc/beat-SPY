@@ -426,7 +426,11 @@ export const usePortfolioStore = defineStore('portfolio', () => {
   async function resetPortfolio(keepVisible = true) {
     if (!portfolio.value) return { error: 'No portfolio' }
     // Individual users can always reset; group/competition portfolios respect allow_reset
-    if (portfolio.value.owner_type !== 'user' && !portfolio.value.allow_reset) return { error: 'Portfolio reset is not allowed' }
+    // Exception: allow reset if portfolio is clearly empty (broken state)
+    const isEmpty = Number(portfolio.value.cash_balance) === 0 && rawHoldings.value.length === 0
+    if (portfolio.value.owner_type !== 'user' && !portfolio.value.allow_reset && !isEmpty) {
+      return { error: 'Portfolio reset is not allowed' }
+    }
 
     const { error } = await supabase.rpc('reset_portfolio', {
       p_portfolio_id: portfolio.value.id,

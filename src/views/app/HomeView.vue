@@ -310,12 +310,15 @@ const bonusTotal = ref(0)
 const showSettings = ref(false)
 const showResetConfirm = ref(false)
 const keepVisible = ref(true)
-// Individual users can always reset; group portfolios respect the allow_reset flag
+// Always allow reset for individual users and group portfolios with allow_reset
 const canReset = computed(() => {
   const p = portfolioStore.portfolio
   if (!p) return false
   if (p.owner_type === 'user') return true
-  return !!p.allow_reset
+  if (p.allow_reset) return true
+  // Also allow reset if portfolio is empty (no cash, no holdings) — clearly broken state
+  if (Number(p.cash_balance) === 0 && portfolioStore.holdings.length === 0) return true
+  return false
 })
 const settingsMsg = ref('')
 const settingsMsgType = ref('success')
