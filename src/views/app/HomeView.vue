@@ -346,6 +346,31 @@
           </div>
         </div>
 
+        <!-- My Team -->
+        <div v-if="membership?.group_id && groupMembers.length > 1" class="card bg-base-100 shadow">
+          <div class="card-body p-3">
+            <h3 class="font-semibold text-sm mb-3">👥 My Team — {{ membership?.group?.name }}</h3>
+            <div class="flex flex-wrap gap-3">
+              <div
+                v-for="member in groupMembers"
+                :key="member.id"
+                class="flex items-center gap-2 bg-base-200 rounded-lg px-3 py-2"
+                :class="member.id === auth.currentUser?.id ? 'ring-1 ring-primary' : ''"
+              >
+                <div class="avatar placeholder">
+                  <div class="w-8 h-8 rounded-full" :class="member.id === auth.currentUser?.id ? 'bg-primary text-primary-content' : 'bg-neutral text-neutral-content'">
+                    <img v-if="member.avatar_url" :src="member.avatar_url" :alt="member.full_name" />
+                    <span v-else class="text-xs font-bold">{{ member.full_name?.charAt(0) }}</span>
+                  </div>
+                </div>
+                <div>
+                  <p class="text-xs font-semibold">{{ member.full_name?.split(' ')[0] }} <span v-if="member.id === auth.currentUser?.id" class="text-primary">(you)</span></p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Compare Teams (only when student is in a class) -->
         <div v-if="activeTab === 'personal' && membership?.group_id && membership.group_id !== 'personal' && classGroups.length > 0" class="card bg-base-100 shadow">
           <div class="card-body p-3">
