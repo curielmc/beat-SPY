@@ -369,6 +369,15 @@ onMounted(async () => {
   }
   rationaleRequired.value = membership.value?.class?.restrictions?.requireRationale !== false
 
+  // Ensure portfolio is loaded (handles direct navigation / page refresh)
+  if (!portfolioStore.portfolio && auth.isLoggedIn) {
+    if (membership.value?.group_id) {
+      await portfolioStore.loadPortfolio('group', membership.value.group_id)
+    } else if (auth.currentUser?.id) {
+      await portfolioStore.loadPortfolio('user', auth.currentUser.id)
+    }
+  }
+
   loading.value = false
 
   // Check if user is in an active competition
