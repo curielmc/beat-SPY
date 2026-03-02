@@ -61,14 +61,23 @@
         <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
         Join a Class
       </RouterLink>
-      <div v-if="activeTab === 'group'" class="flex gap-2 flex-wrap">
-        <div v-for="member in groupMembers" :key="member.id" class="badge badge-sm" :class="member.id === auth.currentUser?.id ? 'badge-primary' : 'badge-ghost'">
-          {{ member.full_name?.split(' ')[0] }}
+      <div v-if="activeTab === 'group'" class="flex flex-col gap-2">
+        <div class="flex gap-1 flex-wrap">
+          <div v-for="member in groupMembers" :key="member.id" class="badge badge-sm" :class="member.id === auth.currentUser?.id ? 'badge-primary' : 'badge-ghost'">
+            <span v-if="member.avatar_url" class="avatar w-3 h-3 rounded-full mr-1"><img :src="member.avatar_url" /></span>
+            {{ member.full_name?.split(' ')[0] }}
+          </div>
         </div>
       </div>
     </div>
 
     <template v-if="!switchingTab">
+    <!-- Group trading warning banner -->
+    <div v-if="activeTab === 'group'" class="alert alert-warning py-2 px-3">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /></svg>
+      <span class="text-xs"><strong>Team Portfolio</strong> — Trades here affect all members of {{ membership?.group?.name }}. Coordinate with your team before buying or selling.</span>
+    </div>
+
     <!-- Two Key Stats -->
     <div class="grid grid-cols-2 gap-3">
       <div class="card bg-base-100 shadow">
