@@ -179,9 +179,15 @@
       <div class="card-body p-4">
         <div class="flex items-center justify-between mb-2">
           <h3 class="font-semibold">Portfolio Settings</h3>
-          <button class="btn btn-xs btn-ghost" @click="showSettings = !showSettings">
-            {{ showSettings ? 'Hide' : 'Show' }}
-          </button>
+          <div class="flex items-center gap-2">
+            <template v-if="isPersonalPortfolio">
+              <button class="btn btn-xs btn-error btn-outline" @click="showResetConfirm = true">Reset</button>
+              <button class="btn btn-xs btn-outline" @click="showCloseConfirm = true">Close</button>
+            </template>
+            <button class="btn btn-xs btn-ghost" @click="showSettings = !showSettings">
+              {{ showSettings ? 'Hide' : 'Show' }}
+            </button>
+          </div>
         </div>
         <div v-if="showSettings" class="space-y-3">
           <!-- Name & Description -->
