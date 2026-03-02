@@ -14,6 +14,7 @@ export const usePortfolioStore = defineStore('portfolio', () => {
   const benchmarkHoldings = ref([])   // benchmark SPY holdings
   const trades = ref([])              // trade history
   const benchmarkTrades = ref([])     // benchmark trade history
+  const snapshots = ref([])           // portfolio snapshots (reset/close history)
   const loading = ref(false)
   const version = ref(0)
 
@@ -61,12 +62,15 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     if (!ownerId) return
     loading.value = true
     try {
-      // Fetch portfolio
+      // Fetch active portfolio (skip closed ones)
       const { data: pData } = await supabase
         .from('portfolios')
         .select('*')
         .eq('owner_type', ownerType)
         .eq('owner_id', ownerId)
+        .or('status.eq.active,status.is.null')
+        .order('created_at', { ascending: false })
+        .limit(1)
         .maybeSingle()
 
       portfolio.value = pData
@@ -422,21 +426,42 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     return { success: true }
   }
 
-  // Reset portfolio (snapshot history, clear holdings/trades, restore cash)
-  async function resetPortfolio(keepVisible = true) {
+  // Reset portfolio: snapshot current state, clear holdings, restore cash
+  async function resetPortfolio() {
     if (!portfolio.value) return { error: 'No portfolio' }
-    // Individual users can always reset; group/competition portfolios respect allow_reset
-    // Exception: allow reset if portfolio is clearly empty (broken state)
     const isEmpty = Number(portfolio.value.cash_balance) === 0 && rawHoldings.value.length === 0
     if (portfolio.value.owner_type !== 'user' && !portfolio.value.allow_reset && !isEmpty) {
       return { error: 'Portfolio reset is not allowed' }
     }
 
-    const { error } = await supabase.rpc('reset_portfolio', {
-      p_portfolio_id: portfolio.value.id,
-      p_keep_visible: keepVisible
+    const portfolioId = portfolio.value.id
+
+    // Snapshot current state
+    const holdingsSnapshot = holdings.value.map(h => ({
+      ticker: h.ticker, shares: Number(h.shares), avg_cost: Number(h.avg_cost),
+      currentPrice: h.currentPrice, marketValue: h.marketValue
+    }))
+    const { error: snapError } = await supabase.from('portfolio_snapshots').insert({
+      portfolio_id: portfolioId,
+      snapshot_type: 'reset',
+      cash_balance: cashBalance.value,
+      starting_cash: startingCash.value,
+      total_value: totalMarketValue.value,
+      return_pct: totalReturnPct.value,
+      holdings: holdingsSnapshot
     })
-    if (error) return { error: error.message }
+    if (snapError) return { error: snapError.message }
+
+    // Delete all holdings
+    await supabase.from('holdings').delete().eq('portfolio_id', portfolioId)
+    await supabase.from('benchmark_holdings').delete().eq('portfolio_id', portfolioId)
+
+    // Reset cash and increment reset_count
+    const newResetCount = (portfolio.value.reset_count || 0) + 1
+    await supabase.from('portfolios').update({
+      cash_balance: STARTING_CASH,
+      reset_count: newResetCount
+    }).eq('id', portfolioId)
 
     // Reload
     await loadPortfolio(portfolio.value.owner_type, portfolio.value.owner_id)
@@ -444,15 +469,72 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     return { success: true }
   }
 
-  // Get reset history for a portfolio
-  async function getResetHistory(portfolioId) {
+  // Close portfolio: snapshot, close it, create a new active one
+  async function closePortfolio() {
+    if (!portfolio.value) return { error: 'No portfolio' }
+    if (portfolio.value.owner_type !== 'user') return { error: 'Can only close personal portfolios' }
+
+    const portfolioId = portfolio.value.id
+
+    // Snapshot current state
+    const holdingsSnapshot = holdings.value.map(h => ({
+      ticker: h.ticker, shares: Number(h.shares), avg_cost: Number(h.avg_cost),
+      currentPrice: h.currentPrice, marketValue: h.marketValue
+    }))
+    const { error: snapError } = await supabase.from('portfolio_snapshots').insert({
+      portfolio_id: portfolioId,
+      snapshot_type: 'close',
+      cash_balance: cashBalance.value,
+      starting_cash: startingCash.value,
+      total_value: totalMarketValue.value,
+      return_pct: totalReturnPct.value,
+      holdings: holdingsSnapshot
+    })
+    if (snapError) return { error: snapError.message }
+
+    // Delete holdings
+    await supabase.from('holdings').delete().eq('portfolio_id', portfolioId)
+    await supabase.from('benchmark_holdings').delete().eq('portfolio_id', portfolioId)
+
+    // Mark as closed
+    await supabase.from('portfolios').update({
+      status: 'closed',
+      closed_at: new Date().toISOString(),
+      cash_balance: 0
+    }).eq('id', portfolioId)
+
+    // Create a new active portfolio
+    const { data: newPortfolio, error: createError } = await supabase
+      .from('portfolios')
+      .insert({
+        owner_type: 'user',
+        owner_id: auth.currentUser.id,
+        name: 'My Portfolio',
+        starting_cash: STARTING_CASH,
+        cash_balance: STARTING_CASH,
+        allow_reset: true,
+        is_public: true
+      })
+      .select()
+      .single()
+    if (createError) return { error: createError.message }
+
+    // Load the new portfolio
+    await loadPortfolio('user', auth.currentUser.id)
+    version.value++
+    return { success: true, newPortfolioId: newPortfolio.id }
+  }
+
+  // Load snapshots for a portfolio
+  async function loadSnapshots(portfolioId) {
     const pid = portfolioId || portfolio.value?.id
     if (!pid) return []
     const { data } = await supabase
-      .from('portfolio_resets')
+      .from('portfolio_snapshots')
       .select('*')
       .eq('portfolio_id', pid)
-      .order('reset_at', { ascending: false })
+      .order('snapshotted_at', { ascending: false })
+    snapshots.value = data || []
     return data || []
   }
 
@@ -598,7 +680,7 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     loadPortfolio, enrichHoldings, buyStock, sellStock,
     getHolding, getPortfolioValueById,
     changeBenchmark, setPublic, updatePortfolioMeta,
-    resetPortfolio, getResetHistory, createPersonalPortfolio,
+    resetPortfolio, closePortfolio, loadSnapshots, snapshots, createPersonalPortfolio,
     getLeaderboardData, getPublicLeaderboardData
   }
 })

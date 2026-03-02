@@ -192,11 +192,11 @@
           <!-- Save Name/Description -->
           <button class="btn btn-sm btn-primary" @click="saveMeta">Save Name & Description</button>
 
-          <!-- Reset -->
-          <div v-if="canReset" class="divider text-xs text-base-content/40">Danger Zone</div>
-          <div v-if="canReset" class="flex items-center gap-2">
+          <!-- Reset & Close (personal portfolios only) -->
+          <div v-if="isPersonalPortfolio" class="divider text-xs text-base-content/40">Danger Zone</div>
+          <div v-if="isPersonalPortfolio" class="flex flex-wrap items-center gap-2">
             <button class="btn btn-sm btn-error btn-outline" @click="showResetConfirm = true">Reset Portfolio</button>
-            <span class="text-xs text-base-content/40">Start fresh with ${{ portfolioStore.startingCash.toLocaleString() }}</span>
+            <button class="btn btn-sm btn-outline" @click="showCloseConfirm = true">Close Portfolio</button>
           </div>
         </div>
       </div>
@@ -206,17 +206,32 @@
     <dialog class="modal" :class="{ 'modal-open': showResetConfirm }">
       <div class="modal-box">
         <h3 class="font-bold text-lg">Reset Portfolio?</h3>
-        <p class="py-4 text-base-content/70">This will snapshot your current portfolio and start fresh with ${{ portfolioStore.startingCash.toLocaleString() }}.</p>
-        <label class="label cursor-pointer justify-start gap-3">
-          <input type="checkbox" class="checkbox checkbox-sm" v-model="keepVisible" />
-          <span class="label-text">Keep track record visible publicly</span>
-        </label>
+        <p class="py-4 text-base-content/70">This will clear all holdings and restore $100k. Your trade history is preserved.</p>
         <div class="modal-action">
           <button class="btn btn-ghost" @click="showResetConfirm = false">Cancel</button>
-          <button class="btn btn-error" @click="handleReset">Reset</button>
+          <button class="btn btn-error" @click="handleReset" :disabled="resetting">
+            <span v-if="resetting" class="loading loading-spinner loading-sm"></span>
+            Reset
+          </button>
         </div>
       </div>
       <form method="dialog" class="modal-backdrop" @click="showResetConfirm = false"><button>close</button></form>
+    </dialog>
+
+    <!-- Close Confirmation Modal -->
+    <dialog class="modal" :class="{ 'modal-open': showCloseConfirm }">
+      <div class="modal-box">
+        <h3 class="font-bold text-lg">Close Portfolio?</h3>
+        <p class="py-4 text-base-content/70">This will close your current portfolio and open a new one. Your track record stays visible in Portfolio History.</p>
+        <div class="modal-action">
+          <button class="btn btn-ghost" @click="showCloseConfirm = false">Cancel</button>
+          <button class="btn btn-error" @click="handleClose" :disabled="closing">
+            <span v-if="closing" class="loading loading-spinner loading-sm"></span>
+            Close & Start New
+          </button>
+        </div>
+      </div>
+      <form method="dialog" class="modal-backdrop" @click="showCloseConfirm = false"><button>close</button></form>
     </dialog>
 
     <!-- Settings Feedback -->
@@ -327,16 +342,12 @@ const showBonusModal = ref(false)
 const bonusTotal = ref(0)
 const showSettings = ref(false)
 const showResetConfirm = ref(false)
-const keepVisible = ref(true)
-// Always allow reset for individual users and group portfolios with allow_reset
-const canReset = computed(() => {
+const showCloseConfirm = ref(false)
+const resetting = ref(false)
+const closing = ref(false)
+const isPersonalPortfolio = computed(() => {
   const p = portfolioStore.portfolio
-  if (!p) return false
-  if (p.owner_type === 'user') return true
-  if (p.allow_reset) return true
-  // Also allow reset if portfolio is empty (no cash, no holdings) — clearly broken state
-  if (Number(p.cash_balance) === 0 && portfolioStore.holdings.length === 0) return true
-  return false
+  return p && p.owner_type === 'user'
 })
 const settingsMsg = ref('')
 const settingsMsgType = ref('success')
@@ -571,11 +582,37 @@ async function saveMeta() {
 }
 
 async function handleReset() {
+  resetting.value = true
+  const result = await portfolioStore.resetPortfolio()
   showResetConfirm.value = false
-  const result = await portfolioStore.resetPortfolio(keepVisible.value)
+  resetting.value = false
   if (result.error) return showFeedback(result.error, 'error')
   settingsForm.value.benchmark = portfolioStore.benchmarkTicker
   showFeedback('Portfolio has been reset!')
+}
+
+async function handleClose() {
+  closing.value = true
+  const result = await portfolioStore.closePortfolio()
+  showCloseConfirm.value = false
+  closing.value = false
+  if (result.error) return showFeedback(result.error, 'error')
+  // Update settings form for the new portfolio
+  if (portfolioStore.portfolio) {
+    settingsForm.value = {
+      name: portfolioStore.portfolio.name || '',
+      description: portfolioStore.portfolio.description || '',
+      benchmark: portfolioStore.benchmarkTicker,
+      isPublic: portfolioStore.portfolio.is_public ?? true
+    }
+  }
+  // Switch to personal tab
+  activeTab.value = 'personal'
+  // Reload charts
+  performanceDatasets.value = []
+  sectorSegments.value = []
+  countrySegments.value = []
+  showFeedback('Portfolio closed. New portfolio created!')
 }
 
 async function switchTab(tab) {
