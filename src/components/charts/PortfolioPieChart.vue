@@ -62,6 +62,8 @@ const chartOptions = {
             return {
               text: `${label} ${pct}%`,
               fillStyle: data.datasets[0].backgroundColor[i],
+              fontColor: '#ffffff',
+              strokeStyle: 'transparent',
               hidden: false,
               index: i
             }
