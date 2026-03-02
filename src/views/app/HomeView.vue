@@ -40,9 +40,25 @@
 
   <div v-if="!loading && membership?.group_id" class="space-y-4">
     <!-- Portfolio Toggle Tabs (only for class students with a group) -->
-    <div v-if="hasGroupPortfolio" role="tablist" class="tabs tabs-boxed">
-      <a role="tab" class="tab" :class="{ 'tab-active': activeTab === 'personal' }" @click="switchTab('personal')">My Portfolio</a>
-      <a role="tab" class="tab" :class="{ 'tab-active': activeTab === 'group' }" @click="switchTab('group')">Group: {{ membership?.group?.name }}</a>
+    <div v-if="hasGroupPortfolio" class="flex gap-2">
+      <button
+        class="flex-1 py-2 px-4 rounded-lg text-sm font-semibold transition-all"
+        :class="activeTab === 'personal'
+          ? 'bg-primary text-primary-content shadow'
+          : 'bg-base-200 text-base-content/60 hover:bg-base-300'"
+        @click="switchTab('personal')"
+      >
+        👤 My Portfolio
+      </button>
+      <button
+        class="flex-1 py-2 px-4 rounded-lg text-sm font-semibold transition-all"
+        :class="activeTab === 'group'
+          ? 'bg-secondary text-secondary-content shadow'
+          : 'bg-base-200 text-base-content/60 hover:bg-base-300'"
+        @click="switchTab('group')"
+      >
+        👥 {{ membership?.group?.name }}
+      </button>
     </div>
 
     <!-- Loading spinner during tab switch -->
