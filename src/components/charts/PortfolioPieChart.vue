@@ -45,11 +45,13 @@ const chartOptions = {
   cutout: '55%',
   plugins: {
     legend: {
-      position: 'bottom',
+      position: 'right',
+      align: 'center',
       labels: {
-        boxWidth: 10,
-        padding: 4,
-        font: { size: 9 },
+        boxWidth: 12,
+        boxHeight: 12,
+        padding: 8,
+        font: { size: 11 },
         color: "#ffffff",
         generateLabels: (chart) => {
           const data = chart.data
