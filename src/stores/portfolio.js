@@ -698,63 +698,67 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     return { holdingsMap, tradesMap }
   }
 
-  // Create a new fund for the current user
-  async function createFund(fundName, fundThesis, fundStartingCash = 100000) {
-    if (!auth.currentUser) return { error: 'Not logged in' }
-    if (allFunds.value.length >= MAX_FUNDS) return { error: `Maximum of ${MAX_FUNDS} funds allowed` }
+  // Load all funds for a given owner (user or group)
+  async function loadFundsForOwner(ownerType, ownerId) {
+    if (!ownerId) return []
+    const { data, error } = await supabase
+      .from('portfolios')
+      .select('id, fund_name, fund_number, fund_thesis, cash_balance, starting_cash, fund_starting_cash, status, created_at')
+      .eq('owner_type', ownerType)
+      .eq('owner_id', ownerId)
+      .or('status.eq.active,status.is.null')
+      .order('fund_number', { ascending: true })
+    if (error) {
+      console.warn('Failed to load funds for owner:', error)
+      return []
+    }
+    return data || []
+  }
 
-    const nextFundNumber = (allFunds.value.length || 0) + 1
-    const market = useMarketDataStore()
+  // Create a new fund for any owner (user or group)
+  async function createFund(ownerType, ownerId, fundName, fundThesis, fundStartingCash = 100000) {
+    if (!auth.currentUser) return { error: 'Not logged in' }
+
+    // Count existing funds for this owner
+    const { count } = await supabase
+      .from('portfolios')
+      .select('id', { count: 'exact' })
+      .eq('owner_type', ownerType)
+      .eq('owner_id', ownerId)
+      .or('status.eq.active,status.is.null')
+
+    if ((count || 0) >= MAX_FUNDS) return { error: `Maximum of ${MAX_FUNDS} funds allowed` }
+
+    const nextFundNumber = (count || 0) + 1
 
     const { data: newPortfolio, error } = await supabase
       .from('portfolios')
       .insert({
-        owner_type: 'user',
-        owner_id: auth.currentUser.id,
+        owner_type: ownerType,
+        owner_id: ownerId,
         cash_balance: fundStartingCash,
         starting_cash: fundStartingCash,
         fund_starting_cash: fundStartingCash,
-        fund_name: fundName,
-        fund_thesis: fundThesis,
+        fund_name: fundName || `Fund ${nextFundNumber}`,
+        fund_thesis: fundThesis || '',
         fund_number: nextFundNumber,
         status: 'active',
-        allow_reset: true,
+        allow_reset: ownerType === 'user',
         is_public: true
       })
       .select()
       .single()
     if (error) return { error: error.message }
 
-    // Buy equivalent SPY for benchmark (mirrors existing benchmark logic)
-    const bmTicker = 'SPY'
-    const bmQuote = await market.fetchQuote(bmTicker)
-    const bmPrice = bmQuote?.price || bmQuote?.previousClose
-    if (bmPrice) {
-      // We don't actually buy benchmark upfront - benchmark buys happen on trades
-      // Just set up the portfolio, benchmark tracks when user trades
-    }
-
-    allFunds.value.push(newPortfolio)
     return { success: true, portfolio: newPortfolio }
   }
 
-  // Load all funds for current user
+  // Load all funds for current user (personal only — kept for backward compat)
   async function loadAllFunds() {
     if (!auth.currentUser) return []
-    const { data, error } = await supabase
-      .from('portfolios')
-      .select('*')
-      .eq('owner_type', 'user')
-      .eq('owner_id', auth.currentUser.id)
-      .or('status.eq.active,status.is.null')
-      .order('fund_number', { ascending: true })
-
-    if (error) {
-      console.warn('Failed to load funds:', error)
-      return []
-    }
-    allFunds.value = data || []
-    return data || []
+    const data = await loadFundsForOwner('user', auth.currentUser.id)
+    allFunds.value = data
+    return data
   }
 
   return {
@@ -769,6 +773,6 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     changeBenchmark, setPublic, updatePortfolioMeta,
     resetPortfolio, closePortfolio, loadSnapshots, snapshots, createPersonalPortfolio,
     getLeaderboardData, getPublicLeaderboardData,
-    createFund, loadAllFunds
+    createFund, loadAllFunds, loadFundsForOwner
   }
 })
