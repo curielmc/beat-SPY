@@ -303,39 +303,112 @@
     </div>
 
     <!-- Charts Section -->
-    <div v-if="portfolioStore.holdings.length > 0" class="space-y-4">
-      <!-- Performance Line Chart -->
-      <div class="card bg-base-100 shadow">
-        <div class="card-body p-4">
-          <div class="flex items-center justify-between mb-2">
-            <h3 class="font-semibold">Performance vs {{ portfolioStore.benchmarkTicker }}</h3>
-            <TimeRangeSelector v-model="chartTimeRange" />
-          </div>
-          <div v-if="chartsLoading" class="flex justify-center py-8">
-            <span class="loading loading-spinner loading-md"></span>
-          </div>
-          <PortfolioLineChart
-            v-else-if="performanceDatasets.length > 0"
-            :datasets="performanceDatasets"
-            :time-range="chartTimeRange"
-            :show-percentage="true"
-          />
-        </div>
+    <div v-if="portfolioStore.holdings.length > 0 || portfolioStore.cashBalance > 0" class="space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="font-semibold text-sm">Charts</h3>
+        <TimeRangeSelector v-model="chartTimeRange" />
       </div>
 
-      <!-- Sector + Country Pie Charts -->
-      <div class="grid grid-cols-2 gap-3">
-        <PortfolioPieChart
-          v-if="sectorSegments.length > 0"
-          :segments="sectorSegments"
-          title="Sector Allocation"
-        />
-        <PortfolioPieChart
-          v-if="countrySegments.length > 0"
-          :segments="countrySegments"
-          title="Country Allocation"
-        />
+      <div v-if="chartsLoading" class="flex justify-center py-8">
+        <span class="loading loading-spinner loading-md"></span>
       </div>
+
+      <template v-else>
+        <!-- Two side-by-side line charts: Portfolio Value + Relative to SPY -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div class="card bg-base-100 shadow">
+            <div class="card-body p-3">
+              <h3 class="font-semibold text-sm mb-2">Portfolio Value</h3>
+              <PortfolioLineChart
+                v-if="portfolioValueDatasets.length > 0"
+                :datasets="portfolioValueDatasets"
+                :time-range="chartTimeRange"
+                height="200px"
+              />
+            </div>
+          </div>
+          <div class="card bg-base-100 shadow">
+            <div class="card-body p-3">
+              <h3 class="font-semibold text-sm mb-2">Relative to S&P 500</h3>
+              <PortfolioLineChart
+                v-if="relativeToSpyDatasets.length > 0"
+                :datasets="relativeToSpyDatasets"
+                :time-range="chartTimeRange"
+                :show-percentage="true"
+                height="200px"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- Compare Teams (only when student is in a class) -->
+        <div v-if="activeTab === 'personal' && membership?.group_id && membership.group_id !== 'personal' && classGroups.length > 0" class="card bg-base-100 shadow">
+          <div class="card-body p-3">
+            <h3 class="font-semibold text-sm mb-2">Compare Teams</h3>
+            <div class="flex flex-wrap gap-1 mb-2">
+              <button
+                v-for="g in classGroups"
+                :key="g.id"
+                class="btn btn-xs"
+                :class="selectedGroupIds.includes(g.id)
+                  ? (g.id === membership.group_id ? 'btn-primary' : 'btn-secondary')
+                  : 'btn-ghost'"
+                :disabled="g.id === membership.group_id"
+                @click="toggleGroupComparison(g.id)"
+              >
+                {{ g.name }}
+              </button>
+            </div>
+            <div v-if="loadingComparison" class="flex justify-center py-4">
+              <span class="loading loading-spinner loading-sm"></span>
+            </div>
+            <PortfolioLineChart
+              v-else-if="comparisonDatasets.length > 0"
+              :datasets="comparisonDatasets"
+              :time-range="chartTimeRange"
+              :show-percentage="true"
+              height="200px"
+            />
+          </div>
+        </div>
+
+        <!-- Performance Line Chart -->
+        <div class="card bg-base-100 shadow">
+          <div class="card-body p-4">
+            <h3 class="font-semibold mb-2">Performance vs {{ portfolioStore.benchmarkTicker }}</h3>
+            <PortfolioLineChart
+              v-if="performanceDatasets.length > 0"
+              :datasets="performanceDatasets"
+              :time-range="chartTimeRange"
+              :show-percentage="true"
+            />
+          </div>
+        </div>
+
+        <!-- 4 Pie Charts: Stock, Sector, Country, Asset Class -->
+        <div class="grid grid-cols-2 gap-3">
+          <PortfolioPieChart
+            v-if="stockSegments.length > 0"
+            :segments="stockSegments"
+            title="By Stock"
+          />
+          <PortfolioPieChart
+            v-if="sectorSegments.length > 0"
+            :segments="sectorSegments"
+            title="By Sector"
+          />
+          <PortfolioPieChart
+            v-if="countrySegments.length > 0"
+            :segments="countrySegments"
+            title="By Country"
+          />
+          <PortfolioPieChart
+            v-if="assetClassSegments.length > 0"
+            :segments="assetClassSegments"
+            title="By Asset Class"
+          />
+        </div>
+      </template>
     </div>
     </template>
   </div>
@@ -385,8 +458,37 @@ const isIndependent = computed(() => membership.value?.group_id === 'personal')
 const chartTimeRange = ref('3M')
 const chartsLoading = ref(false)
 const performanceDatasets = ref([])
+const portfolioValueDatasets = ref([])
+const relativeToSpyDatasets = ref([])
 const sectorSegments = ref([])
 const countrySegments = ref([])
+const stockSegments = ref([])
+const assetClassSegments = ref([])
+
+// Compare Teams state
+const classGroups = ref([])
+const selectedGroupIds = ref([])
+const comparisonDatasets = ref([])
+const loadingComparison = ref(false)
+
+// Synthetic history helper
+function generateSyntheticHistory(startDate, endDate, startValue, endValue, seed) {
+  const start = new Date(startDate)
+  const end = new Date(endDate || new Date())
+  const days = Math.max(1, Math.round((end - start) / (1000 * 60 * 60 * 24)))
+  const points = []
+  let rng = seed ? parseInt(String(seed).replace(/-/g, '').slice(0, 8), 16) : 12345
+  for (let i = 0; i <= Math.min(days, 180); i++) {
+    rng = (rng * 1664525 + 1013904223) & 0xffffffff
+    const noise = ((rng >>> 0) / 0xffffffff - 0.5) * 0.003
+    const t = i / Math.max(days, 1)
+    const value = startValue + (endValue - startValue) * t + noise * startValue
+    const date = new Date(start)
+    date.setDate(date.getDate() + i)
+    points.push({ date, value })
+  }
+  return points
+}
 
 onMounted(async () => {
   // Get current membership
@@ -435,6 +537,11 @@ onMounted(async () => {
   // Load charts after portfolio data is ready
   if (portfolioStore.holdings.length > 0) {
     loadCharts()
+  }
+
+  // Load class groups for Compare Teams chart
+  if (membership.value?.class_id) {
+    loadClassGroups()
   }
 })
 
@@ -521,6 +628,43 @@ async function loadCharts() {
     }
     performanceDatasets.value = datasets
 
+    // --- Portfolio Value Line Chart (absolute $) ---
+    const pvDatasets = []
+    if (portfolioHistory.length > 1) {
+      pvDatasets.push({ label: 'My Portfolio', data: portfolioHistory, color: 'primary' })
+    } else {
+      // Synthetic fallback
+      const createdAt = portfolioStore.portfolio?.created_at
+      const synth = generateSyntheticHistory(createdAt, null, startCash, portfolioStore.totalMarketValue, portfolioStore.portfolio?.id)
+      pvDatasets.push({ label: 'My Portfolio', data: synth, color: 'primary' })
+    }
+    if (spyHistory.length > 0) {
+      pvDatasets.push({ label: portfolioStore.benchmarkTicker, data: spyHistory, color: 'sp500' })
+    } else {
+      const createdAt = portfolioStore.portfolio?.created_at
+      const spyEnd = startCash * (1 + portfolioStore.benchmarkReturnPct / 100)
+      const synthSpy = generateSyntheticHistory(createdAt, null, startCash, spyEnd, 'spy-seed')
+      pvDatasets.push({ label: portfolioStore.benchmarkTicker, data: synthSpy, color: 'sp500' })
+    }
+    portfolioValueDatasets.value = pvDatasets
+
+    // --- Relative to S&P 500 (spread %) ---
+    // Use a 100 baseline so showPercentage computes correctly
+    const myPts = pvDatasets[0]?.data || []
+    const spyPts = pvDatasets[1]?.data || []
+    if (myPts.length > 0 && spyPts.length > 0) {
+      const myBaseline = myPts[0].value
+      const spyBaseline = spyPts[0].value
+      const spreadData = myPts.map((p, i) => {
+        const spyVal = i < spyPts.length ? spyPts[i].value : spyPts[spyPts.length - 1].value
+        const myRet = ((p.value - myBaseline) / myBaseline) * 100
+        const spyRet = ((spyVal - spyBaseline) / spyBaseline) * 100
+        // Store as 100 + spread so showPercentage yields the spread %
+        return { date: p.date, value: 100 + (myRet - spyRet) }
+      })
+      relativeToSpyDatasets.value = [{ label: 'vs S&P 500', data: spreadData, color: 'accent' }]
+    }
+
     // --- Sector & Country Pie Charts ---
     const tickers = portfolioStore.holdings.map(h => h.ticker)
     let profiles = []
@@ -553,8 +697,111 @@ async function loadCharts() {
     countrySegments.value = Object.entries(countryMap)
       .map(([label, value]) => ({ label, value }))
       .sort((a, b) => b.value - a.value)
+
+    // --- By Stock Pie Chart ---
+    stockSegments.value = portfolioStore.holdings
+      .map(h => ({ label: h.ticker, value: h.marketValue }))
+      .sort((a, b) => b.value - a.value)
+
+    // --- By Asset Class Pie Chart ---
+    const acMap = {}
+    acMap['Cash'] = portfolioStore.cashBalance
+    for (const h of portfolioStore.holdings) {
+      acMap['Stock'] = (acMap['Stock'] || 0) + h.marketValue
+    }
+    assetClassSegments.value = Object.entries(acMap)
+      .filter(([, v]) => v > 0)
+      .map(([label, value]) => ({ label, value }))
+      .sort((a, b) => b.value - a.value)
   } finally {
     chartsLoading.value = false
+  }
+}
+
+// --- Compare Teams ---
+const GROUP_COLORS = ['primary', 'secondary', 'accent', 'info', 'success', 'warning', 'error', 'neutral1', 'neutral2', 'neutral3']
+
+async function loadClassGroups() {
+  if (!membership.value?.class_id) return
+  const { data } = await supabase
+    .from('groups')
+    .select('*, portfolios(id, cash_balance, starting_cash, created_at)')
+    .eq('class_id', membership.value.class_id)
+  if (!data) return
+  classGroups.value = data
+  // My group always selected
+  selectedGroupIds.value = [membership.value.group_id]
+  await buildComparisonDatasets()
+}
+
+function toggleGroupComparison(groupId) {
+  if (groupId === membership.value.group_id) return // can't deselect own group
+  const idx = selectedGroupIds.value.indexOf(groupId)
+  if (idx >= 0) {
+    selectedGroupIds.value.splice(idx, 1)
+  } else {
+    selectedGroupIds.value.push(groupId)
+  }
+  buildComparisonDatasets()
+}
+
+async function buildComparisonDatasets() {
+  loadingComparison.value = true
+  try {
+    const datasets = []
+    const startCash = portfolioStore.startingCash
+
+    for (let gi = 0; gi < selectedGroupIds.value.length; gi++) {
+      const gid = selectedGroupIds.value[gi]
+      const group = classGroups.value.find(g => g.id === gid)
+      if (!group) continue
+
+      const portfolio = group.portfolios?.[0]
+      if (!portfolio) continue
+
+      const gStartCash = portfolio.starting_cash || startCash
+
+      // Fetch current group portfolio value
+      let currentValue = gStartCash
+      if (gid === membership.value.group_id) {
+        currentValue = portfolioStore.totalMarketValue
+      } else {
+        // Query holdings for this group's portfolio to estimate value
+        const { data: holdings } = await supabase
+          .from('holdings')
+          .select('ticker, shares, avg_cost')
+          .eq('portfolio_id', portfolio.id)
+
+        let holdingsValue = 0
+        if (holdings?.length > 0) {
+          // Approximate using our cached prices if available
+          for (const h of holdings) {
+            const ourHolding = portfolioStore.holdings.find(oh => oh.ticker === h.ticker)
+            const price = ourHolding?.currentPrice || h.avg_cost
+            holdingsValue += Number(h.shares) * price
+          }
+        }
+        currentValue = (portfolio.cash_balance || 0) + holdingsValue
+      }
+
+      const synth = generateSyntheticHistory(portfolio.created_at, null, gStartCash, currentValue, gid)
+      const colorIdx = gi % GROUP_COLORS.length
+      datasets.push({
+        label: group.name,
+        data: synth,
+        color: GROUP_COLORS[colorIdx]
+      })
+    }
+
+    // Add SPY line
+    const spyEnd = startCash * (1 + portfolioStore.benchmarkReturnPct / 100)
+    const createdAt = portfolioStore.portfolio?.created_at
+    const synthSpy = generateSyntheticHistory(createdAt, null, startCash, spyEnd, 'spy-compare')
+    datasets.push({ label: portfolioStore.benchmarkTicker, data: synthSpy, color: 'sp500' })
+
+    comparisonDatasets.value = datasets
+  } finally {
+    loadingComparison.value = false
   }
 }
 
@@ -661,8 +908,13 @@ async function switchTab(tab) {
     }
     // Reload charts
     performanceDatasets.value = []
+    portfolioValueDatasets.value = []
+    relativeToSpyDatasets.value = []
     sectorSegments.value = []
     countrySegments.value = []
+    stockSegments.value = []
+    assetClassSegments.value = []
+    comparisonDatasets.value = []
     if (portfolioStore.holdings.length > 0) {
       loadCharts()
     }
