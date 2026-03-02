@@ -109,7 +109,7 @@
       </div>
       <div class="card bg-base-100 shadow">
         <div class="card-body p-3">
-          <p class="text-xs text-base-content/60">vs {{ portfolioStore.benchmarkTicker }}</p>
+          <p class="text-xs text-base-content/60">vs S&P 500 ({{ portfolioStore.benchmarkTicker }} proxy)</p>
           <p class="text-xl font-bold" :class="vsSP500 >= 0 ? 'text-success' : 'text-error'">
             {{ vsSP500 >= 0 ? '+' : '' }}{{ vsSP500.toFixed(2) }}%
           </p>
@@ -131,7 +131,7 @@
         <div class="stat-value text-lg">${{ portfolioStore.cashBalance.toLocaleString('en-US', { maximumFractionDigits: 2 }) }}</div>
       </div>
       <div class="stat py-2">
-        <div class="stat-title text-xs">Benchmark ({{ portfolioStore.benchmarkTicker }})</div>
+        <div class="stat-title text-xs">S&P 500 (via {{ portfolioStore.benchmarkTicker }})</div>
         <div class="stat-value text-lg" :class="portfolioStore.benchmarkReturnPct >= 0 ? 'text-success' : 'text-error'">
           {{ portfolioStore.benchmarkReturnPct >= 0 ? '+' : '' }}{{ portfolioStore.benchmarkReturnPct.toFixed(2) }}%
         </div>
@@ -335,7 +335,7 @@
           </div>
           <div class="card bg-base-100 shadow">
             <div class="card-body p-3">
-              <h3 class="font-semibold text-sm mb-2">Relative to S&P 500</h3>
+              <h3 class="font-semibold text-sm mb-2">Relative to S&P 500 <span class="text-xs font-normal text-base-content/40">({{ portfolioStore.benchmarkTicker }} proxy)</span></h3>
               <PortfolioLineChart
                 v-if="relativeToSpyDatasets.length > 0"
                 :datasets="relativeToSpyDatasets"
