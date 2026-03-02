@@ -319,7 +319,7 @@ const loading = ref(true)
 const creatingPortfolio = ref(false)
 const membership = ref(null)
 const groupMembers = ref([])
-const activeTab = ref('group') // default to group when in a class
+const activeTab = ref('personal') // default to personal portfolio
 const switchingTab = ref(false)
 // True when user is in a real class with a group (not independent/personal)
 const hasGroupPortfolio = computed(() => membership.value?.group_id && membership.value.group_id !== 'personal')
