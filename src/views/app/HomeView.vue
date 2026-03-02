@@ -180,8 +180,8 @@
           <button class="btn btn-sm btn-primary" @click="saveMeta">Save Name & Description</button>
 
           <!-- Reset -->
-          <div v-if="portfolioStore.portfolio?.allow_reset" class="divider text-xs text-base-content/40">Danger Zone</div>
-          <div v-if="portfolioStore.portfolio?.allow_reset" class="flex items-center gap-2">
+          <div v-if="canReset" class="divider text-xs text-base-content/40">Danger Zone</div>
+          <div v-if="canReset" class="flex items-center gap-2">
             <button class="btn btn-sm btn-error btn-outline" @click="showResetConfirm = true">Reset Portfolio</button>
             <span class="text-xs text-base-content/40">Start fresh with ${{ portfolioStore.startingCash.toLocaleString() }}</span>
           </div>
@@ -310,6 +310,13 @@ const bonusTotal = ref(0)
 const showSettings = ref(false)
 const showResetConfirm = ref(false)
 const keepVisible = ref(true)
+// Individual users can always reset; group portfolios respect the allow_reset flag
+const canReset = computed(() => {
+  const p = portfolioStore.portfolio
+  if (!p) return false
+  if (p.owner_type === 'user') return true
+  return !!p.allow_reset
+})
 const settingsMsg = ref('')
 const settingsMsgType = ref('success')
 const settingsForm = ref({ name: '', description: '', benchmark: '', isPublic: true })

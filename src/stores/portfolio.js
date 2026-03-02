@@ -422,7 +422,8 @@ export const usePortfolioStore = defineStore('portfolio', () => {
   // Reset portfolio (snapshot history, clear holdings/trades, restore cash)
   async function resetPortfolio(keepVisible = true) {
     if (!portfolio.value) return { error: 'No portfolio' }
-    if (!portfolio.value.allow_reset) return { error: 'Portfolio reset is not allowed' }
+    // Individual users can always reset; group/competition portfolios respect allow_reset
+    if (portfolio.value.owner_type !== 'user' && !portfolio.value.allow_reset) return { error: 'Portfolio reset is not allowed' }
 
     const { error } = await supabase.rpc('reset_portfolio', {
       p_portfolio_id: portfolio.value.id,
