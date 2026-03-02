@@ -196,6 +196,24 @@ export const useAuthStore = defineStore('auth', () => {
       })
     if (memberError) return { error: 'Failed to join class: ' + memberError.message }
 
+    // Create personal portfolio for this student (every student gets $100k individual portfolio)
+    const { data: existingPersonal } = await supabase
+      .from('portfolios')
+      .select('id')
+      .eq('owner_type', 'user')
+      .eq('owner_id', currentUser.value.id)
+      .maybeSingle()
+
+    if (!existingPersonal) {
+      await supabase.from('portfolios').insert({
+        owner_type: 'user',
+        owner_id: currentUser.value.id,
+        starting_cash: 100000,
+        cash_balance: 100000,
+        allow_reset: true
+      })
+    }
+
     return { success: true, classData, groupId: finalGroupId }
   }
 
