@@ -95,7 +95,7 @@
     </div>
 
     <!-- My Team (group tab only) -->
-    <div v-if="activeTab === 'group' && membership?.group_id && groupMembers.length > 1" class="card bg-base-100 shadow">
+    <div v-if="activeTab === 'group' && membership?.group_id && groupMembers.length > 0" class="card bg-base-100 shadow">
       <div class="card-body p-3">
         <h3 class="font-semibold text-sm mb-3">👥 My Team</h3>
         <div class="flex flex-wrap gap-3">
