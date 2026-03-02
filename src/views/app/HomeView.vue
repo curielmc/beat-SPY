@@ -39,23 +39,36 @@
   </dialog>
 
   <div v-if="!loading && membership?.group_id" class="space-y-4">
+    <!-- Portfolio Toggle Tabs (only for class students with a group) -->
+    <div v-if="hasGroupPortfolio" role="tablist" class="tabs tabs-boxed">
+      <a role="tab" class="tab" :class="{ 'tab-active': activeTab === 'personal' }" @click="switchTab('personal')">My Portfolio</a>
+      <a role="tab" class="tab" :class="{ 'tab-active': activeTab === 'group' }" @click="switchTab('group')">Group: {{ membership?.group?.name }}</a>
+    </div>
+
+    <!-- Loading spinner during tab switch -->
+    <div v-if="switchingTab" class="flex justify-center py-10">
+      <span class="loading loading-spinner loading-lg"></span>
+    </div>
+
     <!-- Header -->
-    <div class="flex items-center justify-between">
+    <div v-if="!switchingTab" class="flex items-center justify-between">
       <div>
-        <h1 class="text-xl font-bold">{{ membership?.group?.name || 'My Portfolio' }}</h1>
-        <p class="text-sm text-base-content/60">{{ auth.profile?.full_name }}</p>
+        <h1 class="text-xl font-bold">{{ activeTab === 'group' ? membership?.group?.name : (auth.profile?.full_name || 'My Portfolio') }}</h1>
+        <p v-if="activeTab === 'group'" class="text-sm text-base-content/60">{{ auth.profile?.full_name }}</p>
+        <p v-else class="text-sm text-base-content/60">Personal Portfolio</p>
       </div>
       <RouterLink v-if="isIndependent" to="/join" class="btn btn-ghost btn-xs gap-1">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
         Join a Class
       </RouterLink>
-      <div class="flex gap-2 flex-wrap">
+      <div v-if="activeTab === 'group'" class="flex gap-2 flex-wrap">
         <div v-for="member in groupMembers" :key="member.id" class="badge badge-sm" :class="member.id === auth.currentUser?.id ? 'badge-primary' : 'badge-ghost'">
           {{ member.full_name?.split(' ')[0] }}
         </div>
       </div>
     </div>
 
+    <template v-if="!switchingTab">
     <!-- Two Key Stats -->
     <div class="grid grid-cols-2 gap-3">
       <div class="card bg-base-100 shadow">
@@ -284,6 +297,7 @@
         />
       </div>
     </div>
+    </template>
   </div>
 </template>
 
@@ -305,6 +319,10 @@ const loading = ref(true)
 const creatingPortfolio = ref(false)
 const membership = ref(null)
 const groupMembers = ref([])
+const activeTab = ref('group') // default to group when in a class
+const switchingTab = ref(false)
+// True when user is in a real class with a group (not independent/personal)
+const hasGroupPortfolio = computed(() => membership.value?.group_id && membership.value.group_id !== 'personal')
 const showBonusModal = ref(false)
 const bonusTotal = ref(0)
 const showSettings = ref(false)
@@ -558,6 +576,37 @@ async function handleReset() {
   if (result.error) return showFeedback(result.error, 'error')
   settingsForm.value.benchmark = portfolioStore.benchmarkTicker
   showFeedback('Portfolio has been reset!')
+}
+
+async function switchTab(tab) {
+  if (tab === activeTab.value) return
+  activeTab.value = tab
+  switchingTab.value = true
+  try {
+    if (tab === 'personal') {
+      await portfolioStore.loadPortfolio('user', auth.currentUser.id)
+    } else {
+      await portfolioStore.loadPortfolio('group', membership.value.group_id)
+    }
+    // Update settings form for the new portfolio
+    if (portfolioStore.portfolio) {
+      settingsForm.value = {
+        name: portfolioStore.portfolio.name || '',
+        description: portfolioStore.portfolio.description || '',
+        benchmark: portfolioStore.benchmarkTicker,
+        isPublic: portfolioStore.portfolio.is_public ?? true
+      }
+    }
+    // Reload charts
+    performanceDatasets.value = []
+    sectorSegments.value = []
+    countrySegments.value = []
+    if (portfolioStore.holdings.length > 0) {
+      loadCharts()
+    }
+  } finally {
+    switchingTab.value = false
+  }
 }
 
 async function dismissBonus() {
