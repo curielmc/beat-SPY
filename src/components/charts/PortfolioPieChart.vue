@@ -49,6 +49,7 @@ const chartOptions = {
         boxWidth: 10,
         padding: 4,
         font: { size: 9 },
+        color: "#ffffff",
         generateLabels: (chart) => {
           const data = chart.data
           const total = data.datasets[0].data.reduce((a, b) => a + b, 0)

@@ -99,7 +99,7 @@ const chartOptions = computed(() => ({
   plugins: {
     legend: {
       position: 'bottom',
-      labels: { boxWidth: 12, padding: 6, font: { size: 10 } }
+      labels: { boxWidth: 12, padding: 6, font: { size: 10 }, color: "#ffffff" }
     },
     tooltip: {
       callbacks: {
@@ -127,7 +127,7 @@ const chartOptions = computed(() => ({
     },
     y: {
       ticks: {
-        font: { size: 10 },
+        font: { size: 10 }, color: "#ffffff",
         callback: (v) => {
           if (props.showPercentage) return `${v > 0 ? '+' : ''}${v.toFixed(1)}%`
           return v >= 1000 ? `$${(v / 1000).toFixed(0)}k` : `$${v}`
