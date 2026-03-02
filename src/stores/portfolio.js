@@ -191,15 +191,16 @@ export const usePortfolioStore = defineStore('portfolio', () => {
 
     const market = useMarketDataStore()
 
-    // Fetch live price
+    // Fetch price (uses last close on weekends/after-hours)
     const quote = await market.fetchQuote(ticker)
     if (!quote) return { success: false, error: 'Could not fetch stock price' }
-    const price = quote.price
+    const price = quote.price || quote.previousClose
+    if (!price || price <= 0) return { success: false, error: 'Could not determine a valid price for ' + ticker }
 
     // Fetch benchmark price
     const bmTicker = benchmarkTicker.value
     const bmQuote = await market.fetchQuote(bmTicker)
-    const bmPrice = bmQuote?.price
+    const bmPrice = bmQuote?.price || bmQuote?.previousClose
 
     const shares = dollars / price
     const portfolioId = portfolio.value.id
@@ -291,13 +292,15 @@ export const usePortfolioStore = defineStore('portfolio', () => {
 
     const market = useMarketDataStore()
 
+    // Fetch price (uses last close on weekends/after-hours)
     const quote = await market.fetchQuote(ticker)
     if (!quote) return { success: false, error: 'Could not fetch stock price' }
-    const price = quote.price
+    const price = quote.price || quote.previousClose
+    if (!price || price <= 0) return { success: false, error: 'Could not determine a valid price for ' + ticker }
 
     const bmTicker = benchmarkTicker.value
     const bmQuote = await market.fetchQuote(bmTicker)
-    const bmPrice = bmQuote?.price
+    const bmPrice = bmQuote?.price || bmQuote?.previousClose
 
     const existing = rawHoldings.value.find(h => h.ticker === ticker)
     if (!existing) return { success: false, error: "You don't own this stock" }
