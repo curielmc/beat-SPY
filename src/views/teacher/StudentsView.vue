@@ -64,15 +64,20 @@
       <!-- Award Cash Modal -->
       <dialog class="modal" :class="{ 'modal-open': showAwardModal }">
         <div class="modal-box">
-          <h3 class="font-bold text-lg mb-4">Award Bonus Cash</h3>
-          <p class="text-base-content/60 mb-4">Award bonus cash to <strong>{{ awardGroupName }}</strong></p>
+          <h3 class="font-bold text-lg mb-4">Adjust Cash — {{ awardGroupName }}</h3>
+          <div class="flex gap-2 mb-4">
+            <button class="btn flex-1" :class="awardType === 'add' ? 'btn-success' : 'btn-ghost'" @click="awardType = 'add'">+ Add Cash</button>
+            <button class="btn flex-1" :class="awardType === 'subtract' ? 'btn-error' : 'btn-ghost'" @click="awardType = 'subtract'">− Subtract Cash</button>
+          </div>
           <div class="form-control mb-4">
             <label class="label"><span class="label-text">Amount ($)</span></label>
             <input v-model.number="awardAmount" type="number" min="1" step="100" class="input input-bordered w-full" placeholder="e.g. 5000" />
           </div>
           <div class="modal-action">
             <button class="btn btn-ghost" @click="showAwardModal = false">Cancel</button>
-            <button class="btn btn-success" :disabled="!awardAmount || awardAmount <= 0" @click="confirmAward">Award</button>
+            <button class="btn" :class="awardType === 'add' ? 'btn-success' : 'btn-error'" :disabled="!awardAmount || awardAmount <= 0" @click="confirmAward">
+              {{ awardType === 'add' ? 'Add Cash' : 'Subtract Cash' }}
+            </button>
           </div>
         </div>
         <form method="dialog" class="modal-backdrop" @click="showAwardModal = false"><button>close</button></form>
@@ -152,7 +157,7 @@
             </div>
           </div>
 
-          <button class="btn btn-sm btn-success btn-outline mb-4" @click="openAwardModal(group)">$ Award Bonus Cash</button>
+          <button class="btn btn-sm btn-success btn-outline mb-4" @click="openAwardModal(group)">$ Adjust Cash</button>
 
           <!-- Holdings Table -->
           <div class="overflow-x-auto">
@@ -235,6 +240,7 @@ const kickStudentName = ref('')
 const showAwardModal = ref(false)
 const awardGroupId = ref(null)
 const awardGroupName = ref('')
+const awardType = ref("add")
 const awardAmount = ref(null)
 const awardSuccess = ref('')
 
@@ -277,13 +283,15 @@ async function confirmKick() {
 function openAwardModal(group) {
   awardGroupId.value = group.id
   awardGroupName.value = group.name
+  awardType.value = "add"
   awardAmount.value = null
   showAwardModal.value = true
 }
 
 async function confirmAward() {
   if (!awardGroupId.value || !awardAmount.value || awardAmount.value <= 0) return
-  await teacher.awardBonusCash(awardGroupId.value, awardAmount.value)
+  const finalAmount = awardType.value === "subtract" ? -awardAmount.value : awardAmount.value
+  await teacher.awardBonusCash(awardGroupId.value, finalAmount)
   awardSuccess.value = `Awarded $${awardAmount.value.toLocaleString()} to ${awardGroupName.value}!`
   showAwardModal.value = false
   rankedGroups.value = await teacher.getRankedGroups()

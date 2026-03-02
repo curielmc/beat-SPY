@@ -240,7 +240,7 @@ export const useTeacherStore = defineStore('teacher', () => {
     return { success: true }
   }
 
-  // Award bonus cash
+  // Award or deduct cash (pass negative amount to deduct)
   async function awardBonusCash(groupId, amount) {
     // Get portfolio for this group
     const { data: pData } = await supabase
