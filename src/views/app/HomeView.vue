@@ -41,15 +41,38 @@
   <div v-if="!loading && membership?.group_id" class="space-y-4">
     <!-- Portfolio Toggle Tabs (only for class students with a group) -->
     <div v-if="hasGroupPortfolio" class="flex gap-2">
-      <button
-        class="flex-1 py-2 px-4 rounded-lg text-sm font-semibold transition-all"
-        :class="activeTab === 'personal'
-          ? 'bg-primary text-primary-content shadow'
-          : 'bg-base-200 text-base-content/60 hover:bg-base-300'"
-        @click="switchTab('personal')"
-      >
-        👤 My Portfolio
-      </button>
+      <!-- Fund selector dropdown for personal tab -->
+      <div class="flex-1 relative">
+        <button
+          class="w-full py-2 px-4 rounded-lg text-sm font-semibold transition-all flex items-center justify-between"
+          :class="activeTab === 'personal'
+            ? 'bg-primary text-primary-content shadow'
+            : 'bg-base-200 text-base-content/60 hover:bg-base-300'"
+          @click="activeTab === 'personal' ? (showFundDropdown = !showFundDropdown) : switchTab('personal')"
+        >
+          <span>👤 {{ currentFundLabel }}</span>
+          <svg v-if="activeTab === 'personal' && portfolioStore.allFunds.length > 1" xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+        </button>
+        <!-- Fund dropdown -->
+        <div v-if="showFundDropdown && activeTab === 'personal'" class="absolute top-full left-0 right-0 mt-1 bg-base-100 border border-base-300 rounded-lg shadow-lg z-50 overflow-hidden">
+          <button
+            v-for="fund in portfolioStore.allFunds"
+            :key="fund.id"
+            class="w-full text-left px-4 py-2 text-sm hover:bg-base-200 transition-colors"
+            :class="fund.id === portfolioStore.portfolio?.id ? 'bg-primary/10 font-semibold' : ''"
+            @click="switchFund(fund)"
+          >
+            Fund {{ fund.fund_number }}: {{ fund.fund_name || 'My Portfolio' }}
+          </button>
+          <button
+            v-if="portfolioStore.allFunds.length < portfolioStore.MAX_FUNDS"
+            class="w-full text-left px-4 py-2 text-sm text-primary hover:bg-base-200 transition-colors border-t border-base-300"
+            @click="showFundDropdown = false; showCreateFund = true"
+          >
+            + New Fund
+          </button>
+        </div>
+      </div>
       <button
         class="flex-1 py-2 px-4 rounded-lg text-sm font-semibold transition-all"
         :class="activeTab === 'group'
@@ -58,6 +81,30 @@
         @click="switchTab('group')"
       >
         👥 {{ membership?.group?.name }}
+      </button>
+    </div>
+
+    <!-- Fund selector for independent users (no group) -->
+    <div v-else-if="portfolioStore.allFunds.length > 1 || (portfolioStore.portfolio && !hasGroupPortfolio)" class="flex gap-2 items-center">
+      <div class="flex-1 flex gap-1 overflow-x-auto">
+        <button
+          v-for="fund in portfolioStore.allFunds"
+          :key="fund.id"
+          class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap"
+          :class="fund.id === portfolioStore.portfolio?.id
+            ? 'bg-primary text-primary-content shadow'
+            : 'bg-base-200 text-base-content/60 hover:bg-base-300'"
+          @click="switchFund(fund)"
+        >
+          Fund {{ fund.fund_number }}: {{ fund.fund_name || 'My Portfolio' }}
+        </button>
+      </div>
+      <button
+        v-if="portfolioStore.allFunds.length < portfolioStore.MAX_FUNDS"
+        class="btn btn-xs btn-ghost text-primary"
+        @click="showCreateFund = true"
+      >
+        + New Fund
       </button>
     </div>
 
@@ -71,6 +118,7 @@
       <div>
         <h1 class="text-xl font-bold">{{ activeTab === 'group' ? membership?.group?.name : (auth.profile?.full_name || 'My Portfolio') }}</h1>
         <p v-if="activeTab === 'group'" class="text-sm text-base-content/60">{{ auth.profile?.full_name }}</p>
+        <p v-else-if="portfolioStore.portfolio?.fund_thesis" class="text-sm text-base-content/60">{{ portfolioStore.portfolio.fund_thesis }}</p>
         <p v-else class="text-sm text-base-content/60">Personal Portfolio</p>
       </div>
       <RouterLink v-if="isIndependent" to="/join" class="btn btn-ghost btn-xs gap-1">
@@ -289,6 +337,30 @@
       <form method="dialog" class="modal-backdrop" @click="showCloseConfirm = false"><button>close</button></form>
     </dialog>
 
+    <!-- Create Fund Modal -->
+    <dialog class="modal" :class="{ 'modal-open': showCreateFund }">
+      <div class="modal-box">
+        <h3 class="font-bold text-lg">Create New Fund</h3>
+        <div class="form-control mt-4">
+          <label class="label"><span class="label-text">Fund Name</span></label>
+          <input v-model="newFund.name" type="text" placeholder="e.g. Tech Disruptors" class="input input-bordered" maxlength="50" />
+        </div>
+        <div class="form-control mt-3">
+          <label class="label"><span class="label-text">Investment Thesis</span></label>
+          <textarea v-model="newFund.thesis" placeholder="Describe your investment strategy..." class="textarea textarea-bordered" rows="3" maxlength="280"></textarea>
+        </div>
+        <p class="text-xs text-base-content/50 mt-2">Starts with $100,000 cash</p>
+        <div class="modal-action">
+          <button class="btn btn-ghost" @click="showCreateFund = false">Cancel</button>
+          <button class="btn btn-primary" @click="handleCreateFund" :disabled="!newFund.name.trim() || creatingFund">
+            <span v-if="creatingFund" class="loading loading-spinner loading-sm"></span>
+            Create Fund
+          </button>
+        </div>
+      </div>
+      <form method="dialog" class="modal-backdrop" @click="showCreateFund = false"><button>close</button></form>
+    </dialog>
+
     <!-- Settings Feedback -->
     <div v-if="settingsMsg" class="toast toast-end">
       <div class="alert" :class="settingsMsgType === 'success' ? 'alert-success' : 'alert-error'">
@@ -446,7 +518,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
 import { usePortfolioStore } from '../../stores/portfolio'
 import { supabase } from '../../lib/supabase'
@@ -455,6 +527,7 @@ import PortfolioLineChart from '../../components/charts/PortfolioLineChart.vue'
 import PortfolioPieChart from '../../components/charts/PortfolioPieChart.vue'
 import TimeRangeSelector from '../../components/charts/TimeRangeSelector.vue'
 
+const route = useRoute()
 const auth = useAuthStore()
 const portfolioStore = usePortfolioStore()
 
@@ -471,6 +544,17 @@ const bonusTotal = ref(0)
 const showSettings = ref(false)
 const showResetConfirm = ref(false)
 const showCloseConfirm = ref(false)
+const showCreateFund = ref(false)
+const showFundDropdown = ref(false)
+const creatingFund = ref(false)
+const newFund = ref({ name: '', thesis: '' })
+
+const currentFundLabel = computed(() => {
+  const p = portfolioStore.portfolio
+  if (!p) return 'My Portfolio'
+  if (p.fund_name) return `Fund ${p.fund_number || 1}: ${p.fund_name}`
+  return 'My Portfolio'
+})
 const resetting = ref(false)
 const closing = ref(false)
 const isPersonalPortfolio = computed(() => {
@@ -550,6 +634,16 @@ onMounted(async () => {
       membership.value = { group_id: 'personal', group: { name: 'My Portfolio' } }
       groupMembers.value = [{ id: auth.currentUser.id, full_name: auth.profile?.full_name }]
     }
+  }
+
+  // Load all funds for the current user
+  await portfolioStore.loadAllFunds()
+
+  // If ?fund=xxx query param, switch to that fund
+  const fundQueryId = route.query.fund
+  if (fundQueryId && portfolioStore.allFunds.find(f => f.id === fundQueryId)) {
+    await portfolioStore.loadPortfolioById(fundQueryId)
+    activeTab.value = 'personal'
   }
 
   // Populate settings form
@@ -917,6 +1011,71 @@ async function handleClose() {
   showFeedback('Portfolio closed. New portfolio created!')
 }
 
+async function handleCreateFund() {
+  if (!newFund.value.name.trim()) return
+  creatingFund.value = true
+  try {
+    const result = await portfolioStore.createFund(newFund.value.name.trim(), newFund.value.thesis.trim())
+    if (result.error) {
+      showFeedback(result.error, 'error')
+      return
+    }
+    // Switch to the new fund
+    await portfolioStore.loadPortfolioById(result.portfolio.id)
+    showCreateFund.value = false
+    newFund.value = { name: '', thesis: '' }
+    // Update settings form
+    if (portfolioStore.portfolio) {
+      settingsForm.value = {
+        name: portfolioStore.portfolio.name || '',
+        description: portfolioStore.portfolio.description || '',
+        benchmark: portfolioStore.benchmarkTicker,
+        isPublic: portfolioStore.portfolio.is_public ?? true
+      }
+    }
+    // Reload charts
+    resetCharts()
+    showFeedback('Fund created!')
+  } finally {
+    creatingFund.value = false
+  }
+}
+
+async function switchFund(fund) {
+  showFundDropdown.value = false
+  if (fund.id === portfolioStore.portfolio?.id) return
+  switchingTab.value = true
+  activeTab.value = 'personal'
+  try {
+    await portfolioStore.loadPortfolioById(fund.id)
+    if (portfolioStore.portfolio) {
+      settingsForm.value = {
+        name: portfolioStore.portfolio.name || '',
+        description: portfolioStore.portfolio.description || '',
+        benchmark: portfolioStore.benchmarkTicker,
+        isPublic: portfolioStore.portfolio.is_public ?? true
+      }
+    }
+    resetCharts()
+    if (portfolioStore.holdings.length > 0) {
+      loadCharts()
+    }
+  } finally {
+    switchingTab.value = false
+  }
+}
+
+function resetCharts() {
+  performanceDatasets.value = []
+  portfolioValueDatasets.value = []
+  relativeToSpyDatasets.value = []
+  sectorSegments.value = []
+  countrySegments.value = []
+  stockSegments.value = []
+  assetClassSegments.value = []
+  comparisonDatasets.value = []
+}
+
 async function switchTab(tab) {
   if (tab === activeTab.value) return
   activeTab.value = tab
@@ -936,15 +1095,7 @@ async function switchTab(tab) {
         isPublic: portfolioStore.portfolio.is_public ?? true
       }
     }
-    // Reload charts
-    performanceDatasets.value = []
-    portfolioValueDatasets.value = []
-    relativeToSpyDatasets.value = []
-    sectorSegments.value = []
-    countrySegments.value = []
-    stockSegments.value = []
-    assetClassSegments.value = []
-    comparisonDatasets.value = []
+    resetCharts()
     if (portfolioStore.holdings.length > 0) {
       loadCharts()
     }

@@ -29,6 +29,7 @@ const router = createRouter({
         { path: 'competitions/:id', name: 'competition-detail', component: () => import('../views/app/CompetitionDetailView.vue') },
         { path: 'join', name: 'join-class', component: () => import('../views/app/JoinClassView.vue') },
         { path: 'active-class', name: 'active-class', component: () => import('../views/app/ActiveClassView.vue') },
+        { path: 'my-funds', name: 'my-funds', component: () => import('../views/app/MyFundsView.vue') },
         { path: 'portfolio-history', name: 'portfolio-history', component: () => import('../views/app/PortfolioHistoryView.vue') },
         { path: 'sp500', name: 'sp500', component: () => import('../views/app/SP500View.vue') },
         { path: 'settings', name: 'profile-settings', component: () => import('../views/app/ProfileSettingsView.vue') },

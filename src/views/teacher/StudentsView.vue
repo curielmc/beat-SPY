@@ -65,6 +65,16 @@
       <dialog class="modal" :class="{ 'modal-open': showAwardModal }">
         <div class="modal-box">
           <h3 class="font-bold text-lg mb-4">Adjust Cash — {{ awardGroupName }}</h3>
+          <!-- Target selector: group portfolio or a student's fund -->
+          <div v-if="awardFundOptions.length > 0" class="form-control mb-4">
+            <label class="label"><span class="label-text">Target</span></label>
+            <select v-model="awardTargetId" class="select select-bordered w-full">
+              <option :value="null">Group Portfolio</option>
+              <option v-for="f in awardFundOptions" :key="f.id" :value="f.id">
+                {{ f.studentName }} — {{ f.fund_name || 'Fund ' + (f.fund_number || 1) }}
+              </option>
+            </select>
+          </div>
           <div class="flex gap-2 mb-4">
             <button class="btn flex-1" :class="awardType === 'add' ? 'btn-success' : 'btn-ghost'" @click="awardType = 'add'">+ Add Cash</button>
             <button class="btn flex-1" :class="awardType === 'subtract' ? 'btn-error' : 'btn-ghost'" @click="awardType = 'subtract'">− Subtract Cash</button>
@@ -189,6 +199,33 @@
               </tbody>
             </table>
           </div>
+
+          <!-- Student Personal Funds -->
+          <div v-if="studentFunds[group.id]?.length" class="mt-4">
+            <h4 class="font-semibold text-sm mb-2">Student Personal Funds</h4>
+            <div class="overflow-x-auto">
+              <table class="table table-sm">
+                <thead>
+                  <tr>
+                    <th>Student</th>
+                    <th>Fund</th>
+                    <th>Thesis</th>
+                    <th class="text-right">Value</th>
+                    <th class="text-right">Return</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="sf in studentFunds[group.id]" :key="sf.id">
+                    <td class="text-sm">{{ sf.studentName }}</td>
+                    <td class="text-sm font-semibold">{{ sf.fund_name || 'Fund ' + (sf.fund_number || 1) }}</td>
+                    <td class="text-xs text-base-content/60 max-w-[200px] truncate">{{ sf.fund_thesis || '-' }}</td>
+                    <td class="text-right font-mono">${{ Number(sf.cash_balance || 0).toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</td>
+                    <td class="text-right font-mono text-base-content/50">-</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
     </template>
@@ -205,6 +242,7 @@ const teacher = useTeacherStore()
 const loading = ref(true)
 const rankedGroups = ref([])
 const groupHoldings = reactive({})
+const studentFunds = reactive({})
 const assignTargets = reactive({})
 const newGroupNames = reactive({})
 
@@ -243,14 +281,32 @@ const awardGroupName = ref('')
 const awardType = ref("add")
 const awardAmount = ref(null)
 const awardSuccess = ref('')
+const awardTargetId = ref(null)
+const awardFundOptions = ref([])
 
 onMounted(async () => {
   await teacher.loadTeacherData()
   rankedGroups.value = await teacher.getRankedGroups()
 
-  // Load holdings for each group
+  // Load holdings and student funds for each group
   for (const group of rankedGroups.value) {
     groupHoldings[group.id] = await teacher.getGroupHoldings(group.id)
+
+    // Load personal funds for each member
+    const funds = []
+    for (const member of (group.members || [])) {
+      const { data: memberFunds } = await supabase
+        .from('portfolios')
+        .select('*')
+        .eq('owner_type', 'user')
+        .eq('owner_id', member.user_id || member.id)
+        .or('status.eq.active,status.is.null')
+        .order('fund_number', { ascending: true })
+      for (const f of (memberFunds || [])) {
+        funds.push({ ...f, studentName: member.name })
+      }
+    }
+    studentFunds[group.id] = funds
   }
 
   loading.value = false
@@ -285,14 +341,34 @@ function openAwardModal(group) {
   awardGroupName.value = group.name
   awardType.value = "add"
   awardAmount.value = null
+  awardTargetId.value = null
+  awardFundOptions.value = studentFunds[group.id] || []
   showAwardModal.value = true
 }
 
 async function confirmAward() {
-  if (!awardGroupId.value || !awardAmount.value || awardAmount.value <= 0) return
+  if (!awardAmount.value || awardAmount.value <= 0) return
   const finalAmount = awardType.value === "subtract" ? -awardAmount.value : awardAmount.value
-  await teacher.awardBonusCash(awardGroupId.value, finalAmount)
-  awardSuccess.value = `Awarded $${awardAmount.value.toLocaleString()} to ${awardGroupName.value}!`
+
+  if (awardTargetId.value) {
+    // Award to a specific student fund
+    const { data: fundData } = await supabase
+      .from('portfolios')
+      .select('cash_balance')
+      .eq('id', awardTargetId.value)
+      .single()
+    if (fundData) {
+      await supabase
+        .from('portfolios')
+        .update({ cash_balance: Number(fundData.cash_balance) + finalAmount })
+        .eq('id', awardTargetId.value)
+    }
+    awardSuccess.value = `${awardType.value === 'add' ? 'Added' : 'Subtracted'} $${awardAmount.value.toLocaleString()} ${awardType.value === 'add' ? 'to' : 'from'} student fund!`
+  } else {
+    // Award to group portfolio
+    await teacher.awardBonusCash(awardGroupId.value, finalAmount)
+    awardSuccess.value = `${awardType.value === 'add' ? 'Added' : 'Subtracted'} $${awardAmount.value.toLocaleString()} ${awardType.value === 'add' ? 'to' : 'from'} ${awardGroupName.value}!`
+  }
   showAwardModal.value = false
   rankedGroups.value = await teacher.getRankedGroups()
   setTimeout(() => { awardSuccess.value = '' }, 5000)

@@ -15,8 +15,10 @@ export const usePortfolioStore = defineStore('portfolio', () => {
   const trades = ref([])              // trade history
   const benchmarkTrades = ref([])     // benchmark trade history
   const snapshots = ref([])           // portfolio snapshots (reset/close history)
+  const allFunds = ref([])            // all funds for current user
   const loading = ref(false)
   const version = ref(0)
+  const MAX_FUNDS = 6
 
   const cashBalance = computed(() => portfolio.value?.cash_balance || 0)
   const startingCash = computed(() => portfolio.value?.starting_cash || STARTING_CASH)
@@ -57,6 +59,29 @@ export const usePortfolioStore = defineStore('portfolio', () => {
 
   const isBeatingSP500 = computed(() => totalReturnPct.value > benchmarkReturnPct.value)
 
+  // Load a specific portfolio by its ID
+  async function loadPortfolioById(portfolioId) {
+    if (!portfolioId) return
+    loading.value = true
+    try {
+      const { data: pData } = await supabase
+        .from('portfolios')
+        .select('*')
+        .eq('id', portfolioId)
+        .single()
+
+      portfolio.value = pData
+
+      if (pData) {
+        await _loadPortfolioData(pData)
+      } else {
+        _clearPortfolioData()
+      }
+    } finally {
+      loading.value = false
+    }
+  }
+
   // Load portfolio for a given owner (groupId or userId)
   async function loadPortfolio(ownerType, ownerId) {
     if (!ownerId) return
@@ -76,48 +101,51 @@ export const usePortfolioStore = defineStore('portfolio', () => {
       portfolio.value = pData
 
       if (pData) {
-        // Fetch holdings
-        const { data: hData } = await supabase
-          .from('holdings')
-          .select('*')
-          .eq('portfolio_id', pData.id)
-        rawHoldings.value = hData || []
-
-        // Fetch benchmark holdings
-        const { data: bhData } = await supabase
-          .from('benchmark_holdings')
-          .select('*')
-          .eq('portfolio_id', pData.id)
-        benchmarkHoldings.value = bhData || []
-
-        // Fetch trades
-        const { data: tData } = await supabase
-          .from('trades')
-          .select('*')
-          .eq('portfolio_id', pData.id)
-          .order('executed_at', { ascending: false })
-        trades.value = tData || []
-
-        // Fetch benchmark trades
-        const { data: btData } = await supabase
-          .from('benchmark_trades')
-          .select('*')
-          .eq('portfolio_id', pData.id)
-          .order('executed_at', { ascending: false })
-        benchmarkTrades.value = btData || []
-
-        // Fetch live prices for all holdings
-        await enrichHoldings()
+        await _loadPortfolioData(pData)
       } else {
-        rawHoldings.value = []
-        benchmarkHoldings.value = []
-        trades.value = []
-        benchmarkTrades.value = []
-        holdings.value = []
+        _clearPortfolioData()
       }
     } finally {
       loading.value = false
     }
+  }
+
+  async function _loadPortfolioData(pData) {
+    const { data: hData } = await supabase
+      .from('holdings')
+      .select('*')
+      .eq('portfolio_id', pData.id)
+    rawHoldings.value = hData || []
+
+    const { data: bhData } = await supabase
+      .from('benchmark_holdings')
+      .select('*')
+      .eq('portfolio_id', pData.id)
+    benchmarkHoldings.value = bhData || []
+
+    const { data: tData } = await supabase
+      .from('trades')
+      .select('*')
+      .eq('portfolio_id', pData.id)
+      .order('executed_at', { ascending: false })
+    trades.value = tData || []
+
+    const { data: btData } = await supabase
+      .from('benchmark_trades')
+      .select('*')
+      .eq('portfolio_id', pData.id)
+      .order('executed_at', { ascending: false })
+    benchmarkTrades.value = btData || []
+
+    await enrichHoldings()
+  }
+
+  function _clearPortfolioData() {
+    rawHoldings.value = []
+    benchmarkHoldings.value = []
+    trades.value = []
+    benchmarkTrades.value = []
+    holdings.value = []
   }
 
   async function enrichHoldings() {
@@ -670,17 +698,77 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     return { holdingsMap, tradesMap }
   }
 
+  // Create a new fund for the current user
+  async function createFund(fundName, fundThesis, fundStartingCash = 100000) {
+    if (!auth.currentUser) return { error: 'Not logged in' }
+    if (allFunds.value.length >= MAX_FUNDS) return { error: `Maximum of ${MAX_FUNDS} funds allowed` }
+
+    const nextFundNumber = (allFunds.value.length || 0) + 1
+    const market = useMarketDataStore()
+
+    const { data: newPortfolio, error } = await supabase
+      .from('portfolios')
+      .insert({
+        owner_type: 'user',
+        owner_id: auth.currentUser.id,
+        cash_balance: fundStartingCash,
+        starting_cash: fundStartingCash,
+        fund_starting_cash: fundStartingCash,
+        fund_name: fundName,
+        fund_thesis: fundThesis,
+        fund_number: nextFundNumber,
+        status: 'active',
+        allow_reset: true,
+        is_public: true
+      })
+      .select()
+      .single()
+    if (error) return { error: error.message }
+
+    // Buy equivalent SPY for benchmark (mirrors existing benchmark logic)
+    const bmTicker = 'SPY'
+    const bmQuote = await market.fetchQuote(bmTicker)
+    const bmPrice = bmQuote?.price || bmQuote?.previousClose
+    if (bmPrice) {
+      // We don't actually buy benchmark upfront - benchmark buys happen on trades
+      // Just set up the portfolio, benchmark tracks when user trades
+    }
+
+    allFunds.value.push(newPortfolio)
+    return { success: true, portfolio: newPortfolio }
+  }
+
+  // Load all funds for current user
+  async function loadAllFunds() {
+    if (!auth.currentUser) return []
+    const { data, error } = await supabase
+      .from('portfolios')
+      .select('*')
+      .eq('owner_type', 'user')
+      .eq('owner_id', auth.currentUser.id)
+      .or('status.eq.active,status.is.null')
+      .order('fund_number', { ascending: true })
+
+    if (error) {
+      console.warn('Failed to load funds:', error)
+      return []
+    }
+    allFunds.value = data || []
+    return data || []
+  }
+
   return {
     portfolio, holdings, rawHoldings, benchmarkHoldings,
     trades, benchmarkTrades, loading, version,
     cashBalance, startingCash, totalMarketValue,
     totalReturnDollar, totalReturnPct,
     benchmarkMarketValue, benchmarkReturnPct, isBeatingSP500,
-    benchmarkTicker, STARTING_CASH,
-    loadPortfolio, enrichHoldings, buyStock, sellStock,
+    benchmarkTicker, STARTING_CASH, allFunds, MAX_FUNDS,
+    loadPortfolio, loadPortfolioById, enrichHoldings, buyStock, sellStock,
     getHolding, getPortfolioValueById,
     changeBenchmark, setPublic, updatePortfolioMeta,
     resetPortfolio, closePortfolio, loadSnapshots, snapshots, createPersonalPortfolio,
-    getLeaderboardData, getPublicLeaderboardData
+    getLeaderboardData, getPublicLeaderboardData,
+    createFund, loadAllFunds
   }
 })
