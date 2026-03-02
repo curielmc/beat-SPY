@@ -97,6 +97,18 @@ export async function screenStocks(params = {}) {
   return fmpFetch(`/stock-screener?${query.toString()}`)
 }
 
+export async function getSPYHoldings() {
+  return fmpFetch('/etf-holder/SPY')
+}
+
+export async function getSP500Constituents() {
+  return fmpFetch('/sp500_constituent')
+}
+
+export async function getETFInfo(ticker) {
+  return fmpFetch(`/etf-holder/${ticker}`)
+}
+
 export async function screenStocksMultiCountry(countries, params = {}) {
   const limit = Math.ceil((params.limit || 50) / countries.length)
   const calls = countries.map(c => screenStocks({ ...params, country: c, limit }))
