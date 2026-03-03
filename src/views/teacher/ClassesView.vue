@@ -62,9 +62,19 @@
 
               <!-- Existing invites table -->
               <div v-if="classInvites[cls.id]?.length" class="mt-4">
+                <div class="flex items-center gap-2 mb-2">
+                  <label class="flex items-center gap-1 text-sm cursor-pointer">
+                    <input type="checkbox" class="checkbox checkbox-sm" :checked="isAllSelected(cls.id)" @change="toggleSelectAll(cls.id, $event.target.checked)" />
+                    Select All
+                  </label>
+                  <button v-if="selectedInvites[cls.id]?.size > 0" class="btn btn-xs btn-error btn-outline" @click="handleBulkRemove(cls.id)">
+                    Delete Selected ({{ selectedInvites[cls.id]?.size }})
+                  </button>
+                </div>
                 <table class="table table-sm">
                   <thead>
                     <tr>
+                      <th class="w-8"></th>
                       <th>Name</th>
                       <th>Email</th>
                       <th>Grade</th>
@@ -75,6 +85,7 @@
                   </thead>
                   <tbody>
                     <tr v-for="inv in classInvites[cls.id]" :key="inv.id">
+                      <td><input type="checkbox" class="checkbox checkbox-sm" :checked="selectedInvites[cls.id]?.has(inv.id)" @change="toggleSelectInvite(cls.id, inv.id, $event.target.checked)" /></td>
                       <td>{{ inv.full_name }}</td>
                       <td class="font-mono text-xs">{{ inv.email || '-' }}</td>
                       <td>{{ inv.grade || '-' }}</td>
@@ -186,6 +197,7 @@ const invitePasteText = ref('')
 const inviteError = ref('')
 const inviteSuccess = ref('')
 const classInvites = ref({})
+const selectedInvites = ref({})
 const showResetModal = ref(false)
 const resetClass = ref(null)
 const resetConfirmText = ref('')
@@ -399,6 +411,42 @@ function handleCSVUpload(event) {
 
 async function handleRemoveInvite(classId, inviteId) {
   await teacher.removeInvite(inviteId)
+  selectedInvites.value[classId]?.delete(inviteId)
+  classInvites.value[classId] = await teacher.loadInvites(classId)
+}
+
+function toggleSelectInvite(classId, inviteId, checked) {
+  if (!selectedInvites.value[classId]) selectedInvites.value[classId] = new Set()
+  if (checked) {
+    selectedInvites.value[classId].add(inviteId)
+  } else {
+    selectedInvites.value[classId].delete(inviteId)
+  }
+  // Force reactivity
+  selectedInvites.value = { ...selectedInvites.value }
+}
+
+function toggleSelectAll(classId, checked) {
+  if (checked) {
+    selectedInvites.value[classId] = new Set((classInvites.value[classId] || []).map(i => i.id))
+  } else {
+    selectedInvites.value[classId] = new Set()
+  }
+  selectedInvites.value = { ...selectedInvites.value }
+}
+
+function isAllSelected(classId) {
+  const invites = classInvites.value[classId] || []
+  return invites.length > 0 && selectedInvites.value[classId]?.size === invites.length
+}
+
+async function handleBulkRemove(classId) {
+  const ids = [...(selectedInvites.value[classId] || [])]
+  if (ids.length === 0) return
+  for (const id of ids) {
+    await teacher.removeInvite(id)
+  }
+  selectedInvites.value[classId] = new Set()
   classInvites.value[classId] = await teacher.loadInvites(classId)
 }
 </script>

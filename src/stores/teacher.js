@@ -369,10 +369,17 @@ export const useTeacherStore = defineStore('teacher', () => {
 
   // Bulk upsert invites for a class, auto-create groups if group_name provided
   async function addInvites(classId, rows) {
+    // Refresh groups to ensure we have current data
+    const { data: freshGroups } = await supabase
+      .from('groups')
+      .select('*')
+      .eq('class_id', classId)
+    const existingGroups = freshGroups || []
+
     // Auto-create groups from unique group names
     const groupNames = [...new Set(rows.map(r => r.group_name).filter(Boolean))]
     for (const gName of groupNames) {
-      const existing = groups.value.find(g => g.class_id === classId && g.name.toLowerCase() === gName.toLowerCase())
+      const existing = existingGroups.find(g => g.name.toLowerCase() === gName.toLowerCase())
       if (!existing) {
         await createGroup(classId, gName)
       }
