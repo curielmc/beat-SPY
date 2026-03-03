@@ -546,6 +546,12 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     await supabase.from('holdings').delete().eq('portfolio_id', portfolioId)
     await supabase.from('benchmark_holdings').delete().eq('portfolio_id', portfolioId)
 
+    // Clear trade history for personal portfolios only
+    if (portfolio.value.owner_type === 'user') {
+      await supabase.from('trades').delete().eq('portfolio_id', portfolioId)
+      await supabase.from('benchmark_trades').delete().eq('portfolio_id', portfolioId)
+    }
+
     // Reset cash and increment reset_count
     const newResetCount = (portfolio.value.reset_count || 0) + 1
     await supabase.from('portfolios').update({
