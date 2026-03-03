@@ -180,7 +180,27 @@ export const useAuthStore = defineStore('auth', () => {
 
     let finalGroupId = null
 
-    if (classData.group_mode !== 'teacher_assign') {
+    // If invite has a group_name, look up the matching group
+    if (!groupId && !newGroupName && inviteId) {
+      const { data: inviteData } = await supabase
+        .from('class_invites')
+        .select('group_name')
+        .eq('id', inviteId)
+        .maybeSingle()
+      if (inviteData?.group_name) {
+        const { data: matchedGroup } = await supabase
+          .from('groups')
+          .select('id')
+          .eq('class_id', classData.id)
+          .ilike('name', inviteData.group_name)
+          .maybeSingle()
+        if (matchedGroup) {
+          finalGroupId = matchedGroup.id
+        }
+      }
+    }
+
+    if (!finalGroupId && classData.group_mode !== 'teacher_assign') {
       if (newGroupName) {
         // Create new group
         const { data: newGroup, error: groupError } = await supabase

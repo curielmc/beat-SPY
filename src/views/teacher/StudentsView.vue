@@ -144,6 +144,23 @@
         <form method="dialog" class="modal-backdrop" @click="showCreateGroupModal = false"><button>close</button></form>
       </dialog>
 
+      <!-- Delete Group Modal -->
+      <dialog class="modal" :class="{ 'modal-open': showDeleteGroupModal }">
+        <div class="modal-box">
+          <h3 class="font-bold text-lg text-error mb-2">Delete Group</h3>
+          <p class="mb-2">This will permanently delete <strong>{{ deleteGroupTarget?.name }}</strong> and its portfolio/holdings.</p>
+          <p v-if="deleteGroupTarget?.members?.length" class="text-sm text-base-content/60 mb-4">{{ deleteGroupTarget.members.length }} member(s) will become unassigned.</p>
+          <div class="modal-action">
+            <button class="btn btn-ghost" @click="showDeleteGroupModal = false">Cancel</button>
+            <button class="btn btn-error" :disabled="deletingGroup" @click="handleDeleteGroup">
+              <span v-if="deletingGroup" class="loading loading-spinner loading-sm"></span>
+              Delete Group
+            </button>
+          </div>
+        </div>
+        <form method="dialog" class="modal-backdrop" @click="showDeleteGroupModal = false"><button>close</button></form>
+      </dialog>
+
       <div v-if="awardSuccess" class="alert alert-success">
         <span>{{ awardSuccess }}</span>
       </div>
@@ -176,6 +193,7 @@
                   type="checkbox"
                   class="toggle toggle-xs toggle-primary"
                   :checked="group.allow_student_configure"
+                  @click.stop
                   @change="toggleStudentConfigure(group, $event.target.checked)"
                 />
               </label>
@@ -218,7 +236,10 @@
             </div>
           </div>
 
-          <button class="btn btn-sm btn-success btn-outline mb-4" @click="openAwardModal(group)">$ Adjust Cash</button>
+          <div class="flex gap-2 mb-4">
+            <button class="btn btn-sm btn-success btn-outline" @click="openAwardModal(group)">$ Adjust Cash</button>
+            <button class="btn btn-sm btn-error btn-outline" @click="openDeleteGroupModal(group)">Delete Group</button>
+          </div>
 
           <!-- Holdings Table -->
           <div class="overflow-x-auto">
@@ -352,6 +373,52 @@ async function handleCreateGroup() {
   showCreateGroupModal.value = false
   createGroupName.value = ''
   rankedGroups.value = await teacher.getRankedGroups()
+}
+
+// Delete Group
+const showDeleteGroupModal = ref(false)
+const deleteGroupTarget = ref(null)
+const deletingGroup = ref(false)
+
+function openDeleteGroupModal(group) {
+  deleteGroupTarget.value = group
+  showDeleteGroupModal.value = true
+}
+
+async function handleDeleteGroup() {
+  if (!deleteGroupTarget.value) return
+  deletingGroup.value = true
+  try {
+    const groupId = deleteGroupTarget.value.id
+
+    // Unassign members
+    await supabase
+      .from('class_memberships')
+      .update({ group_id: null })
+      .eq('group_id', groupId)
+
+    // Delete group portfolio + holdings
+    const { data: portfolio } = await supabase
+      .from('portfolios')
+      .select('id')
+      .eq('owner_type', 'group')
+      .eq('owner_id', groupId)
+      .maybeSingle()
+
+    if (portfolio) {
+      await supabase.from('holdings').delete().eq('portfolio_id', portfolio.id)
+      await supabase.from('portfolios').delete().eq('id', portfolio.id)
+    }
+
+    // Delete the group
+    await supabase.from('groups').delete().eq('id', groupId)
+
+    showDeleteGroupModal.value = false
+    await teacher.loadTeacherData()
+    rankedGroups.value = await teacher.getRankedGroups()
+  } finally {
+    deletingGroup.value = false
+  }
 }
 
 // Open New Fund for Class
