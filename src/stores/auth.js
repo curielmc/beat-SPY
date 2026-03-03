@@ -130,7 +130,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   // Join a class
-  async function joinClass(classCode, groupId = null, newGroupName = null) {
+  async function joinClass(classCode, groupId = null, newGroupName = null, inviteId = null) {
     if (!currentUser.value) return { error: 'Not logged in' }
 
     // Look up the class by code
@@ -214,7 +214,21 @@ export const useAuthStore = defineStore('auth', () => {
       })
     }
 
+    // Mark invite as joined if provided
+    if (inviteId) {
+      await supabase.rpc('mark_invite_joined', { invite_id: inviteId })
+    }
+
     return { success: true, classData, groupId: finalGroupId }
+  }
+
+  // Check if an email has a pending class invite
+  async function checkEmailInvite(emailAddr) {
+    const { data, error } = await supabase.rpc('find_class_invite_by_email', {
+      lookup_email: emailAddr
+    })
+    if (error || !data || data.length === 0) return null
+    return data[0]
   }
 
   // Validate a class code (for signup flow)
@@ -312,7 +326,7 @@ export const useAuthStore = defineStore('auth', () => {
     isLoggedIn, userType, isTeacher, isAdmin,
     allMemberships, activeClassId, membership, setActiveClass,
     init, fetchProfile, signup, login, signInWithOAuth,
-    updateProfile, joinClass, validateClassCode,
+    updateProfile, joinClass, validateClassCode, checkEmailInvite,
     getGroupsForClass, getCurrentMembership, getGroupMembers,
     fetchPublicProfile, fetchPublicPortfolios, logout
   }

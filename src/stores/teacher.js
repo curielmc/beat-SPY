@@ -356,12 +356,49 @@ export const useTeacherStore = defineStore('teacher', () => {
     })
   }
 
+  // Load invites for a class
+  async function loadInvites(classId) {
+    const { data, error } = await supabase
+      .from('class_invites')
+      .select('*')
+      .eq('class_id', classId)
+      .order('invited_at', { ascending: false })
+    if (error) return []
+    return data || []
+  }
+
+  // Bulk upsert invites for a class
+  async function addInvites(classId, rows) {
+    const invites = rows.map(r => ({
+      class_id: classId,
+      email: r.email.toLowerCase().trim(),
+      full_name: r.full_name.trim()
+    }))
+    const { data, error } = await supabase
+      .from('class_invites')
+      .upsert(invites, { onConflict: 'class_id,email' })
+      .select()
+    if (error) return { error: error.message }
+    return { data }
+  }
+
+  // Remove a pending invite
+  async function removeInvite(inviteId) {
+    const { error } = await supabase
+      .from('class_invites')
+      .delete()
+      .eq('id', inviteId)
+    if (error) return { error: error.message }
+    return { success: true }
+  }
+
   return {
     classes, groups, students, unassignedStudents, loading,
     loadTeacherData, getRankedGroups, createClass, generateClassCode,
     createGroup, assignStudentToGroup, moveStudentToGroup,
     kickFromGroup, kickStudent, awardBonusCash,
     updateRestrictions, updateGroupMode, setApprovalCode,
-    generateApprovalCode, getGroupHoldings, updateClassSettings
+    generateApprovalCode, getGroupHoldings, updateClassSettings,
+    loadInvites, addInvites, removeInvite
   }
 })

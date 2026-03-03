@@ -32,7 +32,10 @@
         </div>
         <div class="form-control">
           <label class="label"><span class="label-text">Email</span></label>
-          <input v-model="email" type="email" placeholder="you@school.edu" class="input input-bordered w-full" />
+          <input v-model="email" type="email" placeholder="you@school.edu" class="input input-bordered w-full" @blur="checkInvite" />
+        </div>
+        <div v-if="inviteMatch" class="alert alert-success text-sm py-2">
+          <span>We found your invite to {{ inviteMatch.class_name }}!</span>
         </div>
         <div class="form-control">
           <label class="label"><span class="label-text">Password</span></label>
@@ -136,6 +139,7 @@ const submitting = ref(false)
 const isIndependent = ref(false)
 const availableGroups = ref([])
 const loadingGroups = ref(false)
+const inviteMatch = ref(null)
 
 watch(teacherCode, () => {
   codeError.value = false
@@ -158,6 +162,29 @@ function startIndependent() {
   isIndependent.value = true
   validClass.value = null
   step.value = 2
+}
+
+async function checkInvite() {
+  if (!email.value || !email.value.includes('@')) return
+  const invite = await auth.checkEmailInvite(email.value)
+  if (invite) {
+    inviteMatch.value = invite
+    // Auto-fill name if blank
+    if (!name.value.trim()) {
+      name.value = invite.full_name
+    }
+    // Auto-set class from invite if not already set
+    if (!validClass.value) {
+      const cls = await auth.validateClassCode(invite.class_code)
+      if (cls) {
+        validClass.value = cls
+        teacherCode.value = invite.class_code
+        isIndependent.value = false
+      }
+    }
+  } else {
+    inviteMatch.value = null
+  }
 }
 
 function validateInfo() {
@@ -223,7 +250,8 @@ async function completeSignup() {
     const joinResult = await auth.joinClass(
       teacherCode.value,
       selectedGroupId.value,
-      newGroupName.value.trim() || null
+      newGroupName.value.trim() || null,
+      inviteMatch.value?.id || null
     )
 
     if (joinResult.error) {

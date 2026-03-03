@@ -44,6 +44,48 @@
               </div>
             </div>
             <p class="text-xs text-base-content/40">Note: Starting cash only applies to new groups created after this change.</p>
+
+            <!-- Pre-load Students -->
+            <div class="border-t pt-4 mt-4">
+              <h3 class="font-semibold mb-2">Pre-load Students</h3>
+              <p class="text-xs text-base-content/60 mb-2">Paste student names and emails (one per line: Full Name, email@school.edu) or upload a CSV.</p>
+              <textarea v-model="invitePasteText" rows="4" class="textarea textarea-bordered w-full font-mono text-sm" placeholder="John Smith, john@school.edu&#10;Jane Doe, jane@school.edu"></textarea>
+              <div class="flex gap-2 mt-2">
+                <label class="btn btn-sm btn-outline">
+                  Upload CSV
+                  <input type="file" accept=".csv,.txt" class="hidden" @change="handleCSVUpload" />
+                </label>
+                <button class="btn btn-sm btn-primary" @click="handleAddInvites(cls.id)" :disabled="!invitePasteText.trim()">Add Students</button>
+              </div>
+              <p v-if="inviteError" class="text-error text-sm mt-1">{{ inviteError }}</p>
+              <p v-if="inviteSuccess" class="text-success text-sm mt-1">{{ inviteSuccess }}</p>
+
+              <!-- Existing invites table -->
+              <div v-if="classInvites[cls.id]?.length" class="mt-4">
+                <table class="table table-sm">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Email</th>
+                      <th>Status</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="inv in classInvites[cls.id]" :key="inv.id">
+                      <td>{{ inv.full_name }}</td>
+                      <td class="font-mono text-xs">{{ inv.email }}</td>
+                      <td>
+                        <span class="badge badge-sm" :class="inv.status === 'joined' ? 'badge-success' : 'badge-warning'">{{ inv.status }}</span>
+                      </td>
+                      <td>
+                        <button v-if="inv.status === 'pending'" class="btn btn-xs btn-ghost text-error" @click="handleRemoveInvite(cls.id, inv.id)">Remove</button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -110,6 +152,10 @@ const newAllowReset = ref(false)
 const error = ref('')
 const success = ref('')
 const expandedClass = ref(null)
+const invitePasteText = ref('')
+const inviteError = ref('')
+const inviteSuccess = ref('')
+const classInvites = ref({})
 
 onMounted(async () => {
   await teacher.loadTeacherData()
@@ -124,8 +170,14 @@ const classesWithCounts = computed(() => {
   }))
 })
 
-function toggleClassSettings(classId) {
-  expandedClass.value = expandedClass.value === classId ? null : classId
+async function toggleClassSettings(classId) {
+  if (expandedClass.value === classId) {
+    expandedClass.value = null
+  } else {
+    expandedClass.value = classId
+    // Load invites when expanding
+    classInvites.value[classId] = await teacher.loadInvites(classId)
+  }
 }
 
 async function updateSetting(classId, key, value) {
@@ -160,5 +212,61 @@ async function handleCreate() {
   newStartingCash.value = 100000
   newMaxPortfolios.value = 1
   newAllowReset.value = false
+}
+
+function parseInviteLines(text) {
+  return text.split('\n')
+    .map(line => line.trim())
+    .filter(line => line && line.includes(','))
+    .map(line => {
+      const parts = line.split(',').map(p => p.trim())
+      // Skip header rows
+      if (parts[0].toLowerCase() === 'name' || parts[0].toLowerCase() === 'full name') return null
+      // Detect order: if first part looks like email, swap
+      if (parts[0].includes('@') && parts.length >= 2) {
+        return { email: parts[0], full_name: parts[1] }
+      }
+      // Default: name first, email second
+      const email = parts.find(p => p.includes('@'))
+      const nameParts = parts.filter(p => !p.includes('@'))
+      if (!email) return null
+      return { email, full_name: nameParts.join(' ') }
+    })
+    .filter(Boolean)
+}
+
+async function handleAddInvites(classId) {
+  inviteError.value = ''
+  inviteSuccess.value = ''
+  const rows = parseInviteLines(invitePasteText.value)
+  if (rows.length === 0) {
+    inviteError.value = 'No valid rows found. Use format: Full Name, email@school.edu'
+    return
+  }
+  const result = await teacher.addInvites(classId, rows)
+  if (result.error) {
+    inviteError.value = result.error
+    return
+  }
+  inviteSuccess.value = `Added ${rows.length} student(s)`
+  invitePasteText.value = ''
+  classInvites.value[classId] = await teacher.loadInvites(classId)
+  setTimeout(() => { inviteSuccess.value = '' }, 3000)
+}
+
+function handleCSVUpload(event) {
+  const file = event.target.files[0]
+  if (!file) return
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    invitePasteText.value = e.target.result
+  }
+  reader.readAsText(file)
+  event.target.value = ''
+}
+
+async function handleRemoveInvite(classId, inviteId) {
+  await teacher.removeInvite(inviteId)
+  classInvites.value[classId] = await teacher.loadInvites(classId)
 }
 </script>
