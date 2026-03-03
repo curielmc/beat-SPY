@@ -51,6 +51,25 @@ export const useAuthStore = defineStore('auth', () => {
       if (event === 'SIGNED_IN' && session?.user) {
         currentUser.value = session.user
         await fetchProfile(session.user.id)
+
+        // Auto-join class if student has a pending invite and no memberships
+        if (profile.value?.role === 'student' && session.user.email) {
+          const { data: existing } = await supabase
+            .from('class_memberships')
+            .select('id')
+            .eq('user_id', session.user.id)
+            .limit(1)
+          if (!existing || existing.length === 0) {
+            const invite = await checkEmailInvite(session.user.email)
+            if (invite) {
+              // Update name from invite if it's just the email prefix
+              if (profile.value.full_name === session.user.email.split('@')[0]) {
+                await updateProfile({ full_name: invite.full_name })
+              }
+              await joinClass(invite.class_code, null, null, invite.id)
+            }
+          }
+        }
       } else if (event === 'SIGNED_OUT') {
         currentUser.value = null
         profile.value = null
