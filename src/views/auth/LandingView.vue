@@ -105,11 +105,14 @@ async function signUpWithEmail() {
     return
   }
 
+  // Check for a pending class invite before creating account
+  const invite = await auth.checkEmailInvite(email.value)
+
   // Login failed — try signup
   const result = await auth.signup({
     email: email.value,
     password: password.value,
-    fullName: email.value.split('@')[0],
+    fullName: invite?.full_name || email.value.split('@')[0],
     role: 'student'
   })
 
@@ -117,6 +120,11 @@ async function signUpWithEmail() {
     emailError.value = result.error
     submitting.value = false
     return
+  }
+
+  // If invite found, auto-join the class
+  if (invite) {
+    await auth.joinClass(invite.class_code, null, null, invite.id)
   }
 
   submitting.value = false
