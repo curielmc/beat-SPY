@@ -1,8 +1,11 @@
 <template>
   <div class="space-y-6">
-    <div>
-      <h1 class="text-2xl font-bold">Student Progress</h1>
-      <p class="text-base-content/70">View each group's performance, holdings, and allocation</p>
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-2xl font-bold">Student Progress</h1>
+        <p class="text-base-content/70">View each group's performance, holdings, and allocation</p>
+      </div>
+      <button class="btn btn-primary btn-sm" @click="showOpenFundModal = true">Open New Fund for Class</button>
     </div>
 
     <div v-if="loading" class="flex justify-center py-12">
@@ -91,6 +94,34 @@
           </div>
         </div>
         <form method="dialog" class="modal-backdrop" @click="showAwardModal = false"><button>close</button></form>
+      </dialog>
+
+      <!-- Open New Fund for Class Modal -->
+      <dialog class="modal" :class="{ 'modal-open': showOpenFundModal }">
+        <div class="modal-box">
+          <h3 class="font-bold text-lg mb-4">Open New Fund for Entire Class</h3>
+          <p class="text-sm text-base-content/60 mb-4">This creates a new fund for every group in the class simultaneously.</p>
+          <div class="form-control mb-3">
+            <label class="label"><span class="label-text">Fund Name</span></label>
+            <input v-model="openFundForm.name" type="text" placeholder="e.g. Sector Rotation Fund" class="input input-bordered" maxlength="50" />
+          </div>
+          <div class="form-control mb-3">
+            <label class="label"><span class="label-text">Investment Thesis (optional)</span></label>
+            <textarea v-model="openFundForm.thesis" placeholder="Describe the fund's strategy..." class="textarea textarea-bordered" rows="2" maxlength="280"></textarea>
+          </div>
+          <div class="form-control mb-3">
+            <label class="label"><span class="label-text">Starting Cash ($)</span></label>
+            <input v-model.number="openFundForm.cash" type="number" min="1000" step="1000" class="input input-bordered" />
+          </div>
+          <div class="modal-action">
+            <button class="btn btn-ghost" @click="showOpenFundModal = false">Cancel</button>
+            <button class="btn btn-primary" @click="handleOpenClassFund" :disabled="!openFundForm.name.trim() || openingFund">
+              <span v-if="openingFund" class="loading loading-spinner loading-sm"></span>
+              Open Fund
+            </button>
+          </div>
+        </div>
+        <form method="dialog" class="modal-backdrop" @click="showOpenFundModal = false"><button>close</button></form>
       </dialog>
 
       <div v-if="awardSuccess" class="alert alert-success">
@@ -283,6 +314,38 @@ const awardAmount = ref(null)
 const awardSuccess = ref('')
 const awardTargetId = ref(null)
 const awardFundOptions = ref([])
+
+// Open New Fund for Class
+const showOpenFundModal = ref(false)
+const openingFund = ref(false)
+const openFundForm = ref({ name: '', thesis: '', cash: 100000 })
+
+async function handleOpenClassFund() {
+  const currentClass = teacher.classes[0]
+  if (!currentClass) return
+  openingFund.value = true
+  try {
+    const { error } = await supabase.rpc('open_class_fund', {
+      p_class_id: currentClass.id,
+      p_fund_name: openFundForm.value.name.trim(),
+      p_thesis: openFundForm.value.thesis.trim() || null,
+      p_starting_cash: openFundForm.value.cash || 100000
+    })
+    if (error) {
+      awardSuccess.value = `Error: ${error.message}`
+      setTimeout(() => { awardSuccess.value = '' }, 5000)
+      return
+    }
+    showOpenFundModal.value = false
+    openFundForm.value = { name: '', thesis: '', cash: 100000 }
+    awardSuccess.value = 'New fund opened for all groups!'
+    setTimeout(() => { awardSuccess.value = '' }, 5000)
+    // Reload data
+    rankedGroups.value = await teacher.getRankedGroups()
+  } finally {
+    openingFund.value = false
+  }
+}
 
 onMounted(async () => {
   await teacher.loadTeacherData()

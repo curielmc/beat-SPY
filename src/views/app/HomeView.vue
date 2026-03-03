@@ -61,25 +61,16 @@
       </button>
     </div>
 
-    <!-- Level 2: Fund selector (shown under whichever L1 tab is active) -->
-    <div v-if="currentFunds.length > 0 || (!hasGroupPortfolio && portfolioStore.portfolio)" class="flex items-center gap-2 overflow-x-auto pb-1">
+    <!-- Level 2: Fund selector (group tab only) -->
+    <div v-if="activeTab === 'group' && groupFunds.length > 0" class="flex items-center gap-2 overflow-x-auto pb-1">
       <button
-        v-for="fund in currentFunds"
+        v-for="fund in groupFunds"
         :key="fund.id"
         class="btn btn-xs whitespace-nowrap"
-        :class="activeFundId === fund.id
-          ? (activeTab === 'group' ? 'btn-secondary' : 'btn-primary')
-          : 'btn-ghost'"
+        :class="activeFundId === fund.id ? 'btn-secondary' : 'btn-ghost'"
         @click="switchFund(fund)"
       >
         {{ fund.fund_name || `Fund ${fund.fund_number}` }}
-      </button>
-      <button
-        v-if="currentFunds.length < portfolioStore.MAX_FUNDS"
-        class="btn btn-xs btn-outline gap-1"
-        @click="showCreateFund = true"
-      >
-        <span>+</span> New Fund
       </button>
     </div>
 
@@ -90,14 +81,24 @@
 
     <!-- Header -->
     <div v-if="!switchingTab" class="flex items-center justify-between">
-      <div>
+      <div class="flex items-center gap-2">
         <h1 class="text-xl font-bold">
-          {{ activeFundName }}
+          <template v-if="activeTab === 'personal'">{{ auth.profile?.full_name || 'My Portfolio' }}</template>
+          <template v-else>{{ activeFundName }}</template>
           <span class="text-sm font-normal text-base-content/50">
-            {{ activeTab === 'group' ? membership?.group?.name : 'Personal' }}
+            {{ activeTab === 'group' ? membership?.group?.name : '' }}
           </span>
         </h1>
-        <p v-if="activeFund?.fund_thesis" class="text-xs text-base-content/50 italic mt-0.5">"{{ activeFund.fund_thesis }}"</p>
+        <select
+          v-if="activeTab === 'personal'"
+          v-model="personalVisibility"
+          @change="handleVisibilityChange"
+          class="select select-xs select-ghost"
+        >
+          <option value="private">Private</option>
+          <option value="group">Group</option>
+          <option value="public">Public</option>
+        </select>
       </div>
       <RouterLink v-if="isIndependent" to="/join" class="btn btn-ghost btn-xs gap-1">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
@@ -264,10 +265,12 @@
 
           <!-- Visibility -->
           <div class="form-control">
-            <label class="label cursor-pointer justify-start gap-3">
-              <input type="checkbox" class="toggle toggle-primary toggle-sm" v-model="settingsForm.isPublic" @change="toggleVisibility" />
-              <span class="label-text text-sm">Public portfolio (visible on leaderboard)</span>
-            </label>
+            <label class="label py-1"><span class="label-text text-xs">Visibility</span></label>
+            <select v-model="personalVisibility" @change="handleVisibilityChange" class="select select-bordered select-sm w-full max-w-xs">
+              <option value="private">Private — only you can see it</option>
+              <option value="group">Group — classmates see returns only</option>
+              <option value="public">Public — anyone on platform sees returns</option>
+            </select>
           </div>
 
           <!-- Save Name/Description -->
@@ -313,30 +316,6 @@
         </div>
       </div>
       <form method="dialog" class="modal-backdrop" @click="showCloseConfirm = false"><button>close</button></form>
-    </dialog>
-
-    <!-- Create Fund Modal -->
-    <dialog class="modal" :class="{ 'modal-open': showCreateFund }">
-      <div class="modal-box">
-        <h3 class="font-bold text-lg">Create New Fund</h3>
-        <div class="form-control mt-4">
-          <label class="label"><span class="label-text">Fund Name</span></label>
-          <input v-model="newFund.name" type="text" placeholder="e.g. Tech Disruptors" class="input input-bordered" maxlength="50" />
-        </div>
-        <div class="form-control mt-3">
-          <label class="label"><span class="label-text">Investment Thesis</span></label>
-          <textarea v-model="newFund.thesis" placeholder="Describe your investment strategy..." class="textarea textarea-bordered" rows="3" maxlength="280"></textarea>
-        </div>
-        <p class="text-xs text-base-content/50 mt-2">Starts with $100,000 cash</p>
-        <div class="modal-action">
-          <button class="btn btn-ghost" @click="showCreateFund = false">Cancel</button>
-          <button class="btn btn-primary" @click="handleCreateFund" :disabled="!newFund.name.trim() || creatingFund">
-            <span v-if="creatingFund" class="loading loading-spinner loading-sm"></span>
-            Create Fund
-          </button>
-        </div>
-      </div>
-      <form method="dialog" class="modal-backdrop" @click="showCreateFund = false"><button>close</button></form>
     </dialog>
 
     <!-- Settings Feedback -->
@@ -522,24 +501,19 @@ const bonusTotal = ref(0)
 const showSettings = ref(false)
 const showResetConfirm = ref(false)
 const showCloseConfirm = ref(false)
-const showCreateFund = ref(false)
-const creatingFund = ref(false)
-const newFund = ref({ name: '', thesis: '' })
+const personalVisibility = ref('private')
 
-// Multi-fund state
-const personalFunds = ref([])
+// Multi-fund state (group funds only — personal has exactly 1 portfolio)
 const groupFunds = ref([])
 const activeFundId = ref(null)
 
-const currentFunds = computed(() =>
-  activeTab.value === 'group' ? groupFunds.value : personalFunds.value
-)
 const activeFund = computed(() =>
-  currentFunds.value.find(f => f.id === activeFundId.value) || null
+  groupFunds.value.find(f => f.id === activeFundId.value) || null
 )
 const activeFundName = computed(() => {
+  if (activeTab.value === 'personal') return auth.profile?.full_name || 'My Portfolio'
   const f = activeFund.value
-  if (!f) return portfolioStore.portfolio?.fund_name || 'My Portfolio'
+  if (!f) return portfolioStore.portfolio?.fund_name || 'Group Fund'
   return f.fund_name || `Fund ${f.fund_number}`
 })
 const resetting = ref(false)
@@ -550,7 +524,7 @@ const isPersonalPortfolio = computed(() => {
 })
 const settingsMsg = ref('')
 const settingsMsgType = ref('success')
-const settingsForm = ref({ name: '', description: '', benchmark: '', isPublic: true })
+const settingsForm = ref({ name: '', description: '', benchmark: '' })
 
 const vsSP500 = computed(() => portfolioStore.totalReturnPct - portfolioStore.benchmarkReturnPct)
 const isIndependent = computed(() => membership.value?.group_id === 'personal')
@@ -599,24 +573,22 @@ onMounted(async () => {
     // Load group members
     groupMembers.value = await auth.getGroupMembers(membership.value.group_id)
 
-    // Load both personal and group funds
-    personalFunds.value = await portfolioStore.loadFundsForOwner('user', auth.currentUser.id)
-    groupFunds.value = await portfolioStore.loadFundsForOwner('group', membership.value.group_id)
+    // Load single personal portfolio
+    await portfolioStore.loadPersonalPortfolio()
+    // Load group funds
+    groupFunds.value = await portfolioStore.loadGroupFunds(membership.value.group_id)
 
-    // Default: load first personal fund
-    if (personalFunds.value.length > 0) {
-      activeFundId.value = personalFunds.value[0].id
-      await portfolioStore.loadPortfolioById(personalFunds.value[0].id)
+    // Default: load personal portfolio
+    if (portfolioStore.portfolio) {
       activeTab.value = 'personal'
+      personalVisibility.value = portfolioStore.portfolio.visibility || 'private'
+    } else if (groupFunds.value.length > 0) {
+      // No personal portfolio, load first group fund
+      activeFundId.value = groupFunds.value[0].id
+      await portfolioStore.loadPortfolioById(groupFunds.value[0].id)
+      activeTab.value = 'group'
     } else {
-      // No personal fund, load group fund
-      if (groupFunds.value.length > 0) {
-        activeFundId.value = groupFunds.value[0].id
-        await portfolioStore.loadPortfolioById(groupFunds.value[0].id)
-        activeTab.value = 'group'
-      } else {
-        await portfolioStore.loadPortfolio('group', membership.value.group_id)
-      }
+      await portfolioStore.loadPortfolio('group', membership.value.group_id)
     }
 
     // Check for bonus notifications
@@ -632,31 +604,19 @@ onMounted(async () => {
     }
   } else if (!membership.value) {
     // Independent user - check for personal portfolio
-    await portfolioStore.loadPortfolio('user', auth.currentUser?.id)
+    await portfolioStore.loadPersonalPortfolio()
     if (portfolioStore.portfolio) {
       membership.value = { group_id: 'personal', group: { name: 'My Portfolio' } }
       groupMembers.value = [{ id: auth.currentUser.id, full_name: auth.profile?.full_name }]
-    }
-    // Load personal funds
-    personalFunds.value = await portfolioStore.loadFundsForOwner('user', auth.currentUser?.id)
-    if (personalFunds.value.length > 0) {
-      activeFundId.value = personalFunds.value[0].id
+      personalVisibility.value = portfolioStore.portfolio.visibility || 'private'
     }
   }
 
-  // Also load allFunds for backward compat
-  await portfolioStore.loadAllFunds()
-
-  // If ?fund=xxx query param, switch to that fund
+  // If ?fund=xxx query param, switch to that group fund
   const fundQueryId = route.query.fund
   if (fundQueryId) {
-    const personalMatch = personalFunds.value.find(f => f.id === fundQueryId)
     const groupMatch = groupFunds.value.find(f => f.id === fundQueryId)
-    if (personalMatch) {
-      activeTab.value = 'personal'
-      activeFundId.value = fundQueryId
-      await portfolioStore.loadPortfolioById(fundQueryId)
-    } else if (groupMatch) {
+    if (groupMatch) {
       activeTab.value = 'group'
       activeFundId.value = fundQueryId
       await portfolioStore.loadPortfolioById(fundQueryId)
@@ -668,9 +628,9 @@ onMounted(async () => {
     settingsForm.value = {
       name: portfolioStore.portfolio.name || '',
       description: portfolioStore.portfolio.description || '',
-      benchmark: portfolioStore.benchmarkTicker,
-      isPublic: portfolioStore.portfolio.is_public ?? true
+      benchmark: portfolioStore.benchmarkTicker
     }
+    personalVisibility.value = portfolioStore.portfolio.visibility || 'private'
   }
 
   loading.value = false
@@ -953,13 +913,10 @@ async function handleStartInvesting() {
     creatingPortfolio.value = false
     return
   }
-  await portfolioStore.loadPortfolio('user', auth.currentUser?.id)
+  await portfolioStore.loadPersonalPortfolio()
   membership.value = { group_id: 'personal', group: { name: 'My Portfolio' } }
   groupMembers.value = [{ id: auth.currentUser.id, full_name: auth.profile?.full_name }]
-  personalFunds.value = await portfolioStore.loadFundsForOwner('user', auth.currentUser.id)
-  if (personalFunds.value.length > 0) {
-    activeFundId.value = personalFunds.value[0].id
-  }
+  personalVisibility.value = portfolioStore.portfolio?.visibility || 'private'
   settingsForm.value = {
     name: portfolioStore.portfolio?.name || '',
     description: portfolioStore.portfolio?.description || '',
@@ -983,10 +940,11 @@ async function saveBenchmark() {
   showFeedback(`Benchmark changed to ${ticker}`)
 }
 
-async function toggleVisibility() {
-  const result = await portfolioStore.setPublic(settingsForm.value.isPublic)
+async function handleVisibilityChange() {
+  const result = await portfolioStore.updateVisibility(portfolioStore.portfolio?.id, personalVisibility.value)
   if (result.error) return showFeedback(result.error, 'error')
-  showFeedback(settingsForm.value.isPublic ? 'Portfolio is now public' : 'Portfolio is now private')
+  const labels = { private: 'Private', group: 'Group', public: 'Public' }
+  showFeedback(`Visibility set to ${labels[personalVisibility.value]}`)
 }
 
 async function saveMeta() {
@@ -1032,45 +990,6 @@ async function handleClose() {
   showFeedback('Portfolio closed. New portfolio created!')
 }
 
-async function handleCreateFund() {
-  if (!newFund.value.name.trim()) return
-  creatingFund.value = true
-  try {
-    const ownerType = activeTab.value === 'group' ? 'group' : 'user'
-    const ownerId = ownerType === 'group' ? membership.value.group_id : auth.currentUser.id
-    const result = await portfolioStore.createFund(ownerType, ownerId, newFund.value.name.trim(), newFund.value.thesis.trim())
-    if (result.error) {
-      showFeedback(result.error, 'error')
-      return
-    }
-    // Reload funds for this owner
-    if (ownerType === 'group') {
-      groupFunds.value = await portfolioStore.loadFundsForOwner('group', ownerId)
-    } else {
-      personalFunds.value = await portfolioStore.loadFundsForOwner('user', ownerId)
-      await portfolioStore.loadAllFunds()
-    }
-    // Switch to the new fund
-    activeFundId.value = result.portfolio.id
-    await portfolioStore.loadPortfolioById(result.portfolio.id)
-    showCreateFund.value = false
-    newFund.value = { name: '', thesis: '' }
-    // Update settings form
-    if (portfolioStore.portfolio) {
-      settingsForm.value = {
-        name: portfolioStore.portfolio.name || '',
-        description: portfolioStore.portfolio.description || '',
-        benchmark: portfolioStore.benchmarkTicker,
-        isPublic: portfolioStore.portfolio.is_public ?? true
-      }
-    }
-    resetCharts()
-    showFeedback('Fund created!')
-  } finally {
-    creatingFund.value = false
-  }
-}
-
 async function switchFund(fund) {
   if (fund.id === activeFundId.value) return
   activeFundId.value = fund.id
@@ -1081,8 +1000,7 @@ async function switchFund(fund) {
       settingsForm.value = {
         name: portfolioStore.portfolio.name || '',
         description: portfolioStore.portfolio.description || '',
-        benchmark: portfolioStore.benchmarkTicker,
-        isPublic: portfolioStore.portfolio.is_public ?? true
+        benchmark: portfolioStore.benchmarkTicker
       }
     }
     resetCharts()
@@ -1110,22 +1028,24 @@ async function switchTab(tab) {
   activeTab.value = tab
   switchingTab.value = true
   try {
-    const funds = tab === 'group' ? groupFunds.value : personalFunds.value
-    if (funds.length > 0) {
-      activeFundId.value = funds[0].id
-      await portfolioStore.loadPortfolioById(funds[0].id)
-    } else if (tab === 'personal') {
-      await portfolioStore.loadPortfolio('user', auth.currentUser.id)
+    if (tab === 'personal') {
+      await portfolioStore.loadPersonalPortfolio()
+      personalVisibility.value = portfolioStore.portfolio?.visibility || 'private'
     } else {
-      await portfolioStore.loadPortfolio('group', membership.value.group_id)
+      // Group tab: load first group fund
+      if (groupFunds.value.length > 0) {
+        activeFundId.value = groupFunds.value[0].id
+        await portfolioStore.loadPortfolioById(groupFunds.value[0].id)
+      } else {
+        await portfolioStore.loadPortfolio('group', membership.value.group_id)
+      }
     }
     // Update settings form for the new portfolio
     if (portfolioStore.portfolio) {
       settingsForm.value = {
         name: portfolioStore.portfolio.name || '',
         description: portfolioStore.portfolio.description || '',
-        benchmark: portfolioStore.benchmarkTicker,
-        isPublic: portfolioStore.portfolio.is_public ?? true
+        benchmark: portfolioStore.benchmarkTicker
       }
     }
     resetCharts()

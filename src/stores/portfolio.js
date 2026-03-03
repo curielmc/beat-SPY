@@ -429,16 +429,78 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     return { success: true }
   }
 
-  // Toggle portfolio visibility
-  async function setPublic(isPublic) {
-    if (!portfolio.value) return { error: 'No portfolio' }
+  // Update portfolio visibility (private/group/public)
+  async function updateVisibility(portfolioId, visibility) {
+    const pid = portfolioId || portfolio.value?.id
+    if (!pid) return { error: 'No portfolio' }
     const { error } = await supabase
       .from('portfolios')
-      .update({ is_public: isPublic })
-      .eq('id', portfolio.value.id)
+      .update({ visibility })
+      .eq('id', pid)
     if (error) return { error: error.message }
-    portfolio.value.is_public = isPublic
+    if (portfolio.value?.id === pid) portfolio.value.visibility = visibility
     return { success: true }
+  }
+
+  // Update share_holdings flag (group funds)
+  async function updateShareHoldings(portfolioId, shareHoldings) {
+    const pid = portfolioId || portfolio.value?.id
+    if (!pid) return { error: 'No portfolio' }
+    const { error } = await supabase
+      .from('portfolios')
+      .update({ share_holdings: shareHoldings })
+      .eq('id', pid)
+    if (error) return { error: error.message }
+    if (portfolio.value?.id === pid) portfolio.value.share_holdings = shareHoldings
+    return { success: true }
+  }
+
+  // Legacy toggle for backward compat
+  async function setPublic(isPublic) {
+    return updateVisibility(portfolio.value?.id, isPublic ? 'public' : 'private')
+  }
+
+  // Load the single personal portfolio for the current user
+  async function loadPersonalPortfolio() {
+    if (!auth.currentUser) return
+    loading.value = true
+    try {
+      const { data: pData } = await supabase
+        .from('portfolios')
+        .select('*')
+        .eq('owner_type', 'user')
+        .eq('owner_id', auth.currentUser.id)
+        .or('status.eq.active,status.is.null')
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+
+      portfolio.value = pData
+      if (pData) {
+        await _loadPortfolioData(pData)
+      } else {
+        _clearPortfolioData()
+      }
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // Load all group funds for a group, sorted by fund_number
+  async function loadGroupFunds(groupId) {
+    if (!groupId) return []
+    const { data, error } = await supabase
+      .from('portfolios')
+      .select('id, fund_name, fund_number, fund_thesis, cash_balance, starting_cash, fund_starting_cash, status, created_at, visibility, share_holdings')
+      .eq('owner_type', 'group')
+      .eq('owner_id', groupId)
+      .or('status.eq.active,status.is.null')
+      .order('fund_number', { ascending: true })
+    if (error) {
+      console.warn('Failed to load group funds:', error)
+      return []
+    }
+    return data || []
   }
 
   // Update portfolio name/description
@@ -770,9 +832,10 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     benchmarkTicker, STARTING_CASH, allFunds, MAX_FUNDS,
     loadPortfolio, loadPortfolioById, enrichHoldings, buyStock, sellStock,
     getHolding, getPortfolioValueById,
-    changeBenchmark, setPublic, updatePortfolioMeta,
+    changeBenchmark, setPublic, updateVisibility, updateShareHoldings, updatePortfolioMeta,
     resetPortfolio, closePortfolio, loadSnapshots, snapshots, createPersonalPortfolio,
     getLeaderboardData, getPublicLeaderboardData,
-    createFund, loadAllFunds, loadFundsForOwner
+    createFund, loadAllFunds, loadFundsForOwner,
+    loadPersonalPortfolio, loadGroupFunds
   }
 })
