@@ -5,7 +5,10 @@
         <h1 class="text-2xl font-bold">Student Progress</h1>
         <p class="text-base-content/70">View each group's performance, holdings, and allocation</p>
       </div>
-      <button class="btn btn-primary btn-sm" @click="showOpenFundModal = true">Open New Fund for Class</button>
+      <div class="flex gap-2">
+        <button class="btn btn-outline btn-sm" @click="showCreateGroupModal = true">+ Create Group</button>
+        <button class="btn btn-primary btn-sm" @click="showOpenFundModal = true">Open New Fund for Class</button>
+      </div>
     </div>
 
     <div v-if="loading" class="flex justify-center py-12">
@@ -122,6 +125,23 @@
           </div>
         </div>
         <form method="dialog" class="modal-backdrop" @click="showOpenFundModal = false"><button>close</button></form>
+      </dialog>
+
+      <!-- Create Group Modal -->
+      <dialog class="modal" :class="{ 'modal-open': showCreateGroupModal }">
+        <div class="modal-box">
+          <h3 class="font-bold text-lg mb-4">Create New Group</h3>
+          <div class="form-control mb-4">
+            <label class="label"><span class="label-text">Group Name</span></label>
+            <input v-model="createGroupName" type="text" placeholder="e.g. Team Alpha" class="input input-bordered w-full" @keydown.enter="handleCreateGroup" />
+          </div>
+          <p v-if="createGroupError" class="text-error text-sm mb-2">{{ createGroupError }}</p>
+          <div class="modal-action">
+            <button class="btn btn-ghost" @click="showCreateGroupModal = false">Cancel</button>
+            <button class="btn btn-primary" :disabled="!createGroupName.trim()" @click="handleCreateGroup">Create</button>
+          </div>
+        </div>
+        <form method="dialog" class="modal-backdrop" @click="showCreateGroupModal = false"><button>close</button></form>
       </dialog>
 
       <div v-if="awardSuccess" class="alert alert-success">
@@ -314,6 +334,25 @@ const awardAmount = ref(null)
 const awardSuccess = ref('')
 const awardTargetId = ref(null)
 const awardFundOptions = ref([])
+
+// Create Group
+const showCreateGroupModal = ref(false)
+const createGroupName = ref('')
+const createGroupError = ref('')
+
+async function handleCreateGroup() {
+  createGroupError.value = ''
+  const currentClass = teacher.classes[0]
+  if (!currentClass) return
+  const result = await teacher.createGroup(currentClass.id, createGroupName.value.trim())
+  if (result.error) {
+    createGroupError.value = result.error
+    return
+  }
+  showCreateGroupModal.value = false
+  createGroupName.value = ''
+  rankedGroups.value = await teacher.getRankedGroups()
+}
 
 // Open New Fund for Class
 const showOpenFundModal = ref(false)

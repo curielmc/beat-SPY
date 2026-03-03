@@ -86,9 +86,34 @@
                 </table>
               </div>
             </div>
+
+            <!-- Reset Class -->
+            <div class="border-t pt-4 mt-4">
+              <button class="btn btn-error btn-sm btn-outline" @click="openResetModal(cls)">Reset Class</button>
+              <p class="text-xs text-base-content/40 mt-1">Removes all students, groups, portfolios, and holdings. Invites are kept.</p>
+            </div>
           </div>
         </div>
       </div>
+
+      <!-- Reset Class Confirmation Modal -->
+      <dialog class="modal" :class="{ 'modal-open': showResetModal }">
+        <div class="modal-box">
+          <h3 class="font-bold text-lg text-error mb-2">Reset Class</h3>
+          <p class="mb-2">This will permanently delete all <strong>groups</strong>, <strong>student memberships</strong>, <strong>portfolios</strong>, and <strong>holdings</strong> for <strong>{{ resetClass?.class_name }}</strong>.</p>
+          <p class="text-sm text-base-content/60 mb-4">Pre-loaded student invites will be kept and reset to "pending" so students can re-join.</p>
+          <p class="text-sm mb-4">Type <code class="font-mono bg-base-200 px-1">{{ resetClass?.code }}</code> to confirm:</p>
+          <input v-model="resetConfirmText" type="text" class="input input-bordered w-full uppercase" placeholder="Type class code" />
+          <div class="modal-action">
+            <button class="btn btn-ghost" @click="showResetModal = false">Cancel</button>
+            <button class="btn btn-error" :disabled="resetConfirmText.toUpperCase() !== resetClass?.code || resetting" @click="handleResetClass">
+              <span v-if="resetting" class="loading loading-spinner loading-sm"></span>
+              Reset Class
+            </button>
+          </div>
+        </div>
+        <form method="dialog" class="modal-backdrop" @click="showResetModal = false"><button>close</button></form>
+      </dialog>
 
       <div v-if="classesWithCounts.length === 0" class="card bg-base-100 shadow">
         <div class="card-body text-center text-base-content/50">No classes yet. Create one below.</div>
@@ -140,6 +165,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useTeacherStore } from '../../stores/teacher'
+import { supabase } from '../../lib/supabase'
 
 const teacher = useTeacherStore()
 
@@ -156,6 +182,10 @@ const invitePasteText = ref('')
 const inviteError = ref('')
 const inviteSuccess = ref('')
 const classInvites = ref({})
+const showResetModal = ref(false)
+const resetClass = ref(null)
+const resetConfirmText = ref('')
+const resetting = ref(false)
 
 onMounted(async () => {
   await teacher.loadTeacherData()
@@ -212,6 +242,87 @@ async function handleCreate() {
   newStartingCash.value = 100000
   newMaxPortfolios.value = 1
   newAllowReset.value = false
+}
+
+function openResetModal(cls) {
+  resetClass.value = cls
+  resetConfirmText.value = ''
+  showResetModal.value = true
+}
+
+async function handleResetClass() {
+  if (!resetClass.value) return
+  resetting.value = true
+  try {
+    const classId = resetClass.value.id
+
+    // Get all groups for this class
+    const { data: groupData } = await supabase
+      .from('groups')
+      .select('id')
+      .eq('class_id', classId)
+    const groupIds = (groupData || []).map(g => g.id)
+
+    // Delete group portfolios + their holdings
+    if (groupIds.length > 0) {
+      const { data: portfolios } = await supabase
+        .from('portfolios')
+        .select('id')
+        .eq('owner_type', 'group')
+        .in('owner_id', groupIds)
+      const portfolioIds = (portfolios || []).map(p => p.id)
+
+      if (portfolioIds.length > 0) {
+        await supabase.from('holdings').delete().in('portfolio_id', portfolioIds)
+        await supabase.from('portfolios').delete().in('id', portfolioIds)
+      }
+    }
+
+    // Get memberships to find student user IDs for personal portfolios
+    const { data: memberships } = await supabase
+      .from('class_memberships')
+      .select('user_id')
+      .eq('class_id', classId)
+    const userIds = (memberships || []).map(m => m.user_id)
+
+    // Delete personal portfolios + holdings for these students
+    if (userIds.length > 0) {
+      const { data: userPortfolios } = await supabase
+        .from('portfolios')
+        .select('id')
+        .eq('owner_type', 'user')
+        .in('owner_id', userIds)
+      const userPortfolioIds = (userPortfolios || []).map(p => p.id)
+
+      if (userPortfolioIds.length > 0) {
+        await supabase.from('holdings').delete().in('portfolio_id', userPortfolioIds)
+        await supabase.from('portfolios').delete().in('id', userPortfolioIds)
+      }
+    }
+
+    // Delete memberships
+    await supabase.from('class_memberships').delete().eq('class_id', classId)
+
+    // Delete groups
+    await supabase.from('groups').delete().eq('class_id', classId)
+
+    // Delete blocked emails so students can re-join
+    await supabase.from('blocked_emails').delete().eq('class_id', classId)
+
+    // Reset invites back to pending
+    await supabase
+      .from('class_invites')
+      .update({ status: 'pending', joined_at: null })
+      .eq('class_id', classId)
+
+    showResetModal.value = false
+    success.value = `Class "${resetClass.value.class_name}" has been reset.`
+    await teacher.loadTeacherData()
+    classInvites.value[classId] = await teacher.loadInvites(classId)
+    setTimeout(() => { success.value = '' }, 5000)
+  } finally {
+    resetting.value = false
+  }
 }
 
 function parseInviteLines(text) {
