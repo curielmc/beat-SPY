@@ -392,7 +392,9 @@ async function handleAddInvites(classId) {
     inviteError.value = result.error
     return
   }
-  inviteSuccess.value = `Added ${result.data.added} student(s)`
+  const parts = [`Added ${result.data.added} student(s)`]
+  if (result.data.assigned) parts.push(`assigned ${result.data.assigned} to groups`)
+  inviteSuccess.value = parts.join(', ')
   invitePasteText.value = ''
   classInvites.value[classId] = await teacher.loadInvites(classId)
   setTimeout(() => { inviteSuccess.value = '' }, 3000)

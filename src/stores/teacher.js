@@ -403,7 +403,35 @@ export const useTeacherStore = defineStore('teacher', () => {
         .insert(inv)
       if (!insertErr) added++
     }
-    return { data: { added } }
+
+    // Auto-assign existing class members to their group based on email match
+    const { data: allGroups } = await supabase
+      .from('groups')
+      .select('id, name')
+      .eq('class_id', classId)
+    const { data: memberships } = await supabase
+      .from('class_memberships')
+      .select('id, user_id, group_id, profiles:profiles(email)')
+      .eq('class_id', classId)
+
+    let assigned = 0
+    for (const row of rows) {
+      if (!row.email || !row.group_name) continue
+      const group = (allGroups || []).find(g => g.name.toLowerCase() === row.group_name.toLowerCase())
+      if (!group) continue
+      const member = (memberships || []).find(m =>
+        m.profiles?.email?.toLowerCase() === row.email.toLowerCase().trim()
+      )
+      if (!member || member.group_id === group.id) continue
+      await supabase
+        .from('class_memberships')
+        .update({ group_id: group.id })
+        .eq('id', member.id)
+      assigned++
+    }
+
+    await loadTeacherData()
+    return { data: { added, assigned } }
   }
 
   // Remove a pending invite
