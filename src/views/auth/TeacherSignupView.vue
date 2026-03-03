@@ -80,6 +80,9 @@
       <div class="text-center mt-4">
         <RouterLink to="/login" class="link link-primary text-sm">Already have an account? Log in</RouterLink>
       </div>
+      <p class="text-center text-xs text-base-content/50 mt-2">
+        By signing up, you agree to our <RouterLink to="/terms" class="link link-primary">Terms &amp; Conditions</RouterLink>
+      </p>
     </div>
   </div>
 </template>

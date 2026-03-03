@@ -59,6 +59,11 @@ const router = createRouter({
       component: () => import('../views/public/PublicProfileView.vue')
     },
     {
+      path: '/terms',
+      name: 'terms',
+      component: () => import('../views/public/TermsView.vue')
+    },
+    {
       path: '/admin',
       component: () => import('../layouts/AdminLayout.vue'),
       meta: { requiresAuth: true, role: 'admin' },
