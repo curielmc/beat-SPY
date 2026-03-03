@@ -21,6 +21,7 @@
         <div class="card-body">
           <h2 class="card-title text-lg">Unassigned Students ({{ teacher.unassignedStudents.length }})</h2>
           <p class="text-sm text-base-content/60 mb-3">These students signed up but haven't been assigned to a group yet.</p>
+          <div v-if="assignError" class="alert alert-error text-sm mb-3">⚠️ {{ assignError }}</div>
 
           <div class="space-y-2">
             <div v-for="student in teacher.unassignedStudents" :key="student.id" class="flex items-center gap-3 bg-base-100 rounded-lg p-3">
@@ -316,6 +317,7 @@ const rankedGroups = ref([])
 const groupHoldings = reactive({})
 const studentFunds = reactive({})
 const assignTargets = reactive({})
+const assignError = ref("")
 const newGroupNames = reactive({})
 
 // Inline group rename
@@ -546,6 +548,7 @@ async function confirmAward() {
 async function handleAssign(student) {
   const target = assignTargets[student.id]
   if (!target) return
+  assignError.value = ""
 
   if (target === '__new__') {
     const name = newGroupNames[student.id]?.trim()
@@ -553,11 +556,17 @@ async function handleAssign(student) {
     const currentClass = teacher.classes[0]
     if (!currentClass) return
     const result = await teacher.createGroup(currentClass.id, name)
-    if (result.error) return
-    await teacher.assignStudentToGroup(student.id, result.group.id)
+    if (result.error) { assignError.value = result.error; return }
+    const r2 = await teacher.assignStudentToGroup(student.id, result.group.id)
+    if (r2?.error) { assignError.value = r2.error; return }
     delete newGroupNames[student.id]
   } else {
-    await teacher.assignStudentToGroup(student.id, target)
+    const result = await teacher.assignStudentToGroup(student.id, target)
+    if (result?.error) {
+      console.error("Assign failed:", result.error)
+      assignError.value = result.error
+      return
+    }
   }
 
   delete assignTargets[student.id]
