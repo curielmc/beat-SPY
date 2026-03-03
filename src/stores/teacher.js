@@ -367,19 +367,36 @@ export const useTeacherStore = defineStore('teacher', () => {
     return data || []
   }
 
-  // Bulk upsert invites for a class
+  // Bulk upsert invites for a class, auto-create groups if group_name provided
   async function addInvites(classId, rows) {
-    const invites = rows.map(r => ({
-      class_id: classId,
-      email: r.email.toLowerCase().trim(),
-      full_name: r.full_name.trim()
-    }))
-    const { data, error } = await supabase
-      .from('class_invites')
-      .upsert(invites, { onConflict: 'class_id,email' })
-      .select()
-    if (error) return { error: error.message }
-    return { data }
+    // Auto-create groups from unique group names
+    const groupNames = [...new Set(rows.map(r => r.group_name).filter(Boolean))]
+    for (const gName of groupNames) {
+      const existing = groups.value.find(g => g.class_id === classId && g.name.toLowerCase() === gName.toLowerCase())
+      if (!existing) {
+        await createGroup(classId, gName)
+      }
+    }
+
+    const invites = rows.map(r => {
+      const inv = {
+        class_id: classId,
+        full_name: r.full_name.trim()
+      }
+      if (r.email) inv.email = r.email.toLowerCase().trim()
+      if (r.grade) inv.grade = r.grade.trim()
+      if (r.group_name) inv.group_name = r.group_name.trim()
+      return inv
+    })
+    // Insert rows one by one, skip duplicates
+    let added = 0
+    for (const inv of invites) {
+      const { error: insertErr } = await supabase
+        .from('class_invites')
+        .insert(inv)
+      if (!insertErr) added++
+    }
+    return { data: { added } }
   }
 
   // Remove a pending invite

@@ -48,8 +48,8 @@
             <!-- Pre-load Students -->
             <div class="border-t pt-4 mt-4">
               <h3 class="font-semibold mb-2">Pre-load Students</h3>
-              <p class="text-xs text-base-content/60 mb-2">Paste student names and emails (one per line: Full Name, email@school.edu) or upload a CSV.</p>
-              <textarea v-model="invitePasteText" rows="4" class="textarea textarea-bordered w-full font-mono text-sm" placeholder="John Smith, john@school.edu&#10;Jane Doe, jane@school.edu"></textarea>
+              <p class="text-xs text-base-content/60 mb-2">Paste or upload a CSV: <code>First Name, Last Name, Email, Grade, Group</code></p>
+              <textarea v-model="invitePasteText" rows="4" class="textarea textarea-bordered w-full font-mono text-sm" placeholder="John, Smith, john@school.edu, 10, Team Alpha&#10;Jane, Doe, jane@school.edu, 11, Team Beta"></textarea>
               <div class="flex gap-2 mt-2">
                 <label class="btn btn-sm btn-outline">
                   Upload CSV
@@ -67,6 +67,8 @@
                     <tr>
                       <th>Name</th>
                       <th>Email</th>
+                      <th>Grade</th>
+                      <th>Group</th>
                       <th>Status</th>
                       <th></th>
                     </tr>
@@ -74,7 +76,9 @@
                   <tbody>
                     <tr v-for="inv in classInvites[cls.id]" :key="inv.id">
                       <td>{{ inv.full_name }}</td>
-                      <td class="font-mono text-xs">{{ inv.email }}</td>
+                      <td class="font-mono text-xs">{{ inv.email || '-' }}</td>
+                      <td>{{ inv.grade || '-' }}</td>
+                      <td>{{ inv.group_name || '-' }}</td>
                       <td>
                         <span class="badge badge-sm" :class="inv.status === 'joined' ? 'badge-success' : 'badge-warning'">{{ inv.status }}</span>
                       </td>
@@ -326,22 +330,39 @@ async function handleResetClass() {
 }
 
 function parseInviteLines(text) {
+  const headerWords = ['first', 'last', 'name', 'email', 'grade', 'group']
   return text.split('\n')
     .map(line => line.trim())
     .filter(line => line && line.includes(','))
     .map(line => {
       const parts = line.split(',').map(p => p.trim())
       // Skip header rows
-      if (parts[0].toLowerCase() === 'name' || parts[0].toLowerCase() === 'full name') return null
-      // Detect order: if first part looks like email, swap
-      if (parts[0].includes('@') && parts.length >= 2) {
-        return { email: parts[0], full_name: parts[1] }
+      if (headerWords.includes(parts[0].toLowerCase())) return null
+
+      if (parts.length >= 5) {
+        // Format: First, Last, Email, Grade, Group
+        return {
+          full_name: parts[0] + ' ' + parts[1],
+          email: parts[2] || null,
+          grade: parts[3] || null,
+          group_name: parts[4] || null
+        }
+      } else if (parts.length === 4) {
+        // Format: First, Last, Email, Grade (no group)
+        const hasEmail = parts[2].includes('@')
+        return {
+          full_name: parts[0] + ' ' + parts[1],
+          email: hasEmail ? parts[2] : null,
+          grade: hasEmail ? parts[3] : parts[2],
+          group_name: hasEmail ? null : parts[3]
+        }
+      } else if (parts.length >= 2) {
+        // Fallback: Name, Email
+        const email = parts.find(p => p.includes('@'))
+        const nameParts = parts.filter(p => !p.includes('@'))
+        return { full_name: nameParts.join(' '), email: email || null }
       }
-      // Default: name first, email second
-      const email = parts.find(p => p.includes('@'))
-      const nameParts = parts.filter(p => !p.includes('@'))
-      if (!email) return null
-      return { email, full_name: nameParts.join(' ') }
+      return null
     })
     .filter(Boolean)
 }
@@ -351,7 +372,7 @@ async function handleAddInvites(classId) {
   inviteSuccess.value = ''
   const rows = parseInviteLines(invitePasteText.value)
   if (rows.length === 0) {
-    inviteError.value = 'No valid rows found. Use format: Full Name, email@school.edu'
+    inviteError.value = 'No valid rows found. Use format: First, Last, Email, Grade, Group'
     return
   }
   const result = await teacher.addInvites(classId, rows)
@@ -359,7 +380,7 @@ async function handleAddInvites(classId) {
     inviteError.value = result.error
     return
   }
-  inviteSuccess.value = `Added ${rows.length} student(s)`
+  inviteSuccess.value = `Added ${result.data.added} student(s)`
   invitePasteText.value = ''
   classInvites.value[classId] = await teacher.loadInvites(classId)
   setTimeout(() => { inviteSuccess.value = '' }, 3000)
