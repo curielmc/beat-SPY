@@ -24,13 +24,17 @@
             <span v-if="quote.exchange" class="badge badge-sm badge-primary">{{ quote.exchange }}</span>
           </div>
         </div>
-        <div class="text-right">
-          <p class="text-3xl font-bold">${{ Number(quote.price).toFixed(2) }}</p>
-          <p class="text-lg" :class="quote.change >= 0 ? 'text-success' : 'text-error'">
-            {{ quote.change >= 0 ? '+' : '' }}{{ Number(quote.change).toFixed(2) }} ({{ quote.changesPercentage >= 0 ? '+' : '' }}{{ Number(quote.changesPercentage).toFixed(2) }}%)
-          </p>
-        </div>
+
       </div>
+
+      <!-- Robinhood-style Chart -->
+      <StockChart
+        :ticker="ticker"
+        :current-price="Number(quote.price)"
+        :change="Number(quote.change)"
+        :change-pct="Number(quote.changesPercentage)"
+        :is-positive="quote.change >= 0"
+      />
 
       <!-- Competition Context Banner -->
       <div v-if="activeComp" class="alert alert-info">
@@ -314,6 +318,7 @@
 </template>
 
 <script setup>
+import StockChart from '../../components/StockChart.vue'
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMarketDataStore } from '../../stores/marketData'
