@@ -202,8 +202,10 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { supabase } from '../../lib/supabase'
+import { useMarketDataStore } from '../../stores/marketData'
 
 const router = useRouter()
+const market = useMarketDataStore()
 
 const classes = ref([])
 const loading = ref(true)
@@ -299,28 +301,59 @@ async function deleteInvite(classId, inviteId) {
 
 async function loadLeaderboard(cls) {
   leaderboardLoading[cls.id] = true
+
+  // Fetch all group portfolios and holdings in bulk
+  const groupIds = (cls.groups || []).map(g => g.id)
+  const { data: portfolios } = await supabase
+    .from('portfolios')
+    .select('id, owner_id, cash_balance, starting_cash')
+    .eq('owner_type', 'group')
+    .in('owner_id', groupIds)
+
+  const portfolioMap = {}
+  const portfolioIds = []
+  for (const p of (portfolios || [])) {
+    portfolioMap[p.owner_id] = p
+    portfolioIds.push(p.id)
+  }
+
+  // Fetch all holdings for these portfolios
+  const holdingsMap = {}
+  if (portfolioIds.length) {
+    const { data: allHoldings } = await supabase
+      .from('holdings')
+      .select('portfolio_id, ticker, shares, avg_cost')
+      .in('portfolio_id', portfolioIds)
+    for (const h of (allHoldings || [])) {
+      if (!holdingsMap[h.portfolio_id]) holdingsMap[h.portfolio_id] = []
+      holdingsMap[h.portfolio_id].push(h)
+    }
+  }
+
+  // Fetch current market prices for all tickers
+  const allTickers = new Set()
+  for (const holdings of Object.values(holdingsMap)) {
+    for (const h of holdings) allTickers.add(h.ticker)
+  }
+  if (allTickers.size > 0) {
+    await market.fetchBatchQuotes([...allTickers])
+  }
+
+  // Calculate values using real prices
   const ranked = []
   for (const group of (cls.groups || [])) {
-    const { data: pData } = await supabase
-      .from('portfolios')
-      .select('id, cash_balance, starting_cash')
-      .eq('owner_type', 'group')
-      .eq('owner_id', group.id)
-      .maybeSingle()
-
-    let totalValue = cls.starting_cash || 100000
+    const p = portfolioMap[group.id]
+    const startCash = p?.starting_cash || cls.starting_cash || 100000
+    let totalValue = startCash
     let returnPct = 0
-    const startCash = pData?.starting_cash || cls.starting_cash || 100000
 
-    if (pData) {
-      const { data: hData } = await supabase
-        .from('holdings')
-        .select('ticker, shares, avg_cost')
-        .eq('portfolio_id', pData.id)
-
-      // Use avg_cost as fallback price (avoids needing market data API)
-      const holdingsValue = (hData || []).reduce((sum, h) => sum + (h.shares * h.avg_cost), 0)
-      totalValue = holdingsValue + pData.cash_balance
+    if (p) {
+      const holdings = holdingsMap[p.id] || []
+      const holdingsValue = holdings.reduce((sum, h) => {
+        const price = market.getCachedPrice(h.ticker) || Number(h.avg_cost)
+        return sum + (Number(h.shares) * price)
+      }, 0)
+      totalValue = holdingsValue + Number(p.cash_balance)
       returnPct = ((totalValue - startCash) / startCash) * 100
     }
 
