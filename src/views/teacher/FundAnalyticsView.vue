@@ -124,6 +124,57 @@
           </div>
         </div>
       </div>
+    <!-- ── AI THESIS RANKINGS ── -->
+      <div class="card bg-base-100 shadow-sm">
+        <div class="card-body p-4 space-y-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 class="font-bold text-base">🤖 AI Thesis Rankings</h2>
+              <p class="text-xs text-base-content/60">Claude evaluates each group's investment reasoning</p>
+            </div>
+            <button class="btn btn-primary btn-sm" :disabled="aiLoading" @click="runAiAnalysis">
+              <span v-if="aiLoading" class="loading loading-spinner loading-xs mr-1"></span>
+              {{ aiLoading ? 'Analyzing...' : 'Run AI Analysis' }}
+            </button>
+          </div>
+
+          <!-- Results -->
+          <div v-if="aiScores.length" class="space-y-3">
+            <div v-for="(s, i) in aiScores" :key="s.group"
+              class="p-3 rounded-xl border"
+              :class="i === 0 ? 'border-success/40 bg-success/5' : 'border-base-200'">
+              <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center gap-2">
+                  <span class="text-lg">{{ i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i+1}` }}</span>
+                  <span class="font-bold">{{ s.group }}</span>
+                </div>
+                <span class="text-xl font-bold" :class="s.overall >= 7 ? 'text-success' : s.overall >= 5 ? 'text-warning' : 'text-error'">
+                  {{ s.overall.toFixed(1) }}/10
+                </span>
+              </div>
+              <!-- Score bars -->
+              <div class="grid grid-cols-3 gap-2 mb-2">
+                <div class="text-center">
+                  <p class="text-xs text-base-content/50">Clarity</p>
+                  <p class="font-semibold">{{ s.clarity }}/10</p>
+                </div>
+                <div class="text-center">
+                  <p class="text-xs text-base-content/50">Specificity</p>
+                  <p class="font-semibold">{{ s.specificity }}/10</p>
+                </div>
+                <div class="text-center">
+                  <p class="text-xs text-base-content/50">Reasoning</p>
+                  <p class="font-semibold">{{ s.reasoning }}/10</p>
+                </div>
+              </div>
+              <p class="text-sm text-base-content/70 italic">"{{ s.feedback }}"</p>
+            </div>
+          </div>
+
+          <p v-else-if="aiError" class="text-error text-sm">{{ aiError }}</p>
+          <p v-else class="text-sm text-base-content/40 text-center py-4">Click "Run AI Analysis" to score each group's investment thesis and trade rationales.</p>
+        </div>
+      </div>
     </template>
   </div>
 </template>
@@ -135,6 +186,9 @@ import { getBatchProfiles } from '../../services/fmpApi'
 import PortfolioPieChart from '../../components/charts/PortfolioPieChart.vue'
 
 const loading = ref(true)
+const aiLoading = ref(false)
+const aiScores = ref([])
+const aiError = ref('')
 const groupBreakdowns = ref([])
 const activeGroup = ref(null)
 const aggregateSectors = ref([])
@@ -178,6 +232,52 @@ function buildSectorRows(sectorMap, totalDollars) {
       color: colorForSector(sector)
     }))
     .sort((a, b) => b.dollars - a.dollars)
+}
+
+async function runAiAnalysis() {
+  aiLoading.value = true
+  aiError.value = ''
+  aiScores.value = []
+
+  // Build payload — fetch trades + fund thesis for each group
+  const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
+  const { data: trades } = await supabase.from('trades').select('portfolio_id, ticker, side, rationale').not('rationale', 'is', null)
+  const { data: ports } = await supabase.from('portfolios').select('id, owner_id, fund_thesis').eq('owner_type', 'group')
+
+  const portById = {}
+  for (const p of (ports || [])) portById[p.id] = p
+  const portByOwner = {}
+  for (const p of (ports || [])) portByOwner[p.owner_id] = p
+
+  const tradesByPort = {}
+  for (const t of (trades || [])) {
+    if (!tradesByPort[t.portfolio_id]) tradesByPort[t.portfolio_id] = []
+    tradesByPort[t.portfolio_id].push(t)
+  }
+
+  const payload = groupBreakdowns.value.map(g => {
+    const port = portByOwner[g.id]
+    return {
+      name: g.name,
+      fund_thesis: port?.fund_thesis || '',
+      trades: port ? (tradesByPort[port.id] || []) : []
+    }
+  })
+
+  try {
+    const res = await fetch('/api/score-theses', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ groups: payload })
+    })
+    const data = await res.json()
+    if (data.error) { aiError.value = data.error; return }
+    aiScores.value = [...data.scores].sort((a, b) => b.overall - a.overall)
+  } catch (e) {
+    aiError.value = 'Failed to reach AI service: ' + e.message
+  } finally {
+    aiLoading.value = false
+  }
 }
 
 onMounted(async () => {
