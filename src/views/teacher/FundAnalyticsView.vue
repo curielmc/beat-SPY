@@ -173,6 +173,30 @@
 
           <p v-else-if="aiError" class="text-error text-sm">{{ aiError }}</p>
           <p v-else class="text-sm text-base-content/40 text-center py-4">Click "Run AI Analysis" to score each group's investment thesis and trade rationales.</p>
+
+          <!-- Individual Stock Rankings -->
+          <div v-if="stockScores.length" class="mt-4 space-y-3">
+            <h3 class="font-bold text-sm text-base-content/70 uppercase tracking-wide">⭐ Best Individual Stock Rationales</h3>
+            <div v-for="s in stockScores" :key="s.id"
+              class="p-3 rounded-xl bg-base-200 border border-base-300 space-y-1">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <span class="text-lg">{{ s.badge?.split(' ')[0] }}</span>
+                  <span class="font-bold">{{ s.ticker }}</span>
+                  <span class="badge badge-sm badge-ghost">{{ s.group }}</span>
+                </div>
+                <span class="font-bold text-lg" :class="s.overall >= 7 ? 'text-success' : s.overall >= 5 ? 'text-warning' : 'text-base-content'">
+                  {{ s.overall?.toFixed(1) }}/10
+                </span>
+              </div>
+              <p class="text-sm italic text-base-content/80">"{{ s.rationale }}"</p>
+              <div class="flex gap-3 text-xs text-base-content/50">
+                <span>Insight: {{ s.insight }}/10</span>
+                <span>Specificity: {{ s.specificity }}/10</span>
+                <span>Conviction: {{ s.conviction }}/10</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </template>
@@ -188,6 +212,7 @@ import PortfolioPieChart from '../../components/charts/PortfolioPieChart.vue'
 const loading = ref(true)
 const aiLoading = ref(false)
 const aiScores = ref([])
+const stockScores = ref([])
 const aiError = ref('')
 const groupBreakdowns = ref([])
 const activeGroup = ref(null)
@@ -264,15 +289,33 @@ async function runAiAnalysis() {
     }
   })
 
+  // Fetch individual trades with rationales across all group portfolios
+  const { data: allTrades } = await supabase
+    .from('trades')
+    .select('id, portfolio_id, ticker, side, dollars, rationale')
+    .not('rationale', 'is', null)
+
+  // Map portfolio_id → group name
+  const portIdToGroup = {}
+  for (const g of groupBreakdowns.value) {
+    const port = portByOwner[g.id]
+    if (port) portIdToGroup[port.id] = g.name
+  }
+
+  const individualTrades = (allTrades || [])
+    .filter(t => portIdToGroup[t.portfolio_id] && t.rationale?.trim().length > 2)
+    .map(t => ({ ...t, group: portIdToGroup[t.portfolio_id] }))
+
   try {
     const res = await fetch('/api/score-theses', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ groups: payload })
+      body: JSON.stringify({ groups: payload, individualTrades })
     })
     const data = await res.json()
     if (data.error) { aiError.value = data.error; return }
-    aiScores.value = [...data.scores].sort((a, b) => b.overall - a.overall)
+    aiScores.value = [...(data.fundScores || [])].sort((a, b) => b.overall - a.overall)
+    stockScores.value = data.stockScores || []
   } catch (e) {
     aiError.value = 'Failed to reach AI service: ' + e.message
   } finally {
