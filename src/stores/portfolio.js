@@ -913,7 +913,7 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     benchmarkTicker, STARTING_CASH, allFunds, MAX_FUNDS,
     loadPortfolio, loadPortfolioById, enrichHoldings, buyStock, sellStock,
     getHolding, getPortfolioValueById,
-    changeBenchmark, setPublic, updateVisibility, updateShareHoldings, updatePortfolioMeta,
+    setPublic, updateVisibility, updateShareHoldings, updatePortfolioMeta,
     resetPortfolio, closePortfolio, loadSnapshots, snapshots, createPersonalPortfolio,
     getLeaderboardData, getPublicLeaderboardData,
     createFund, loadAllFunds, loadFundsForOwner,

@@ -524,7 +524,7 @@ const isPersonalPortfolio = computed(() => {
 })
 const settingsMsg = ref('')
 const settingsMsgType = ref('success')
-const settingsForm = ref({ name: '', description: '', benchmark: '' })
+const settingsForm = ref({ name: '', description: '' })
 
 const vsSP500 = computed(() => portfolioStore.totalReturnPct - portfolioStore.benchmarkReturnPct)
 const isIndependent = computed(() => membership.value?.group_id === 'personal')
@@ -627,8 +627,7 @@ onMounted(async () => {
   if (portfolioStore.portfolio) {
     settingsForm.value = {
       name: portfolioStore.portfolio.name || '',
-      description: portfolioStore.portfolio.description || '',
-      benchmark: portfolioStore.benchmarkTicker
+      description: portfolioStore.portfolio.description || ''
     }
     personalVisibility.value = portfolioStore.portfolio.visibility || 'private'
   }
@@ -932,14 +931,6 @@ function showFeedback(msg, type = 'success') {
   setTimeout(() => { settingsMsg.value = '' }, 3000)
 }
 
-async function saveBenchmark() {
-  const ticker = settingsForm.value.benchmark.toUpperCase().trim()
-  if (!ticker) return
-  const result = await portfolioStore.changeBenchmark(ticker)
-  if (result.error) return showFeedback(result.error, 'error')
-  showFeedback(`Benchmark changed to ${ticker}`)
-}
-
 async function handleVisibilityChange() {
   const result = await portfolioStore.updateVisibility(portfolioStore.portfolio?.id, personalVisibility.value)
   if (result.error) return showFeedback(result.error, 'error')
@@ -962,7 +953,6 @@ async function handleReset() {
   showResetConfirm.value = false
   resetting.value = false
   if (result.error) return showFeedback(result.error, 'error')
-  settingsForm.value.benchmark = portfolioStore.benchmarkTicker
   showFeedback('Portfolio has been reset!')
 }
 
@@ -976,9 +966,7 @@ async function handleClose() {
   if (portfolioStore.portfolio) {
     settingsForm.value = {
       name: portfolioStore.portfolio.name || '',
-      description: portfolioStore.portfolio.description || '',
-      benchmark: portfolioStore.benchmarkTicker,
-      isPublic: portfolioStore.portfolio.is_public ?? true
+      description: portfolioStore.portfolio.description || ''
     }
   }
   // Switch to personal tab
@@ -999,8 +987,7 @@ async function switchFund(fund) {
     if (portfolioStore.portfolio) {
       settingsForm.value = {
         name: portfolioStore.portfolio.name || '',
-        description: portfolioStore.portfolio.description || '',
-        benchmark: portfolioStore.benchmarkTicker
+        description: portfolioStore.portfolio.description || ''
       }
     }
     resetCharts()
@@ -1044,8 +1031,7 @@ async function switchTab(tab) {
     if (portfolioStore.portfolio) {
       settingsForm.value = {
         name: portfolioStore.portfolio.name || '',
-        description: portfolioStore.portfolio.description || '',
-        benchmark: portfolioStore.benchmarkTicker
+        description: portfolioStore.portfolio.description || ''
       }
     }
     resetCharts()
