@@ -183,9 +183,9 @@
                 @click.stop
                 ref="groupNameInput"
               />
-              <span class="flex items-center gap-1 group/rename">
-                <span class="font-bold cursor-pointer hover:underline" @click.stop="startEditingName(group)">{{ group.name }}</span>
-                <span class="opacity-0 group-hover/rename:opacity-60 cursor-pointer text-xs" @click.stop="startEditingName(group)" title="Rename group">✏️</span>
+              <span v-else class="flex items-center gap-1">
+                <span class="font-bold">{{ group.name }}</span>
+                <button class="btn btn-ghost btn-xs px-1" @click.stop="startEditingName(group)" title="Rename group">✏️</button>
               </span>
               <span class="badge badge-sm" :class="group.returnPct >= 0 ? 'badge-success' : 'badge-error'">
                 {{ group.returnPct >= 0 ? '+' : '' }}{{ group.returnPct.toFixed(2) }}%
