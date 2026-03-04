@@ -282,9 +282,11 @@ export const usePortfolioStore = defineStore('portfolio', () => {
       })
     }
 
-    // Update cash balance
+    // Update cash balance — update local state immediately to prevent overdraft on rapid trades
+    const newCash = cashBalance.value - dollars
+    portfolio.value.cash_balance = newCash
     await supabase.from('portfolios')
-      .update({ cash_balance: cashBalance.value - dollars })
+      .update({ cash_balance: newCash })
       .eq('id', portfolioId)
 
     // Benchmark: buy same dollars of benchmark index
@@ -380,8 +382,10 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     }
 
     // Update cash
+    const newCashSell = cashBalance.value + dollars
+    portfolio.value.cash_balance = newCashSell
     await supabase.from('portfolios')
-      .update({ cash_balance: cashBalance.value + dollars })
+      .update({ cash_balance: newCashSell })
       .eq('id', portfolioId)
 
     // Benchmark: sell proportional benchmark index
