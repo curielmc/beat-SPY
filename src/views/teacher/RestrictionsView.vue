@@ -65,6 +65,27 @@
         </div>
       </div>
 
+      <!-- Fund Selector -->
+      <div class="card bg-base-100 shadow">
+        <div class="card-body p-4 space-y-2">
+          <h2 class="card-title text-lg">🗂️ Configure by Fund</h2>
+          <p class="text-sm text-base-content/60">Each fund (week/round) can have different trading rules. Settings below apply to the selected fund only.</p>
+          <div class="flex flex-wrap gap-2 mt-2">
+            <button
+              v-for="num in availableFunds"
+              :key="num"
+              class="btn btn-sm"
+              :class="activeFundNum === String(num) ? 'btn-primary' : 'btn-ghost'"
+              @click="activeFundNum = String(num); loadFundForm()"
+            >
+              Fund {{ num }}
+              <span v-if="fundRestrictions[String(num)]" class="badge badge-xs badge-success ml-1">✓</span>
+            </button>
+          </div>
+          <p class="text-xs text-base-content/40 mt-1">Editing rules for <strong>Fund {{ activeFundNum }}</strong>. New funds appear here when you open the next round.</p>
+        </div>
+      </div>
+
       <!-- Stock Universe -->
       <div class="card bg-base-100 shadow">
         <div class="card-body space-y-4">
@@ -146,7 +167,7 @@
             <input v-model="blockedTickersInput" type="text" class="input input-bordered w-full" placeholder="e.g. TSLA, GME, AMC" />
           </div>
 
-          <button class="btn btn-primary" @click="saveRestrictions">Save Restrictions</button>
+          <button class="btn btn-primary" @click="saveRestrictions">Save Fund {{ activeFundNum }} Restrictions</button>
         </div>
       </div>
 
@@ -161,7 +182,7 @@
               <p class="text-xs text-base-content/50">Students must provide a rationale before buying or selling</p>
             </div>
           </label>
-          <button class="btn btn-primary" @click="saveRestrictions">Save Restrictions</button>
+          <button class="btn btn-primary" @click="saveRestrictions">Save Fund {{ activeFundNum }} Restrictions</button>
         </div>
       </div>
 
@@ -181,7 +202,7 @@
             </select>
           </div>
 
-          <button class="btn btn-primary" @click="saveRestrictions">Save Restrictions</button>
+          <button class="btn btn-primary" @click="saveRestrictions">Save Fund {{ activeFundNum }} Restrictions</button>
         </div>
       </div>
     </template>
@@ -194,6 +215,9 @@ import { useTeacherStore } from '../../stores/teacher'
 
 const teacher = useTeacherStore()
 const loading = ref(true)
+const activeFundNum = ref('1')
+const availableFunds = ref([1]) // fund numbers that have been opened
+const fundRestrictions = ref({}) // { '1': {...}, '2': {...} }
 const saved = ref(false)
 const savedMessage = ref('')
 const customCode = ref('')
@@ -201,6 +225,8 @@ const currentClass = ref(null)
 
 const form = reactive({
   universe: 'sp500', // 'sp500', 'dow30', 'nasdaq100', 'any'
+  // Top-level keys are fund numbers ('1', '2', ...) or 'default'
+  // Each fund gets its own restriction set
   maxStocksPerPortfolio: 10,
   maxStocksPerSector: null,
   maxSectorPct: null,
@@ -222,10 +248,21 @@ onMounted(async () => {
     currentApprovalCode.value = currentClass.value.approval_code || null
 
     const restrictions = currentClass.value.restrictions || {}
-    form.universe = restrictions.universe || 'sp500'
-    form.maxStocksPerPortfolio = restrictions.maxStocksPerPortfolio || 10
-    form.maxStocksPerSector = restrictions.maxStocksPerSector || null
-    form.maxSectorPct = restrictions.maxSectorPct || null
+    fundRestrictions.value = restrictions.byFund || {}
+
+    // Discover which funds exist from portfolios
+    const { data: fundPorts } = await supabase
+      .from('portfolios')
+      .select('fund_number')
+      .eq('owner_type', 'group')
+    const nums = [...new Set((fundPorts || []).map(p => p.fund_number).filter(Boolean))].sort()
+    availableFunds.value = nums.length ? nums : [1]
+    activeFundNum.value = String(availableFunds.value[availableFunds.value.length - 1])
+  const fr = fundRestrictions.value[activeFundNum.value] || restrictions
+  form.universe = fr.universe || 'sp500'
+  form.maxStocksPerPortfolio = fr.maxStocksPerPortfolio || 10
+  form.maxStocksPerSector = fr.maxStocksPerSector || null
+  form.maxSectorPct = fr.maxSectorPct || null
     form.maxDollarsPerStock = restrictions.maxDollarsPerStock || 20000
     form.blockedTickers = restrictions.blockedTickers || []
     form.tradeFrequency = restrictions.tradeFrequency || 'unlimited'
@@ -278,9 +315,37 @@ async function removeCode() {
   showSaved('Trade approval code removed. Students can trade freely.')
 }
 
+// Reload form fields when switching fund tabs
+function loadFundForm() {
+  if (!currentClass.value) return
+  const restrictions = currentClass.value.restrictions || {}
+  const fr = fundRestrictions.value[activeFundNum.value] || restrictions
+  form.universe = fr.universe || 'sp500'
+  form.maxStocksPerPortfolio = fr.maxStocksPerPortfolio || 10
+  form.maxStocksPerSector = fr.maxStocksPerSector || null
+  form.maxSectorPct = fr.maxSectorPct || null
+  form.blockedTickers = fr.blockedTickers || []
+  form.tradeFrequency = fr.tradeFrequency || 'unlimited'
+  form.requireRationale = fr.requireRationale !== false
+}
+
 async function saveRestrictions() {
   if (!currentClass.value) return
   await teacher.updateRestrictions(currentClass.value.id, {
+    // Per-fund restrictions (byFund key)
+    byFund: {
+      ...fundRestrictions.value,
+      [activeFundNum.value]: {
+        universe: form.universe,
+        maxStocksPerPortfolio: form.maxStocksPerPortfolio,
+        maxStocksPerSector: form.maxStocksPerSector,
+        maxSectorPct: form.maxSectorPct,
+        blockedTickers: [...form.blockedTickers],
+        tradeFrequency: form.tradeFrequency,
+        requireRationale: form.requireRationale
+      }
+    },
+    // Legacy top-level (active fund mirrors for backward compat)
     universe: form.universe,
     maxStocksPerPortfolio: form.maxStocksPerPortfolio,
     maxStocksPerSector: form.maxStocksPerSector,

@@ -225,7 +225,10 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     // ── Universe + Sector restrictions (from class settings) ──
     {
       const membership = await auth.getCurrentMembership()
-      const restrictions = membership?.class?.restrictions || {}
+      const classRestrictions = membership?.class?.restrictions || {}
+      // Use fund-specific restrictions if set, fall back to top-level
+      const fundNum = String(portfolio.value?.fund_number || '1')
+      const restrictions = classRestrictions.byFund?.[fundNum] || classRestrictions
       const universe = restrictions.universe || 'sp500'
 
       // Universe check
@@ -417,10 +420,12 @@ export const usePortfolioStore = defineStore('portfolio', () => {
           return { success: false, error: 'Invalid approval code' }
         }
         // Check trade frequency restriction
-        const freqError = await checkTradeFrequency(ticker, portfolio.value.id, cls.restrictions)
+        const sellFundNum = String(portfolio.value?.fund_number || '1')
+        const sellRestrictions = cls.restrictions?.byFund?.[sellFundNum] || cls.restrictions || {}
+        const freqError = await checkTradeFrequency(ticker, portfolio.value.id, sellRestrictions)
         if (freqError) return { success: false, error: freqError }
         // Check rationale requirement (default: required)
-        const requireRationale = cls.restrictions?.requireRationale !== false
+        const requireRationale = sellRestrictions?.requireRationale !== false
         if (requireRationale && (!rationale || !rationale.trim())) {
           return { success: false, error: 'Please explain your reasoning before trading' }
         }
