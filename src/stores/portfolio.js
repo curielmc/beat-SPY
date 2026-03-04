@@ -190,9 +190,9 @@ export const usePortfolioStore = defineStore('portfolio', () => {
       await market.fetchBatchQuotes([bmTicker])
     }
 
-    // Also fetch company names
+    // Also fetch company names (non-blocking)
     if (tickers.length > 0) {
-      await market.fetchBatchProfiles(tickers)
+      try { await market.fetchBatchProfiles(tickers) } catch(e) { /* non-fatal */ }
     }
 
     holdings.value = rawHoldings.value.map(h => {
@@ -201,7 +201,7 @@ export const usePortfolioStore = defineStore('portfolio', () => {
       const costBasis = h.shares * h.avg_cost
       const gainLoss = marketValue - costBasis
       const gainLossPct = costBasis > 0 ? (gainLoss / costBasis) * 100 : 0
-      const profile = market.profilesCache[h.ticker]?.data
+      const profile = market.profilesCache?.[h.ticker]?.data
       return {
         ...h,
         currentPrice,

@@ -235,7 +235,7 @@ export const useMarketDataStore = defineStore('marketData', () => {
   }
 
   return {
-    quotesCache, searchResults, loading,
+    quotesCache, profilesCache, searchResults, loading,
     fetchQuote, fetchBatchQuotes, fetchHistory,
     fetchCompanyProfile, fetchBatchProfiles, searchStocks, screenStocks, screenStocksMultiCountry,
     getCachedPrice, getCachedQuote, fetchHistoricalCloseForTickers,
