@@ -65,7 +65,13 @@ export const useAuthStore = defineStore('auth', () => {
     if (initialized.value) return
     loading.value = true
     try {
-      const { data: { session } } = await supabase.auth.getSession()
+      // getSession returns cached session; if the access token is expired
+      // we need to refresh it so the user stays logged in across deploys
+      let { data: { session } } = await supabase.auth.getSession()
+      if (session?.expires_at && session.expires_at * 1000 < Date.now()) {
+        const { data: refreshed } = await supabase.auth.refreshSession()
+        session = refreshed?.session || null
+      }
       if (session?.user) {
         currentUser.value = session.user
         await fetchProfile(session.user.id)
