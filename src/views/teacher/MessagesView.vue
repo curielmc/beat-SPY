@@ -76,12 +76,26 @@
           <div
             v-for="msg in thread"
             :key="msg.id"
-            class="flex flex-col max-w-lg"
+            class="flex"
+            :class="msg.sender_id === currentTeacherId ? 'justify-end' : 'justify-start'"
           >
-            <div class="bg-primary text-primary-content rounded-2xl rounded-tl-sm px-4 py-2">
-              <p class="text-sm">{{ msg.content }}</p>
+            <div class="max-w-xs lg:max-w-md">
+              <div
+                class="rounded-2xl px-4 py-2 text-sm"
+                :class="msg.sender_id === currentTeacherId
+                  ? 'bg-primary text-primary-content rounded-tr-sm'
+                  : 'bg-base-200 text-base-content rounded-tl-sm'"
+              >
+                <p v-if="msg.sender_id !== currentTeacherId" class="text-xs font-semibold mb-1 opacity-60">
+                  {{ memberNames[msg.sender_id] || 'Student' }}
+                </p>
+                <p>{{ msg.content }}</p>
+              </div>
+              <p class="text-xs text-base-content/40 mt-1 px-1"
+                :class="msg.sender_id === currentTeacherId ? 'text-right' : 'text-left'">
+                {{ formatTime(msg.created_at) }}
+              </p>
             </div>
-            <p class="text-xs text-base-content/40 mt-1 ml-1">{{ formatTime(msg.created_at) }}</p>
           </div>
         </template>
         <p v-else-if="selected" class="text-center text-base-content/40 text-sm py-8">No messages yet. Send one below.</p>
@@ -114,11 +128,12 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
+import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../stores/auth'
 
 const auth = useAuthStore()
+const currentTeacherId = computed(() => auth.currentUser?.id)
 
 const CLASS_ID = 'c0ee1de7-bf4d-4598-8285-44c8f89f3b22'
 const currentClassId = ref(CLASS_ID)
@@ -131,6 +146,7 @@ const draft = ref('')
 const sending = ref(false)
 const loadingMessages = ref(false)
 const threadEl = ref(null)
+const memberNames = ref({})
 let realtimeSub = null
 
 function formatTime(ts) {
@@ -162,19 +178,35 @@ async function loadThread() {
   loadingMessages.value = true
   thread.value = []
 
-  let query = supabase.from('messages')
-    .select('id, content, created_at, recipient_type, recipient_id')
-    .eq('class_id', CLASS_ID)
-    .order('created_at', { ascending: true })
+  let msgs = []
 
   if (selected.value.type === 'class') {
-    query = query.eq('recipient_type', 'class')
+    const { data } = await supabase.from('messages').select('id, content, created_at, recipient_type, recipient_id, sender_id')
+      .eq('class_id', CLASS_ID).eq('recipient_type', 'class').order('created_at', { ascending: true })
+    msgs = data || []
+  } else if (selected.value.type === 'group') {
+    // Teacher → group messages + student → teacher messages from group members
+    const { data: toGroup } = await supabase.from('messages').select('id, content, created_at, recipient_type, recipient_id, sender_id')
+      .eq('class_id', CLASS_ID).eq('recipient_type', 'group').eq('recipient_id', selected.value.id)
+    // Get group member ids
+    const { data: members } = await supabase.from('class_memberships').select('user_id, profiles:profiles(full_name)').eq('group_id', selected.value.id)
+    const memberIds = (members || []).map(m => m.user_id)
+    memberNames.value = Object.fromEntries((members || []).map(m => [m.user_id, m.profiles?.full_name || 'Student']))
+    const { data: fromGroup } = memberIds.length
+      ? await supabase.from('messages').select('id, content, created_at, recipient_type, recipient_id, sender_id')
+          .eq('class_id', CLASS_ID).in('sender_id', memberIds)
+      : { data: [] }
+    msgs = [...(toGroup || []), ...(fromGroup || [])].sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
   } else {
-    query = query.eq('recipient_type', selected.value.type).eq('recipient_id', selected.value.id)
+    // Direct: teacher → student + student → teacher
+    const { data: toUser } = await supabase.from('messages').select('id, content, created_at, recipient_type, recipient_id, sender_id')
+      .eq('class_id', CLASS_ID).eq('recipient_type', 'user').eq('recipient_id', selected.value.id)
+    const { data: fromUser } = await supabase.from('messages').select('id, content, created_at, recipient_type, recipient_id, sender_id')
+      .eq('class_id', CLASS_ID).eq('sender_id', selected.value.id)
+    msgs = [...(toUser || []), ...(fromUser || [])].sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
   }
 
-  const { data } = await query
-  thread.value = data || []
+  thread.value = msgs
   loadingMessages.value = false
   scrollToBottom()
 }
