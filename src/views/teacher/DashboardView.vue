@@ -70,13 +70,22 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { useTeacherStore } from '../../stores/teacher'
 
+const route = useRoute()
 const teacher = useTeacherStore()
 const loading = ref(true)
 const rankedGroups = ref([])
 
-const currentClass = computed(() => teacher.classes[0] || null)
+const currentClass = computed(() => {
+  const qid = route.query.class_id
+  if (qid) {
+    const match = teacher.classes.find(c => c.id === qid)
+    if (match) return match
+  }
+  return teacher.classes[0] || null
+})
 
 onMounted(async () => {
   await teacher.loadTeacherData()

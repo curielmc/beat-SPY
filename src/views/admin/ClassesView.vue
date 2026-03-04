@@ -148,6 +148,7 @@
             </div>
 
             <div class="flex gap-2">
+              <button class="btn btn-sm btn-outline btn-primary" @click="viewAsTeacher(cls)">View as Teacher</button>
               <button class="btn btn-error btn-sm btn-outline" @click="confirmDelete(cls)">Delete Class</button>
             </div>
           </div>
@@ -178,7 +179,10 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { supabase } from '../../lib/supabase'
+
+const router = useRouter()
 
 const classes = ref([])
 const loading = ref(true)
@@ -268,6 +272,10 @@ async function deleteInvite(classId, inviteId) {
   await supabase.from('class_invites').delete().eq('id', inviteId)
   invites[classId] = (invites[classId] || []).filter(i => i.id !== inviteId)
   showSuccess('Invite deleted')
+}
+
+function viewAsTeacher(cls) {
+  router.push({ path: '/teacher', query: { class_id: cls.id } })
 }
 
 function confirmDelete(cls) {

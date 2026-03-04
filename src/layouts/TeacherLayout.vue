@@ -1,5 +1,11 @@
 <template>
   <div class="min-h-screen bg-base-200">
+    <!-- Admin preview banner -->
+    <div v-if="auth.isAdmin" class="bg-error text-error-content text-center py-2 px-4 text-sm font-semibold flex items-center justify-center gap-3">
+      <span>Viewing as Teacher</span>
+      <RouterLink to="/admin/classes" class="btn btn-xs btn-ghost bg-error-content/20 hover:bg-error-content/30">Back to Admin</RouterLink>
+    </div>
+
     <div class="navbar bg-base-100 shadow-sm">
       <div class="max-w-6xl mx-auto w-full flex items-center">
         <div class="flex-none">
