@@ -93,7 +93,11 @@
         </button>
       </div>
       <div class="p-4">
-        <RouterView />
+        <RouterView v-slot="{ Component }">
+          <keep-alive :max="5" :include="['HomeView','LeaderboardView','StocksView','SP500View']">
+            <component :is="Component" />
+          </keep-alive>
+        </RouterView>
       </div>
     </div>
     </div>

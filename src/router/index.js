@@ -87,18 +87,32 @@ const router = createRouter({
   ]
 })
 
+// Cache role to avoid DB round-trip on every navigation
+let _cachedUserId = null
+let _cachedRole = null
+
 router.beforeEach(async (to) => {
   const { data: { session } } = await supabase.auth.getSession()
   const isLoggedIn = !!session?.user
   let userRole = null
 
   if (isLoggedIn) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', session.user.id)
-      .maybeSingle()
-    userRole = profile?.role || 'student'
+    // Use cached role if same user, otherwise fetch once
+    if (session.user.id === _cachedUserId && _cachedRole) {
+      userRole = _cachedRole
+    } else {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', session.user.id)
+        .maybeSingle()
+      userRole = profile?.role || 'student'
+      _cachedUserId = session.user.id
+      _cachedRole = userRole
+    }
+  } else {
+    _cachedUserId = null
+    _cachedRole = null
   }
 
   // Redirect unauthenticated users away from protected routes

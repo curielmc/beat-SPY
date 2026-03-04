@@ -292,14 +292,27 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   // Get current user's class memberships (all classes)
-  async function getCurrentMembership() {
+  let _membershipCacheUid = null
+  let _membershipCacheTs = 0
+  const MEMBERSHIP_TTL = 5 * 60 * 1000 // 5 minutes
+
+  async function getCurrentMembership(force = false) {
     if (!currentUser.value) return null
+    const now = Date.now()
+    // Return cached result if fresh and same user
+    if (!force && allMemberships.value.length &&
+        _membershipCacheUid === currentUser.value.id &&
+        (now - _membershipCacheTs) < MEMBERSHIP_TTL) {
+      return membership.value
+    }
     const { data, error } = await supabase
       .from('class_memberships')
       .select('*, class:classes(*), group:groups(*)')
       .eq('user_id', currentUser.value.id)
     if (error) return null
     allMemberships.value = data || []
+    _membershipCacheUid = currentUser.value.id
+    _membershipCacheTs = now
     // Set activeClassId to first if not set or not found
     if (allMemberships.value.length && !allMemberships.value.find(m => m.class_id === activeClassId.value)) {
       setActiveClass(allMemberships.value[0].class_id)

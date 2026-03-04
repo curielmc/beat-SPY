@@ -595,13 +595,13 @@ onMounted(async () => {
   membership.value = await auth.getCurrentMembership()
 
   if (membership.value?.group_id) {
-    // Load group members
-    groupMembers.value = await auth.getGroupMembers(membership.value.group_id)
-
-    // Load single personal portfolio
-    await portfolioStore.loadPersonalPortfolio()
-    // Load group funds
-    groupFunds.value = await portfolioStore.loadGroupFunds(membership.value.group_id)
+    // Parallel: load group members, personal portfolio, and group funds simultaneously
+    const [, , gFunds] = await Promise.all([
+      auth.getGroupMembers(membership.value.group_id).then(m => { groupMembers.value = m }),
+      portfolioStore.loadPersonalPortfolio(),
+      portfolioStore.loadGroupFunds(membership.value.group_id)
+    ])
+    groupFunds.value = gFunds
 
     // Default: load personal portfolio
     if (portfolioStore.portfolio) {
