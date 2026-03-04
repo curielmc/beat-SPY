@@ -46,6 +46,21 @@
         </div>
       </div>
 
+      <!-- AI Explain button -->
+      <div class="card bg-base-100 shadow p-4">
+        <div class="flex items-center gap-3 flex-wrap">
+          <button class="btn btn-primary btn-sm gap-2" @click="explainPortfolio" :disabled="explaining">
+            <span v-if="explaining && !explainTicker" class="loading loading-spinner loading-xs"></span>
+            <span v-else>💡</span>
+            {{ explaining && !explainTicker ? 'Reading news...' : 'Explain my portfolio today' }}
+          </button>
+          <span class="text-xs text-base-content/40">Claude reads recent news and explains what moved your stocks</span>
+        </div>
+        <div v-if="explanation && !explainTicker" class="mt-3 p-3 bg-primary/5 border border-primary/20 rounded-lg text-sm leading-relaxed">
+          {{ explanation }}
+        </div>
+      </div>
+
       <!-- Waterfall chart -->
       <div class="card bg-base-100 shadow p-5">
         <h2 class="font-semibold mb-4">Contribution to Return (Today)</h2>
@@ -123,6 +138,11 @@
                     <span class="font-mono font-bold">{{ a.ticker }}</span>
                     <span v-if="a.companyName" class="block text-xs text-base-content/50">{{ a.companyName }}</span>
                   </RouterLink>
+                  <button class="btn btn-ghost btn-xs text-base-content/40 hover:text-primary mt-0.5" @click="explainStock(a)" :disabled="explaining">
+                    <span v-if="explaining && explainTicker === a.ticker" class="loading loading-spinner loading-xs"></span>
+                    <span v-else>💡</span> why?
+                  </button>
+                  <div v-if="explanation && explainTicker === a.ticker" class="mt-1 p-2 bg-primary/5 border border-primary/20 rounded text-xs leading-relaxed max-w-xs">{{ explanation }}</div>
                 </td>
                 <td class="text-right font-mono">{{ a.weight.toFixed(1) }}%</td>
                 <td class="text-right font-mono" :class="a.stockReturn >= 0 ? 'text-success' : 'text-error'">
@@ -208,7 +228,43 @@ const loading = ref(true)
 const prevPrices = ref({})
 const spyPrevClose = ref(0)
 
-const MAX_BAR = 50 // max px per side of waterfall
+const MAX_BAR = 50
+const explaining = ref(false)
+const explanation = ref('')
+const explainTicker = ref('')
+
+async function explainPortfolio() {
+  explaining.value = true
+  explainTicker.value = ''
+  explanation.value = ''
+  try {
+    const tickers = attributions.value.map(a => a.ticker)
+    const changes = Object.fromEntries(attributions.value.map(a => [a.ticker, a.stockReturn]))
+    const summary = `Portfolio return: ${totalReturn.value.toFixed(2)}%. Best: ${topHelper.value?.ticker}. Worst: ${topDrag.value?.ticker}. vs SPY: ${alpha.value.toFixed(2)}%.`
+    const res = await fetch('/api/explain-attribution', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ tickers, changes, portfolioSummary: summary, mode: 'portfolio' })
+    })
+    const data = await res.json()
+    explanation.value = data.explanation
+  } catch(e) { explanation.value = 'Could not load explanation. Try again.' }
+  finally { explaining.value = false }
+}
+
+async function explainStock(a) {
+  explaining.value = true
+  explainTicker.value = a.ticker
+  explanation.value = ''
+  try {
+    const res = await fetch('/api/explain-attribution', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ tickers: [a.ticker], changes: { [a.ticker]: a.stockReturn }, mode: 'stock' })
+    })
+    const data = await res.json()
+    explanation.value = data.explanation
+  } catch(e) { explanation.value = 'Could not load explanation. Try again.' }
+  finally { explaining.value = false }
+}
 
 onMounted(async () => {
   if (!portfolioStore.holdings.length) await portfolioStore.loadPortfolio('user', null)
