@@ -172,16 +172,19 @@
           <div class="flex items-center justify-between pr-4">
             <div class="flex items-center gap-2">
               <!-- Inline rename -->
-              <input
-                v-if="editingGroupId === group.id"
-                v-model="editingGroupName"
-                type="text"
-                class="input input-bordered input-sm w-40 font-bold"
-                @blur="saveGroupName(group)"
-                @keydown.enter="$event.target.blur()"
-                @click.stop
-                ref="groupNameInput"
-              />
+              <span v-if="editingGroupId === group.id" class="flex items-center gap-1" @click.stop>
+                <input
+                  v-model="editingGroupName"
+                  type="text"
+                  class="input input-bordered input-sm w-36 font-bold"
+                  @keydown.enter.stop.prevent="saveGroupName(group)"
+                  @click.stop
+                  ref="groupNameInput"
+                  autofocus
+                />
+                <button class="btn btn-primary btn-sm" @click.stop.prevent="saveGroupName(group)">Save</button>
+                <button class="btn btn-ghost btn-sm" @click.stop.prevent="editingGroupId = null">✕</button>
+              </span>
               <span v-else class="flex items-center gap-1">
                 <span class="font-bold">{{ group.name }}</span>
                 <button class="btn btn-ghost btn-xs px-1" @click.stop.prevent="startEditingName(group)" title="Rename group">✏️</button>
