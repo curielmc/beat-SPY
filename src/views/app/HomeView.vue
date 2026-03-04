@@ -598,12 +598,12 @@ function generateSyntheticHistory(startDate, endDate, startValue, endValue, seed
 let refreshInterval = null
 
 onMounted(async () => {
-  // Admin "View as Student" mode
-  const viewAsId = route.query.viewAs
+  // Admin masquerade mode
+  const viewAsId = auth.masqueradeUser?.id || route.query.viewAs
   if (auth.isAdmin && viewAsId) {
     await portfolioStore.loadPortfolio('user', viewAsId)
     if (portfolioStore.portfolio) {
-      membership.value = { group_id: 'personal', group: { name: 'Viewing Student Portfolio' } }
+      membership.value = { group_id: 'personal', group: { name: 'Student Portfolio' } }
       personalVisibility.value = portfolioStore.portfolio.visibility || 'private'
       settingsForm.value = {
         name: portfolioStore.portfolio.name || '',

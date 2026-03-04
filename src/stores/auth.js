@@ -8,6 +8,20 @@ export const useAuthStore = defineStore('auth', () => {
   const loading = ref(true)
   const initialized = ref(false)
 
+  // Admin masquerade
+  const masqueradeUser = ref(JSON.parse(sessionStorage.getItem('masquerade') || 'null'))
+
+  function startMasquerade(user) {
+    masqueradeUser.value = user
+    sessionStorage.setItem('masquerade', JSON.stringify(user))
+  }
+  function stopMasquerade() {
+    masqueradeUser.value = null
+    sessionStorage.removeItem('masquerade')
+  }
+  const isMasquerading = computed(() => !!masqueradeUser.value)
+  const effectiveUserId = computed(() => masqueradeUser.value?.id || currentUser.value?.id || null)
+
   const allMemberships = ref([])
   const activeClassId = ref(localStorage.getItem('beatspy_active_class') || null)
 
@@ -379,6 +393,7 @@ export const useAuthStore = defineStore('auth', () => {
     allMemberships, activeClassId, membership, setActiveClass,
     init, fetchProfile, signup, login, signInWithOAuth,
     updateProfile, joinClass, validateClassCode, checkEmailInvite,
+    startMasquerade, stopMasquerade, isMasquerading, masqueradeUser, effectiveUserId,
     getGroupsForClass, getCurrentMembership, getGroupMembers,
     fetchPublicProfile, fetchPublicPortfolios, logout
   }

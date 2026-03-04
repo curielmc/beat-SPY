@@ -86,7 +86,10 @@
                 </td>
                 <td class="text-sm text-base-content/60">{{ new Date(user.created_at).toLocaleDateString() }}</td>
                 <td class="flex gap-1">
-                  <RouterLink v-if="user.role === 'student'" :to="{ path: '/home', query: { viewAs: user.id } }" class="btn btn-ghost btn-xs text-primary">View</RouterLink>
+                  <button v-if="user.role === 'student' || user.role === 'teacher'" class="btn btn-ghost btn-xs text-primary gap-1" @click="masqueradeAs(user)">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                    View as {{ user.full_name?.split(' ')[0] }}
+                  </button>
                   <button class="btn btn-ghost btn-xs text-error" @click="confirmDelete(user)">Delete</button>
                 </td>
               </tr>
@@ -120,6 +123,8 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { useAuthStore } from '../../stores/auth'
 import { supabase } from '../../lib/supabase'
 import { downloadCSV, downloadText } from '../../utils/csvExport'
 
@@ -137,6 +142,14 @@ const bulkUpdating = ref(false)
 onMounted(async () => {
   await fetchUsers()
 })
+
+const router = useRouter()
+const auth = useAuthStore()
+
+function masqueradeAs(user) {
+  auth.startMasquerade(user)
+  router.push('/home')
+}
 
 async function fetchUsers() {
   loading.value = true
