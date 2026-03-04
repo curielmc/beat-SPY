@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from './auth'
+import { getSP500Constituents } from '../services/fmpApi'
 import { useMarketDataStore } from './marketData'
 
 export const usePortfolioStore = defineStore('portfolio', () => {
@@ -220,6 +221,13 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     if (!portfolio.value) return { success: false, error: 'Portfolio not found' }
     if (dollars <= 0) return { success: false, error: 'Amount must be positive' }
     if (dollars > cashBalance.value) return { success: false, error: 'Insufficient cash' }
+
+    // Validate ticker is in S&P 500
+    const sp500Data = await getSP500Constituents()
+    const sp500Tickers = new Set((sp500Data || []).map(s => s.symbol?.toUpperCase()))
+    if (sp500Tickers.size > 0 && !sp500Tickers.has(ticker.toUpperCase())) {
+      return { success: false, error: `${ticker} is not in the S&P 500. Only S&P 500 stocks are allowed.` }
+    }
 
     const market = useMarketDataStore()
 
