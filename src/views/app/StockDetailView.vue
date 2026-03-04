@@ -48,8 +48,25 @@
       </div>
 
       <!-- Trade Panel (students only) -->
-      <div v-if="!auth.isTeacher && !auth.isAdmin" class="card bg-base-100 shadow">
+      <div v-if="!auth.isTeacher && !auth.isAdmin" class="card shadow" :class="isGroupPortfolio ? 'bg-secondary/10 border border-secondary/30' : 'bg-base-100'">
         <div class="card-body p-4">
+          <!-- Active Portfolio Indicator -->
+          <div class="flex items-center justify-between mb-3">
+            <div v-if="isGroupPortfolio" class="badge badge-secondary gap-1">
+              {{ membership?.group?.name }} — {{ portfolioStore.portfolio?.fund_name || 'Group Fund' }}
+            </div>
+            <div v-else class="badge badge-primary">Personal Portfolio</div>
+            <button
+              v-if="canSwitchPortfolio"
+              class="btn btn-ghost btn-xs"
+              :disabled="switchingPortfolio"
+              @click="switchPortfolio"
+            >
+              <span v-if="switchingPortfolio" class="loading loading-spinner loading-xs"></span>
+              <template v-else>Switch to {{ isGroupPortfolio ? 'Personal' : 'Group' }}</template>
+            </button>
+          </div>
+
           <!-- Tabs -->
           <div class="tabs tabs-boxed mb-3">
             <button class="tab" :class="{ 'tab-active': tradeMode === 'buy' }" @click="tradeMode = 'buy'">Buy</button>
@@ -343,6 +360,8 @@ const postingTake = ref(false)
 const activeCompEntry = ref(null)
 const activeComp = ref(null)
 const compRuleErrors = ref([])
+const switchingPortfolio = ref(false)
+const groupFunds = ref([])
 
 const tomorrowDate = computed(() => {
   const d = new Date()
@@ -378,6 +397,11 @@ onMounted(async () => {
     }
   }
 
+  // Load group funds for switching
+  if (membership.value?.group_id) {
+    groupFunds.value = await portfolioStore.loadGroupFunds(membership.value.group_id)
+  }
+
   loading.value = false
 
   // Check if user is in an active competition
@@ -401,6 +425,32 @@ onMounted(async () => {
     canPostTake.value = await social.checkCanPost(ticker)
   }
 })
+
+const isGroupPortfolio = computed(() => portfolioStore.portfolio?.owner_type === 'group')
+
+const canSwitchPortfolio = computed(() => {
+  if (!membership.value?.group_id) return false
+  if (isGroupPortfolio.value) return true
+  return groupFunds.value.length > 0
+})
+
+async function switchPortfolio() {
+  switchingPortfolio.value = true
+  tradeResult.value = null
+  tradeAmount.value = 0
+  try {
+    if (isGroupPortfolio.value) {
+      await portfolioStore.loadPersonalPortfolio()
+    } else {
+      // Load the first active group fund
+      if (groupFunds.value.length > 0) {
+        await portfolioStore.loadPortfolioById(groupFunds.value[0].id)
+      }
+    }
+  } finally {
+    switchingPortfolio.value = false
+  }
+}
 
 async function submitTake() {
   takeError.value = ''
