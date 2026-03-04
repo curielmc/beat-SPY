@@ -20,7 +20,8 @@ const router = createRouter({
       meta: { requiresAuth: true, role: 'student' },
       children: [
         { path: 'home', name: 'home', component: () => import('../views/app/HomeView.vue') },
-        { path: 'leaderboard', name: 'leaderboard', component: () => import('../views/app/LeaderboardView.vue') },
+        { path: 'attribution', name: 'attribution', component: () => import('../views/app/AttributionView.vue'), meta: { requiresAuth: true } },
+      { path: 'leaderboard', name: 'leaderboard', component: () => import('../views/app/LeaderboardView.vue') },
         { path: 'stocks', name: 'stocks', component: () => import('../views/app/StocksView.vue') },
         { path: 'screener', name: 'screener', component: () => import('../views/app/AdvancedScreenerView.vue') },
         { path: 'stocks/:ticker', name: 'stock-detail', component: () => import('../views/app/StockDetailView.vue') },
