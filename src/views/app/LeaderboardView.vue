@@ -74,6 +74,43 @@
         </div>
       </div>
 
+      <!-- Highlight Stats -->
+      <div v-if="highlights" class="grid grid-cols-3 gap-3">
+        <!-- Top Fund -->
+        <div class="card bg-base-100 shadow-sm border border-success/30">
+          <div class="card-body p-3 text-center space-y-1">
+            <p class="text-xs text-base-content/50 uppercase tracking-wide">🏆 Top Fund</p>
+            <p class="font-bold text-sm leading-tight">{{ highlights.topFund?.name || '—' }}</p>
+            <p class="text-success font-bold text-base">
+              {{ highlights.topFund?.metrics?.sinceInception >= 0 ? '+' : '' }}{{ highlights.topFund?.metrics?.sinceInception?.toFixed(2) }}%
+            </p>
+          </div>
+        </div>
+
+        <!-- Best Stock Pick -->
+        <div class="card bg-base-100 shadow-sm border border-warning/30">
+          <div class="card-body p-3 text-center space-y-1">
+            <p class="text-xs text-base-content/50 uppercase tracking-wide">⭐ Best Pick</p>
+            <p class="font-bold text-sm leading-tight">{{ highlights.bestStock || '—' }}</p>
+            <p class="text-warning font-bold text-base">
+              {{ highlights.bestStockReturn >= 0 ? '+' : '' }}{{ highlights.bestStockReturn?.toFixed(2) }}%
+            </p>
+            <p class="text-xs text-base-content/40">{{ highlights.bestStockGroup }}</p>
+          </div>
+        </div>
+
+        <!-- Beating SPY -->
+        <div class="card bg-base-100 shadow-sm border border-primary/30">
+          <div class="card-body p-3 text-center space-y-1">
+            <p class="text-xs text-base-content/50 uppercase tracking-wide">📈 Beating SPY</p>
+            <p class="font-bold text-3xl text-primary">
+              {{ highlights.beatingCount !== null ? highlights.beatingCount : '—' }}
+            </p>
+            <p class="text-xs text-base-content/40">of {{ highlights.total }} groups</p>
+          </div>
+        </div>
+      </div>
+
       <!-- Rankings -->
       <div class="space-y-2">
         <LeaderboardEntry
@@ -127,6 +164,37 @@ const metrics = [
   { key: 'annualized', label: 'Annualized' },
   { key: 'riskAdjusted', label: 'Risk-Adj' }
 ]
+
+// --- Highlight Stats ---
+const highlights = computed(() => {
+  const gs = groups.value
+  if (!gs.length) return null
+
+  // 1. Top fund (highest sinceInception return)
+  const topFund = [...gs].sort((a, b) => (b.metrics?.sinceInception || 0) - (a.metrics?.sinceInception || 0))[0]
+
+  // 2. Best single stock pick across all groups
+  let bestStock = null
+  let bestStockReturn = -Infinity
+  let bestStockGroup = null
+  for (const g of gs) {
+    for (const h of (g.holdings || [])) {
+      const currentPrice = market.getCachedPrice(h.ticker) || Number(h.avg_cost)
+      const ret = ((currentPrice - Number(h.avg_cost)) / Number(h.avg_cost)) * 100
+      if (ret > bestStockReturn) {
+        bestStockReturn = ret
+        bestStock = h.ticker
+        bestStockGroup = g.name
+      }
+    }
+  }
+
+  // 3. How many groups beat SPY
+  const spy = activeBenchmarkValue.value
+  const beatingCount = spy !== null ? gs.filter(g => (g.metrics?.sinceInception || 0) > spy).length : null
+
+  return { topFund, bestStock, bestStockReturn, bestStockGroup, beatingCount, total: gs.length }
+})
 
 const PERIOD_METRICS = {
   d5: 5, d20: 20, d30: 30, d90: 90, y1: 365
