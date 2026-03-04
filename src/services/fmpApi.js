@@ -28,8 +28,11 @@ export async function getHistoricalDaily(ticker, from, to) {
   return data?.historical || []
 }
 
+const US_EXCHANGES = ['NYSE', 'NASDAQ', 'AMEX', 'NYSEArca', 'NYSEMkt', 'BATS', 'CBOE']
+
 export async function searchStocks(query) {
-  return fmpFetch(`/search?query=${encodeURIComponent(query)}&limit=20`)
+  const data = await fmpFetch(`/search?query=${encodeURIComponent(query)}&limit=40`)
+  return (data || []).filter(r => US_EXCHANGES.includes(r.exchangeShortName)).slice(0, 20)
 }
 
 export async function getBatchHistoricalClose(tickers, dateStr) {
@@ -68,11 +71,13 @@ export async function getCompanyProfile(ticker) {
 }
 
 export async function getGainers() {
-  return fmpFetch('/stock/gainers')
+  const data = await fmpFetch('/stock/gainers')
+  return (data || []).filter(r => US_EXCHANGES.includes(r.exchangeShortName))
 }
 
 export async function getLosers() {
-  return fmpFetch('/stock/losers')
+  const data = await fmpFetch('/stock/losers')
+  return (data || []).filter(r => US_EXCHANGES.includes(r.exchangeShortName))
 }
 
 export async function screenStocks(params = {}) {
