@@ -32,6 +32,7 @@ const router = createRouter({
         { path: 'my-funds', name: 'my-funds', component: () => import('../views/app/MyFundsView.vue') },
         { path: 'portfolio-history', name: 'portfolio-history', component: () => import('../views/app/PortfolioHistoryView.vue') },
         { path: 'sp500', name: 'sp500', component: () => import('../views/app/SP500View.vue') },
+        { path: 'messages', name: 'student-messages', component: () => import('../views/app/MessagesView.vue') },
         { path: 'settings', name: 'profile-settings', component: () => import('../views/app/ProfileSettingsView.vue') },
         { path: 'team-settings', name: 'team-settings', component: () => import('../views/app/TeamSettingsView.vue') }
       ]
@@ -46,6 +47,7 @@ const router = createRouter({
         { path: 'restrictions', name: 'teacher-restrictions', component: () => import('../views/teacher/RestrictionsView.vue') },
         { path: 'classes', name: 'teacher-classes', component: () => import('../views/teacher/ClassesView.vue') },
         { path: 'fund-analytics', name: 'teacher-fund-analytics', component: () => import('../views/teacher/FundAnalyticsView.vue') },
+        { path: 'messages', name: 'teacher-messages', component: () => import('../views/teacher/MessagesView.vue') },
         { path: 'stocks/:ticker', name: 'teacher-stock-detail', component: () => import('../views/app/StockDetailView.vue') }
       ]
     },

@@ -12,6 +12,7 @@
           <RouterLink to="/teacher/restrictions" class="btn btn-ghost btn-sm" :class="{ 'btn-active': route.path === '/teacher/restrictions' }">Settings</RouterLink>
           <RouterLink to="/teacher/classes" class="btn btn-ghost btn-sm" :class="{ 'btn-active': route.path === '/teacher/classes' }">Classes</RouterLink>
           <RouterLink to="/teacher/fund-analytics" class="btn btn-ghost btn-sm" :class="{ 'btn-active': route.path === '/teacher/fund-analytics' }">📊 Analytics</RouterLink>
+          <RouterLink to="/teacher/messages" class="btn btn-ghost btn-sm" :class="{ 'btn-active': route.path === '/teacher/messages' }">💬 Messages</RouterLink>
         </div>
         <div class="flex-none">
           <button class="btn btn-ghost btn-sm" @click="logout">Logout</button>

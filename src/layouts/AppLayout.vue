@@ -47,6 +47,11 @@
           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
           Competitions
         </RouterLink>
+        <RouterLink to="/messages" class="btn btn-ghost btn-sm justify-start w-full gap-2 relative" :class="{ 'btn-active': route.path === '/messages' }" @click="sidebarOpen = false">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
+          Messages
+          <span v-if="unreadMessages > 0" class="badge badge-xs badge-primary ml-auto">{{ unreadMessages }}</span>
+        </RouterLink>
         <RouterLink to="/feed" class="btn btn-ghost btn-sm justify-start w-full gap-2" :class="{ 'btn-active': route.path === '/feed' }" @click="sidebarOpen = false">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 20H5a2 2 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" /></svg>
           Feed
@@ -91,16 +96,26 @@
 import { ref, onMounted } from 'vue'
 import { RouterView, RouterLink, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import { supabase } from '../lib/supabase'
 
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 const sidebarOpen = ref(false)
 const hasActiveClass = ref(false)
+const unreadMessages = ref(0)
 
 onMounted(async () => {
   const membership = await auth.getCurrentMembership()
   hasActiveClass.value = !!membership?.class_id
+
+  // Load unread message count
+  if (auth.currentUser) {
+    const { data: msgs } = await supabase.from('messages').select('id')
+    const { data: reads } = await supabase.from('message_reads').select('message_id').eq('user_id', auth.currentUser.id)
+    const readSet = new Set((reads || []).map(r => r.message_id))
+    unreadMessages.value = (msgs || []).filter(m => !readSet.has(m.id)).length
+  }
 })
 
 async function handleLogout() {
