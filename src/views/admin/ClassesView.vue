@@ -104,23 +104,30 @@
                       <th class="w-10">Rank</th>
                       <th>Group</th>
                       <th>Members</th>
+                      <th class="text-right">Funds</th>
                       <th class="text-right">Return %</th>
                       <th class="text-right">Portfolio Value</th>
                     </tr>
                   </thead>
-                  <tbody>
-                    <tr v-for="(group, i) in (leaderboards[cls.id] || cls.groups)" :key="group.id">
+                  <tbody v-for="(group, i) in (leaderboards[cls.id] || cls.groups)" :key="group.id">
+                    <tr class="cursor-pointer hover" @click="leaderboards[cls.id] && toggleGroupExpand(cls.id, group.id)">
                       <td>
                         <span v-if="leaderboards[cls.id]" class="badge badge-sm" :class="i === 0 ? 'badge-warning' : 'badge-ghost'">{{ i + 1 }}</span>
                         <span v-else class="text-base-content/30">-</span>
                       </td>
-                      <td class="font-medium">{{ group.name }}</td>
+                      <td class="font-medium">
+                        <span v-if="leaderboards[cls.id] && group.funds?.length" class="mr-1 text-xs">{{ expandedGroups[cls.id + ':' + group.id] ? '&#9660;' : '&#9654;' }}</span>
+                        {{ group.name }}
+                      </td>
                       <td>
                         <div class="flex gap-1 flex-wrap">
                           <span v-for="m in getGroupMembers(cls, group.id)" :key="m.user_id" class="badge badge-sm badge-outline">
                             {{ m.profiles?.full_name?.split(' ')[0] }}
                           </span>
                         </div>
+                      </td>
+                      <td class="text-right">
+                        <span v-if="leaderboards[cls.id]" class="badge badge-sm badge-ghost">{{ group.funds?.length || 0 }}</span>
                       </td>
                       <td class="text-right font-mono" :class="group.returnPct > 0 ? 'text-success' : group.returnPct < 0 ? 'text-error' : ''">
                         <template v-if="leaderboards[cls.id]">{{ group.returnPct >= 0 ? '+' : '' }}{{ group.returnPct.toFixed(2) }}%</template>
@@ -129,6 +136,55 @@
                       <td class="text-right font-mono">
                         <template v-if="leaderboards[cls.id]">${{ group.totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</template>
                         <span v-else class="text-base-content/30">-</span>
+                      </td>
+                    </tr>
+                    <!-- Expanded fund details -->
+                    <tr v-if="expandedGroups[cls.id + ':' + group.id] && group.funds?.length">
+                      <td :colspan="6" class="p-0">
+                        <div class="bg-base-300 p-3 space-y-3">
+                          <!-- Fund tabs -->
+                          <div class="tabs tabs-boxed tabs-sm bg-base-200">
+                            <button v-for="fund in group.funds" :key="fund.id" class="tab" :class="{ 'tab-active': (activeFundTab[group.id] || group.funds[0]?.id) === fund.id }" @click.stop="activeFundTab[group.id] = fund.id">
+                              {{ fund.name }}
+                            </button>
+                          </div>
+                          <!-- Active fund details -->
+                          <div v-for="fund in group.funds" :key="fund.id" v-show="(activeFundTab[group.id] || group.funds[0]?.id) === fund.id">
+                            <div class="flex gap-4 text-sm mb-2">
+                              <span>Cash: <strong class="font-mono">${{ fund.cashBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</strong></span>
+                              <span>Starting: <strong class="font-mono">${{ fund.startingCash.toLocaleString('en-US', { minimumFractionDigits: 0 }) }}</strong></span>
+                              <span>Value: <strong class="font-mono">${{ fund.totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</strong></span>
+                              <span :class="fund.returnPct >= 0 ? 'text-success' : 'text-error'">
+                                {{ fund.returnPct >= 0 ? '+' : '' }}{{ fund.returnPct.toFixed(2) }}%
+                              </span>
+                            </div>
+                            <div v-if="fund.holdings.length === 0" class="text-sm text-base-content/40">All cash — no holdings</div>
+                            <table v-else class="table table-xs">
+                              <thead>
+                                <tr>
+                                  <th>Ticker</th>
+                                  <th class="text-right">Shares</th>
+                                  <th class="text-right">Avg Cost</th>
+                                  <th class="text-right">Price</th>
+                                  <th class="text-right">Market Value</th>
+                                  <th class="text-right">Gain/Loss</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                <tr v-for="h in fund.holdings" :key="h.ticker">
+                                  <td class="font-mono font-semibold">{{ h.ticker }}</td>
+                                  <td class="text-right font-mono">{{ h.shares.toFixed(2) }}</td>
+                                  <td class="text-right font-mono">${{ h.avgCost.toFixed(2) }}</td>
+                                  <td class="text-right font-mono">${{ h.price.toFixed(2) }}</td>
+                                  <td class="text-right font-mono">${{ h.marketValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</td>
+                                  <td class="text-right font-mono" :class="(h.price - h.avgCost) >= 0 ? 'text-success' : 'text-error'">
+                                    {{ ((h.price - h.avgCost) / h.avgCost * 100).toFixed(2) }}%
+                                  </td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
                       </td>
                     </tr>
                   </tbody>
@@ -218,6 +274,13 @@ const invites = reactive({})
 const invitesLoaded = reactive({})
 const leaderboards = reactive({})
 const leaderboardLoading = reactive({})
+const expandedGroups = reactive({})
+const activeFundTab = reactive({})
+
+function toggleGroupExpand(classId, groupId) {
+  const key = classId + ':' + groupId
+  expandedGroups[key] = !expandedGroups[key]
+}
 
 onMounted(async () => {
   await fetchClasses()
@@ -302,18 +365,22 @@ async function deleteInvite(classId, inviteId) {
 async function loadLeaderboard(cls) {
   leaderboardLoading[cls.id] = true
 
-  // Fetch all group portfolios and holdings in bulk
+  // Fetch ALL portfolios (funds) for all groups
   const groupIds = (cls.groups || []).map(g => g.id)
   const { data: portfolios } = await supabase
     .from('portfolios')
-    .select('id, owner_id, cash_balance, starting_cash')
+    .select('id, owner_id, cash_balance, starting_cash, fund_starting_cash, fund_name, fund_number, status')
     .eq('owner_type', 'group')
     .in('owner_id', groupIds)
+    .or('status.eq.active,status.is.null')
+    .order('fund_number', { ascending: true })
 
-  const portfolioMap = {}
+  // Group portfolios by owner_id (each group can have multiple funds)
+  const fundsMap = {} // groupId -> [portfolio, ...]
   const portfolioIds = []
   for (const p of (portfolios || [])) {
-    portfolioMap[p.owner_id] = p
+    if (!fundsMap[p.owner_id]) fundsMap[p.owner_id] = []
+    fundsMap[p.owner_id].push(p)
     portfolioIds.push(p.id)
   }
 
@@ -339,25 +406,49 @@ async function loadLeaderboard(cls) {
     await market.fetchBatchQuotes([...allTickers])
   }
 
-  // Calculate values using real prices
+  // Calculate per-fund and consolidated values
   const ranked = []
   for (const group of (cls.groups || [])) {
-    const p = portfolioMap[group.id]
-    const startCash = p?.starting_cash || cls.starting_cash || 100000
-    let totalValue = startCash
-    let returnPct = 0
+    const funds = fundsMap[group.id] || []
+    let consolidatedValue = 0
+    let consolidatedStarting = 0
+    const fundDetails = []
 
-    if (p) {
-      const holdings = holdingsMap[p.id] || []
-      const holdingsValue = holdings.reduce((sum, h) => {
+    for (const fund of funds) {
+      const startCash = Number(fund.fund_starting_cash || fund.starting_cash || cls.starting_cash || 100000)
+      const holdings = holdingsMap[fund.id] || []
+      const enrichedHoldings = holdings.map(h => {
         const price = market.getCachedPrice(h.ticker) || Number(h.avg_cost)
-        return sum + (Number(h.shares) * price)
-      }, 0)
-      totalValue = holdingsValue + Number(p.cash_balance)
-      returnPct = ((totalValue - startCash) / startCash) * 100
+        const shares = Number(h.shares)
+        return { ticker: h.ticker, shares, avgCost: Number(h.avg_cost), price, marketValue: shares * price }
+      })
+      const holdingsValue = enrichedHoldings.reduce((sum, h) => sum + h.marketValue, 0)
+      const totalValue = holdingsValue + Number(fund.cash_balance)
+      const returnPct = startCash > 0 ? ((totalValue - startCash) / startCash) * 100 : 0
+
+      fundDetails.push({
+        id: fund.id,
+        name: fund.fund_name || `Fund ${fund.fund_number || 1}`,
+        fundNumber: fund.fund_number || 1,
+        cashBalance: Number(fund.cash_balance),
+        startingCash: startCash,
+        totalValue,
+        returnPct,
+        holdings: enrichedHoldings
+      })
+
+      consolidatedValue += totalValue
+      consolidatedStarting += startCash
     }
 
-    ranked.push({ ...group, totalValue, returnPct })
+    // If group has no funds, show starting cash as default
+    if (funds.length === 0) {
+      consolidatedStarting = cls.starting_cash || 100000
+      consolidatedValue = consolidatedStarting
+    }
+
+    const returnPct = consolidatedStarting > 0 ? ((consolidatedValue - consolidatedStarting) / consolidatedStarting) * 100 : 0
+    ranked.push({ ...group, totalValue: consolidatedValue, returnPct, funds: fundDetails })
   }
   ranked.sort((a, b) => b.returnPct - a.returnPct)
   leaderboards[cls.id] = ranked
