@@ -399,12 +399,12 @@ export const usePortfolioStore = defineStore('portfolio', () => {
       })
     }
 
-    // Update cash balance — update local state immediately to prevent overdraft on rapid trades
-    const newCash = cashBalance.value - dollars
+    // Atomic cash update to prevent race conditions with concurrent group trades
+    const { data: newCash } = await supabase.rpc('adjust_cash_balance', {
+      p_portfolio_id: portfolioId,
+      p_delta: -dollars
+    })
     portfolio.value.cash_balance = newCash
-    await supabase.from('portfolios')
-      .update({ cash_balance: newCash })
-      .eq('id', portfolioId)
 
     // Benchmark: buy same dollars of benchmark index
     if (bmPrice) {
@@ -502,12 +502,12 @@ export const usePortfolioStore = defineStore('portfolio', () => {
         .eq('id', existing.id)
     }
 
-    // Update cash
-    const newCashSell = cashBalance.value + dollars
+    // Atomic cash update to prevent race conditions with concurrent group trades
+    const { data: newCashSell } = await supabase.rpc('adjust_cash_balance', {
+      p_portfolio_id: portfolioId,
+      p_delta: dollars
+    })
     portfolio.value.cash_balance = newCashSell
-    await supabase.from('portfolios')
-      .update({ cash_balance: newCashSell })
-      .eq('id', portfolioId)
 
     // Benchmark: sell proportional benchmark index
     if (bmPrice) {
