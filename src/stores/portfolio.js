@@ -222,11 +222,69 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     if (dollars <= 0) return { success: false, error: 'Amount must be positive' }
     if (dollars > cashBalance.value) return { success: false, error: 'Insufficient cash' }
 
-    // Validate ticker is in S&P 500
-    const sp500Data = await getSP500Constituents()
-    const sp500Tickers = new Set((sp500Data || []).map(s => s.symbol?.toUpperCase()))
-    if (sp500Tickers.size > 0 && !sp500Tickers.has(ticker.toUpperCase())) {
-      return { success: false, error: `${ticker} is not in the S&P 500. Only S&P 500 stocks are allowed.` }
+    // ── Universe + Sector restrictions (from class settings) ──
+    {
+      const membership = await auth.getCurrentMembership()
+      const restrictions = membership?.class?.restrictions || {}
+      const universe = restrictions.universe || 'sp500'
+
+      // Universe check
+      if (universe !== 'any') {
+        let allowed = []
+        if (universe === 'sp500') {
+          const data = await getSP500Constituents()
+          allowed = (data || []).map(s => s.symbol?.toUpperCase())
+        } else if (universe === 'dow30') {
+          const fmpKey = import.meta.env.VITE_FMP_API_KEY
+          const data = await fetch(`https://financialmodelingprep.com/api/v3/dowjones_constituent?apikey=${fmpKey}`).then(r => r.json()).catch(() => [])
+          allowed = (data || []).map(s => s.symbol?.toUpperCase())
+        } else if (universe === 'nasdaq100') {
+          const fmpKey = import.meta.env.VITE_FMP_API_KEY
+          const data = await fetch(`https://financialmodelingprep.com/api/v3/nasdaq_constituent?apikey=${fmpKey}`).then(r => r.json()).catch(() => [])
+          allowed = (data || []).map(s => s.symbol?.toUpperCase())
+        }
+        const allowedSet = new Set(allowed)
+        if (allowedSet.size > 0 && !allowedSet.has(ticker.toUpperCase())) {
+          const label = universe === 'sp500' ? 'S&P 500' : universe === 'dow30' ? 'Dow Jones 30' : 'NASDAQ 100'
+          return { success: false, error: `${ticker} is not in the ${label}. Your class is restricted to ${label} stocks only.` }
+        }
+      }
+
+      // Sector checks (max stocks per sector, max sector %)
+      if (restrictions.maxStocksPerSector || restrictions.maxSectorPct) {
+        // Get sector for this ticker
+        const profiles = await getBatchProfiles([ticker])
+        const tickerSector = profiles?.[0]?.sector || 'Unknown'
+
+        // Get current holdings sectors
+        const allTickers = rawHoldings.value.map(h => h.ticker)
+        const holdingProfiles = allTickers.length ? await getBatchProfiles(allTickers) : []
+        const sectorMap = {}
+        for (const p of holdingProfiles) sectorMap[p.symbol] = p.sector || 'Unknown'
+
+        // Count stocks in this sector
+        if (restrictions.maxStocksPerSector) {
+          const sectorCount = rawHoldings.value.filter(h => sectorMap[h.ticker] === tickerSector).length
+          if (sectorCount >= restrictions.maxStocksPerSector) {
+            return { success: false, error: `You already have ${sectorCount} stock${sectorCount > 1 ? 's' : ''} in ${tickerSector}. Max ${restrictions.maxStocksPerSector} per sector allowed.` }
+          }
+        }
+
+        // Check sector % allocation
+        if (restrictions.maxSectorPct) {
+          const totalPortfolioValue = rawHoldings.value.reduce((sum, h) => {
+            const price = market.getCachedPrice(h.ticker) || h.avg_cost
+            return sum + (h.shares * price)
+          }, 0) + cashBalance.value
+          const sectorValue = rawHoldings.value
+            .filter(h => sectorMap[h.ticker] === tickerSector)
+            .reduce((sum, h) => sum + (h.shares * (market.getCachedPrice(h.ticker) || h.avg_cost)), 0)
+          const newSectorPct = totalPortfolioValue > 0 ? ((sectorValue + dollars) / totalPortfolioValue) * 100 : 0
+          if (newSectorPct > restrictions.maxSectorPct) {
+            return { success: false, error: `This trade would put ${newSectorPct.toFixed(1)}% of your portfolio in ${tickerSector}. Max ${restrictions.maxSectorPct}% per sector allowed.` }
+          }
+        }
+      }
     }
 
     const market = useMarketDataStore()

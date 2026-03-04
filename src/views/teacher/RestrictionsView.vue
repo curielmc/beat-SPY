@@ -65,6 +65,67 @@
         </div>
       </div>
 
+      <!-- Stock Universe -->
+      <div class="card bg-base-100 shadow">
+        <div class="card-body space-y-4">
+          <h2 class="card-title text-lg">📋 Stock Universe</h2>
+          <p class="text-sm text-base-content/60">Restrict which stocks students are allowed to buy.</p>
+          <div class="flex flex-col gap-2">
+            <label class="label cursor-pointer justify-start gap-3">
+              <input type="radio" v-model="form.universe" value="sp500" class="radio radio-primary" />
+              <div>
+                <span class="label-text font-medium">S&P 500 only</span>
+                <p class="text-xs text-base-content/50">503 large-cap US stocks</p>
+              </div>
+            </label>
+            <label class="label cursor-pointer justify-start gap-3">
+              <input type="radio" v-model="form.universe" value="dow30" class="radio radio-primary" />
+              <div>
+                <span class="label-text font-medium">Dow Jones 30 only</span>
+                <p class="text-xs text-base-content/50">30 blue-chip stocks</p>
+              </div>
+            </label>
+            <label class="label cursor-pointer justify-start gap-3">
+              <input type="radio" v-model="form.universe" value="nasdaq100" class="radio radio-primary" />
+              <div>
+                <span class="label-text font-medium">NASDAQ 100 only</span>
+                <p class="text-xs text-base-content/50">100 largest NASDAQ stocks</p>
+              </div>
+            </label>
+            <label class="label cursor-pointer justify-start gap-3">
+              <input type="radio" v-model="form.universe" value="any" class="radio radio-primary" />
+              <div>
+                <span class="label-text font-medium">Any stock</span>
+                <p class="text-xs text-base-content/50">No universe restriction</p>
+              </div>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sector Rules -->
+      <div class="card bg-base-100 shadow">
+        <div class="card-body space-y-4">
+          <h2 class="card-title text-lg">🏭 Sector Rules</h2>
+          <div class="form-control">
+            <label class="label">
+              <span class="label-text">Max stocks per sector</span>
+              <span class="label-text-alt text-base-content/50">Leave blank for no limit</span>
+            </label>
+            <input v-model.number="form.maxStocksPerSector" type="number" min="1" max="10"
+              class="input input-bordered w-full" placeholder="e.g. 1 = one stock per sector" />
+          </div>
+          <div class="form-control">
+            <label class="label">
+              <span class="label-text">Max % allocation per sector</span>
+              <span class="label-text-alt text-base-content/50">Leave blank for no limit</span>
+            </label>
+            <input v-model.number="form.maxSectorPct" type="number" min="1" max="100"
+              class="input input-bordered w-full" placeholder="e.g. 30 = max 30% in any sector" />
+          </div>
+        </div>
+      </div>
+
       <!-- Stock Restrictions -->
       <div class="card bg-base-100 shadow">
         <div class="card-body space-y-4">
@@ -139,7 +200,10 @@ const customCode = ref('')
 const currentClass = ref(null)
 
 const form = reactive({
+  universe: 'sp500', // 'sp500', 'dow30', 'nasdaq100', 'any'
   maxStocksPerPortfolio: 10,
+  maxStocksPerSector: null,
+  maxSectorPct: null,
   maxDollarsPerStock: 20000,
   blockedTickers: [],
   tradeFrequency: 'unlimited',
@@ -158,7 +222,10 @@ onMounted(async () => {
     currentApprovalCode.value = currentClass.value.approval_code || null
 
     const restrictions = currentClass.value.restrictions || {}
+    form.universe = restrictions.universe || 'sp500'
     form.maxStocksPerPortfolio = restrictions.maxStocksPerPortfolio || 10
+    form.maxStocksPerSector = restrictions.maxStocksPerSector || null
+    form.maxSectorPct = restrictions.maxSectorPct || null
     form.maxDollarsPerStock = restrictions.maxDollarsPerStock || 20000
     form.blockedTickers = restrictions.blockedTickers || []
     form.tradeFrequency = restrictions.tradeFrequency || 'unlimited'
@@ -214,7 +281,10 @@ async function removeCode() {
 async function saveRestrictions() {
   if (!currentClass.value) return
   await teacher.updateRestrictions(currentClass.value.id, {
+    universe: form.universe,
     maxStocksPerPortfolio: form.maxStocksPerPortfolio,
+    maxStocksPerSector: form.maxStocksPerSector,
+    maxSectorPct: form.maxSectorPct,
     maxDollarsPerStock: form.maxDollarsPerStock,
     blockedTickers: [...form.blockedTickers],
     tradeFrequency: form.tradeFrequency,
