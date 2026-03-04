@@ -14,18 +14,25 @@ export const useAuthStore = defineStore('auth', () => {
   function startMasquerade(user) {
     masqueradeUser.value = user
     sessionStorage.setItem('masquerade', JSON.stringify(user))
-    // Clear membership cache so next load fetches masquerade user's memberships
+    // Clear all caches so next load fetches masquerade user's data fresh
     allMemberships.value = []
     _membershipCacheUid = null
     _membershipCacheTs = 0
+    // Clear portfolio store cache
+    try { const { usePortfolioStore } = require('../stores/portfolio'); usePortfolioStore().$reset?.() } catch(e) {}
+    if (typeof window !== 'undefined') {
+      // Force portfolio store cache clear via global flag
+      window.__clearPortfolioCache = true
+    }
   }
   function stopMasquerade() {
     masqueradeUser.value = null
     sessionStorage.removeItem('masquerade')
-    // Clear cache so it reloads real user's memberships
+    // Clear caches
     allMemberships.value = []
     _membershipCacheUid = null
     _membershipCacheTs = 0
+    if (typeof window !== 'undefined') window.__clearPortfolioCache = true
   }
   const isMasquerading = computed(() => !!masqueradeUser.value)
   const effectiveUserId = computed(() => masqueradeUser.value?.id || currentUser.value?.id || null)

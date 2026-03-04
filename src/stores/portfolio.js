@@ -88,8 +88,16 @@ export const usePortfolioStore = defineStore('portfolio', () => {
   const _portfolioCache = {}
   const PORTFOLIO_TTL = 30 * 1000 // 30 seconds
 
+  function _checkCacheClear() {
+    if (typeof window !== 'undefined' && window.__clearPortfolioCache) {
+      window.__clearPortfolioCache = false
+      Object.keys(_portfolioCache).forEach(k => delete _portfolioCache[k])
+    }
+  }
+
   async function loadPortfolio(ownerType, ownerId) {
     if (!ownerId) return
+    _checkCacheClear()
     const cacheKey = `${ownerType}:${ownerId}`
     const cached = _portfolioCache[cacheKey]
     const now = Date.now()
