@@ -120,9 +120,10 @@ router.beforeEach(async (to) => {
     return { name: 'teacher-dashboard' }
   }
 
-  if (to.matched.some(r => r.meta.role === 'student') && userRole === 'admin') {
-    return { name: 'admin-dashboard' }
-  }
+  // Admins can access student routes (for viewing student experience)
+  // if (to.matched.some(r => r.meta.role === 'student') && userRole === 'admin') {
+  //   return { name: 'admin-dashboard' }
+  // }
 
   // Redirect logged-in users away from auth pages
   const authPages = ['landing', 'login', 'signup', 'teacher-signup']
