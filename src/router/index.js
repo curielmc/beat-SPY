@@ -45,6 +45,7 @@ const router = createRouter({
         { path: 'students', name: 'teacher-students', component: () => import('../views/teacher/StudentsView.vue') },
         { path: 'restrictions', name: 'teacher-restrictions', component: () => import('../views/teacher/RestrictionsView.vue') },
         { path: 'classes', name: 'teacher-classes', component: () => import('../views/teacher/ClassesView.vue') },
+        { path: 'fund-analytics', name: 'teacher-fund-analytics', component: () => import('../views/teacher/FundAnalyticsView.vue') },
         { path: 'stocks/:ticker', name: 'teacher-stock-detail', component: () => import('../views/app/StockDetailView.vue') }
       ]
     },
