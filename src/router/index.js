@@ -80,7 +80,8 @@ const router = createRouter({
         { path: 'portfolios', name: 'admin-portfolios', component: () => import('../views/admin/PortfoliosView.vue') },
         { path: 'settings', name: 'admin-settings', component: () => import('../views/admin/SettingsView.vue') },
         { path: 'competitions', name: 'admin-competitions', component: () => import('../views/admin/CompetitionsAdminView.vue') },
-        { path: 'trades', name: 'admin-trades', component: () => import('../views/admin/TradesView.vue') }
+        { path: 'trades', name: 'admin-trades', component: () => import('../views/admin/TradesView.vue') },
+        { path: 'portfolio', name: 'admin-portfolio', component: () => import('../views/app/HomeView.vue') }
       ]
     }
   ]
