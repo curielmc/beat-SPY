@@ -48,8 +48,18 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     const bmTicker = benchmarkTicker.value
     const bmPrice = market.getCachedPrice(bmTicker)
     if (!bmPrice) return startingCash.value
-    const holdingsValue = benchmarkHoldings.value
-      .reduce((sum, h) => sum + (h.shares * bmPrice), 0)
+
+    let holdingsValue
+    if (benchmarkHoldings.value.length > 0) {
+      // Normal path: use benchmark_holdings rows
+      holdingsValue = benchmarkHoldings.value.reduce((sum, h) => sum + (h.shares * bmPrice), 0)
+    } else {
+      // Fallback: compute from benchmark_trades (personal portfolios may lack benchmark_holdings rows)
+      const totalShares = benchmarkTrades.value
+        .filter(t => t.side === 'buy')
+        .reduce((sum, t) => sum + Number(t.shares), 0)
+      holdingsValue = totalShares * bmPrice
+    }
     return holdingsValue + benchmarkCash.value
   })
 
