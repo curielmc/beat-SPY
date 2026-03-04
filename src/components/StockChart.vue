@@ -111,18 +111,23 @@ async function setPeriod(period) {
   await loadChart()
 }
 
+function applyColor() {
+  if (!areaSeries) return
+  const up = displayChange.value >= 0
+  const color = up ? '#22c55e' : '#ef4444'
+  const fillColor = up ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)'
+  areaSeries.applyOptions({ lineColor: color, topColor: fillColor, bottomColor: 'rgba(0,0,0,0)' })
+}
+
 async function loadChart() {
   const points = await fetchData(activePeriod.value)
   if (!points.length) return
 
   periodOpen.value = points[0].value
 
-  const color = displayChange.value >= 0 ? '#22c55e' : '#ef4444'
-  const fillColor = displayChange.value >= 0 ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)'
-
   if (areaSeries) {
     areaSeries.setData(points)
-    areaSeries.applyOptions({ lineColor: color, topColor: fillColor, bottomColor: 'rgba(0,0,0,0)' })
+    applyColor()
   }
 
   chart?.timeScale().fitContent()
@@ -164,8 +169,8 @@ function initChart() {
   })
 
   areaSeries = chart.addSeries(AreaSeries, {
-    lineColor: '#22c55e',
-    topColor: 'rgba(34,197,94,0.15)',
+    lineColor: props.isPositive ? '#22c55e' : '#ef4444',
+    topColor: props.isPositive ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)',
     bottomColor: 'rgba(0,0,0,0)',
     lineWidth: 2,
     priceLineVisible: false,
@@ -195,6 +200,9 @@ function initChart() {
   })
   ro.observe(chartEl.value)
 }
+
+// Reactively update chart color when price crosses the period open (hover effect)
+watch(displayChange, () => { applyColor() })
 
 onMounted(async () => {
   await nextTick()
