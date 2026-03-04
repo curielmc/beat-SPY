@@ -1,9 +1,13 @@
 <template>
   <div class="space-y-6">
-    <div class="flex items-center justify-between">
+    <div class="flex items-center justify-between flex-wrap gap-3">
       <div>
         <h1 class="text-2xl font-bold">Users</h1>
         <p class="text-base-content/70">Manage all platform users</p>
+      </div>
+      <div class="flex gap-2">
+        <button class="btn btn-sm btn-outline" @click="exportEmails">Export Emails</button>
+        <button class="btn btn-sm btn-outline" @click="exportCSV">Export CSV</button>
       </div>
     </div>
 
@@ -18,6 +22,21 @@
       </select>
     </div>
 
+    <!-- Bulk Action Bar -->
+    <div v-if="selectedIds.size > 0" class="flex items-center gap-3 bg-primary/10 rounded-lg px-4 py-2">
+      <span class="font-semibold text-sm">{{ selectedIds.size }} selected</span>
+      <select v-model="bulkRole" class="select select-bordered select-sm">
+        <option value="" disabled>Change role to...</option>
+        <option value="student">Student</option>
+        <option value="teacher">Teacher</option>
+        <option value="admin">Admin</option>
+      </select>
+      <button class="btn btn-primary btn-sm" :disabled="!bulkRole || bulkUpdating" @click="applyBulkRole">
+        {{ bulkUpdating ? 'Applying...' : 'Apply' }}
+      </button>
+      <button class="btn btn-ghost btn-sm" @click="clearSelection">Clear</button>
+    </div>
+
     <div v-if="loading" class="flex justify-center py-12">
       <span class="loading loading-spinner loading-lg"></span>
     </div>
@@ -28,6 +47,9 @@
           <table class="table">
             <thead>
               <tr>
+                <th class="w-10">
+                  <input type="checkbox" class="checkbox checkbox-sm" :checked="allSelected" :indeterminate="someSelected && !allSelected" @change="toggleAll" />
+                </th>
                 <th>Name</th>
                 <th>Email</th>
                 <th>Role</th>
@@ -36,7 +58,10 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="user in filteredUsers" :key="user.id">
+              <tr v-for="user in filteredUsers" :key="user.id" :class="{ 'bg-primary/5': selectedIds.has(user.id) }">
+                <td>
+                  <input type="checkbox" class="checkbox checkbox-sm" :checked="selectedIds.has(user.id)" @change="toggleUser(user.id)" />
+                </td>
                 <td class="font-medium">{{ user.full_name }}</td>
                 <td class="text-sm">{{ user.email }}</td>
                 <td>
@@ -52,7 +77,7 @@
                 </td>
               </tr>
               <tr v-if="filteredUsers.length === 0">
-                <td colspan="5" class="text-center text-base-content/50">No users found</td>
+                <td colspan="6" class="text-center text-base-content/50">No users found</td>
               </tr>
             </tbody>
           </table>
@@ -73,7 +98,7 @@
       <form method="dialog" class="modal-backdrop" @click="showDeleteModal = false"><button>close</button></form>
     </dialog>
 
-    <div v-if="successMsg" class="alert alert-success">
+    <div v-if="successMsg" class="alert alert-success fixed bottom-4 right-4 w-auto z-50">
       <span>{{ successMsg }}</span>
     </div>
   </div>
@@ -82,6 +107,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { supabase } from '../../lib/supabase'
+import { downloadCSV, downloadText } from '../../utils/csvExport'
 
 const users = ref([])
 const search = ref('')
@@ -90,6 +116,9 @@ const loading = ref(true)
 const showDeleteModal = ref(false)
 const deleteTarget = ref(null)
 const successMsg = ref('')
+const selectedIds = ref(new Set())
+const bulkRole = ref('')
+const bulkUpdating = ref(false)
 
 onMounted(async () => {
   await fetchUsers()
@@ -116,6 +145,47 @@ const filteredUsers = computed(() => {
   return result
 })
 
+const allSelected = computed(() => filteredUsers.value.length > 0 && filteredUsers.value.every(u => selectedIds.value.has(u.id)))
+const someSelected = computed(() => filteredUsers.value.some(u => selectedIds.value.has(u.id)))
+
+function toggleAll() {
+  if (allSelected.value) {
+    selectedIds.value = new Set()
+  } else {
+    selectedIds.value = new Set(filteredUsers.value.map(u => u.id))
+  }
+}
+
+function toggleUser(id) {
+  const next = new Set(selectedIds.value)
+  if (next.has(id)) {
+    next.delete(id)
+  } else {
+    next.add(id)
+  }
+  selectedIds.value = next
+}
+
+function clearSelection() {
+  selectedIds.value = new Set()
+  bulkRole.value = ''
+}
+
+async function applyBulkRole() {
+  if (!bulkRole.value || selectedIds.value.size === 0) return
+  bulkUpdating.value = true
+  const ids = [...selectedIds.value]
+  const { error } = await supabase.from('profiles').update({ role: bulkRole.value }).in('id', ids)
+  if (!error) {
+    for (const u of users.value) {
+      if (selectedIds.value.has(u.id)) u.role = bulkRole.value
+    }
+    showSuccess(`Updated ${ids.length} users to ${bulkRole.value}`)
+    clearSelection()
+  }
+  bulkUpdating.value = false
+}
+
 async function changeRole(userId, newRole) {
   await supabase.from('profiles').update({ role: newRole }).eq('id', userId)
   const user = users.value.find(u => u.id === userId)
@@ -134,6 +204,22 @@ async function deleteUser() {
   users.value = users.value.filter(u => u.id !== deleteTarget.value.id)
   showDeleteModal.value = false
   showSuccess('User deleted')
+}
+
+function exportCSV() {
+  const columns = [
+    { key: 'full_name', label: 'Name' },
+    { key: 'email', label: 'Email' },
+    { key: 'role', label: 'Role' },
+    { key: 'username', label: 'Username' },
+    { key: 'created_at', label: 'Created' }
+  ]
+  downloadCSV(filteredUsers.value, columns, 'users_export')
+}
+
+function exportEmails() {
+  const emails = filteredUsers.value.map(u => u.email).filter(Boolean).join('\n')
+  downloadText(emails, 'user_emails.txt')
 }
 
 function showSuccess(msg) {

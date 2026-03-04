@@ -48,7 +48,10 @@ const router = createRouter({
         { path: 'classes', name: 'teacher-classes', component: () => import('../views/teacher/ClassesView.vue') },
         { path: 'fund-analytics', name: 'teacher-fund-analytics', component: () => import('../views/teacher/FundAnalyticsView.vue') },
         { path: 'messages', name: 'teacher-messages', component: () => import('../views/teacher/MessagesView.vue') },
-        { path: 'stocks/:ticker', name: 'teacher-stock-detail', component: () => import('../views/app/StockDetailView.vue') }
+        { path: 'stocks/:ticker', name: 'teacher-stock-detail', component: () => import('../views/app/StockDetailView.vue') },
+        { path: 'portfolio', name: 'teacher-portfolio', component: () => import('../views/app/HomeView.vue') },
+        { path: 'stocks', name: 'teacher-stocks', component: () => import('../views/app/StocksView.vue') },
+        { path: 'screener', name: 'teacher-screener', component: () => import('../views/app/AdvancedScreenerView.vue') }
       ]
     },
     {
@@ -76,7 +79,8 @@ const router = createRouter({
         { path: 'classes', name: 'admin-classes', component: () => import('../views/admin/ClassesView.vue') },
         { path: 'portfolios', name: 'admin-portfolios', component: () => import('../views/admin/PortfoliosView.vue') },
         { path: 'settings', name: 'admin-settings', component: () => import('../views/admin/SettingsView.vue') },
-        { path: 'competitions', name: 'admin-competitions', component: () => import('../views/admin/CompetitionsAdminView.vue') }
+        { path: 'competitions', name: 'admin-competitions', component: () => import('../views/admin/CompetitionsAdminView.vue') },
+        { path: 'trades', name: 'admin-trades', component: () => import('../views/admin/TradesView.vue') }
       ]
     }
   ]
