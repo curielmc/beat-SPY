@@ -1,5 +1,12 @@
 <template>
-  <div class="min-h-screen bg-base-200 flex">
+  <div class="min-h-screen bg-base-200 flex flex-col">
+    <!-- Admin preview banner -->
+    <div v-if="viewingAs" class="bg-error text-error-content text-center py-2 px-4 text-sm font-semibold flex items-center justify-center gap-3 shrink-0">
+      <span>Viewing as {{ viewingAs.full_name }} ({{ viewingAs.email }})</span>
+      <RouterLink to="/admin/users" class="btn btn-xs btn-ghost bg-error-content/20 hover:bg-error-content/30">Back to Admin</RouterLink>
+    </div>
+
+    <div class="flex flex-1 min-h-0">
     <!-- Mobile overlay -->
     <div v-if="sidebarOpen" class="fixed inset-0 bg-black/40 z-30 lg:hidden" @click="sidebarOpen = false"></div>
 
@@ -89,6 +96,7 @@
         <RouterView />
       </div>
     </div>
+    </div>
   </div>
 </template>
 
@@ -104,8 +112,19 @@ const auth = useAuthStore()
 const sidebarOpen = ref(false)
 const hasActiveClass = ref(false)
 const unreadMessages = ref(0)
+const viewingAs = ref(null)
 
 onMounted(async () => {
+  // Admin "View as Student" mode
+  if (auth.isAdmin && route.query.viewAs) {
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, full_name, email')
+      .eq('id', route.query.viewAs)
+      .maybeSingle()
+    if (data) viewingAs.value = data
+  }
+
   const membership = await auth.getCurrentMembership()
   hasActiveClass.value = !!membership?.class_id
 

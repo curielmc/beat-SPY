@@ -62,7 +62,20 @@
                 <td>
                   <input type="checkbox" class="checkbox checkbox-sm" :checked="selectedIds.has(user.id)" @change="toggleUser(user.id)" />
                 </td>
-                <td class="font-medium">{{ user.full_name }}</td>
+                <td class="font-medium">
+                  <span class="inline-flex items-center gap-1.5">
+                    <span v-if="user.role === 'admin'" class="text-error" title="Admin">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
+                    </span>
+                    <span v-else-if="user.role === 'teacher'" class="text-secondary" title="Teacher">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3zM3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01.25-3.762zM9.3 16.573A9.026 9.026 0 007 14.935v-3.957l1.818.78a3 3 0 002.364 0l5.508-2.361a11.026 11.026 0 01.25 3.762 1 1 0 01-.89.89 8.968 8.968 0 00-5.35 2.524 1 1 0 01-1.4 0z" /></svg>
+                    </span>
+                    <span v-else class="text-base-content/30" title="Student">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" /></svg>
+                    </span>
+                    {{ user.full_name }}
+                  </span>
+                </td>
                 <td class="text-sm">{{ user.email }}</td>
                 <td>
                   <select :value="user.role" class="select select-bordered select-xs" @change="changeRole(user.id, $event.target.value)">
@@ -72,7 +85,8 @@
                   </select>
                 </td>
                 <td class="text-sm text-base-content/60">{{ new Date(user.created_at).toLocaleDateString() }}</td>
-                <td>
+                <td class="flex gap-1">
+                  <RouterLink v-if="user.role === 'student'" :to="{ path: '/home', query: { viewAs: user.id } }" class="btn btn-ghost btn-xs text-primary">View</RouterLink>
                   <button class="btn btn-ghost btn-xs text-error" @click="confirmDelete(user)">Delete</button>
                 </td>
               </tr>

@@ -1,0 +1,4 @@
+-- Allow admins to update any profile (e.g., change roles from admin panel)
+DROP POLICY IF EXISTS "Users can update own profile" ON profiles;
+CREATE POLICY "Users can update own profile" ON profiles
+  FOR UPDATE USING (id = auth.uid() OR is_admin());

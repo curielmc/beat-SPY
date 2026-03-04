@@ -566,6 +566,23 @@ function generateSyntheticHistory(startDate, endDate, startValue, endValue, seed
 }
 
 onMounted(async () => {
+  // Admin "View as Student" mode
+  const viewAsId = route.query.viewAs
+  if (auth.isAdmin && viewAsId) {
+    await portfolioStore.loadPortfolio('user', viewAsId)
+    if (portfolioStore.portfolio) {
+      membership.value = { group_id: 'personal', group: { name: 'Viewing Student Portfolio' } }
+      personalVisibility.value = portfolioStore.portfolio.visibility || 'private'
+      settingsForm.value = {
+        name: portfolioStore.portfolio.name || '',
+        description: portfolioStore.portfolio.description || ''
+      }
+    }
+    loading.value = false
+    if (portfolioStore.holdings.length > 0) loadCharts()
+    return
+  }
+
   // Get current membership
   membership.value = await auth.getCurrentMembership()
 
