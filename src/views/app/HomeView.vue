@@ -211,7 +211,10 @@
             <tbody>
               <tr v-for="h in portfolioStore.holdings" :key="h.ticker">
                 <td>
-                  <RouterLink :to="`/stocks/${h.ticker}`" class="font-mono font-bold link link-hover">{{ h.ticker }}</RouterLink>
+                  <RouterLink :to="`/stocks/${h.ticker}`" class="link link-hover">
+                    <span class="font-mono font-bold">{{ h.ticker }}</span>
+                    <span v-if="h.companyName" class="block text-xs text-base-content/50 font-normal">{{ h.companyName }}</span>
+                  </RouterLink>
                 </td>
                 <td class="text-right font-mono">{{ Number(h.shares).toFixed(2) }}</td>
                 <td class="text-right font-mono">${{ h.currentPrice.toFixed(2) }}</td>
@@ -344,7 +347,10 @@
               <template v-for="t in portfolioStore.trades.slice(0, 10)" :key="t.id">
                 <tr>
                   <td class="text-sm">{{ new Date(t.executed_at).toLocaleDateString() }}</td>
-                  <td class="font-mono font-bold">{{ t.ticker }}</td>
+                  <td>
+                    <span class="font-mono font-bold">{{ t.ticker }}</span>
+                    <span class="block text-xs text-base-content/50">{{ portfolioStore.holdings.find(h => h.ticker === t.ticker)?.companyName || '' }}</span>
+                  </td>
                   <td><span class="badge badge-xs" :class="t.side === 'buy' ? 'badge-success' : 'badge-error'">{{ t.side }}</span></td>
                   <td class="text-right font-mono">${{ Number(t.dollars).toFixed(2) }}</td>
                   <td class="text-right font-mono">${{ Number(t.price).toFixed(2) }}</td>
