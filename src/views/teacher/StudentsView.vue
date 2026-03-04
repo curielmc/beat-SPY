@@ -167,9 +167,8 @@
       </div>
 
       <!-- Per-group sections -->
-      <div v-for="group in rankedGroups" :key="group.id" class="collapse collapse-arrow bg-base-100 shadow">
-        <input type="checkbox" />
-        <div class="collapse-title">
+      <div v-for="group in rankedGroups" :key="group.id" class="bg-base-100 shadow rounded-xl overflow-hidden">
+        <div class="p-4 cursor-pointer select-none flex items-center justify-between" @click="toggleGroupExpand(group.id)">
           <div class="flex items-center justify-between pr-4">
             <div class="flex items-center gap-2">
               <!-- Inline rename -->
@@ -204,8 +203,9 @@
             </div>
             <span class="text-sm text-base-content/60">{{ group.memberNames?.join(', ') }}</span>
           </div>
+          <span class="text-base-content/40 text-lg">{{ expandedGroups.has(group.id) ? '▲' : '▼' }}</span>
         </div>
-        <div class="collapse-content">
+        <div v-show="expandedGroups.has(group.id)" class="px-4 pb-4">
           <!-- Members with transfer -->
           <div class="mb-3">
             <span class="text-sm text-base-content/60">Members: </span>
@@ -325,6 +325,15 @@ const newGroupNames = reactive({})
 
 // Inline group rename
 const editingGroupId = ref(null)
+const expandedGroups = ref(new Set())
+function toggleGroupExpand(groupId) {
+  if (expandedGroups.value.has(groupId)) {
+    expandedGroups.value.delete(groupId)
+  } else {
+    expandedGroups.value.add(groupId)
+  }
+  expandedGroups.value = new Set(expandedGroups.value) // trigger reactivity
+}
 const editingGroupName = ref('')
 
 function startEditingName(group) {
