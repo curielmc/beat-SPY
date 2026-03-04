@@ -93,11 +93,7 @@
         </button>
       </div>
       <div class="p-4">
-        <RouterView v-slot="{ Component }">
-          <keep-alive :max="5" :include="['HomeView','LeaderboardView','StocksView','SP500View']">
-            <component :is="Component" />
-          </keep-alive>
-        </RouterView>
+        <RouterView />
       </div>
     </div>
     </div>
@@ -105,7 +101,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { RouterView, RouterLink, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { supabase } from '../lib/supabase'
@@ -145,4 +141,35 @@ async function handleLogout() {
   await auth.logout()
   router.push('/')
 }
+
+// iOS Safari fix: refresh session when app returns from background
+function handleVisibilityChange() {
+  if (document.visibilityState === 'visible') {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        // Session expired while backgrounded — redirect to login
+        router.push({ name: 'login' })
+      }
+    })
+  }
+}
+
+// iOS bfcache fix: force reload if page is restored from cache
+function handlePageShow(e) {
+  if (e.persisted) {
+    // Page was restored from bfcache — iOS freezes JS timers/state
+    // Force a clean reload so Vue reactivity works correctly
+    window.location.reload()
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('visibilitychange', handleVisibilityChange)
+  window.addEventListener('pageshow', handlePageShow)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
+  window.removeEventListener('pageshow', handlePageShow)
+})
 </script>
