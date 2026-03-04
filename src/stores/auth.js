@@ -14,10 +14,18 @@ export const useAuthStore = defineStore('auth', () => {
   function startMasquerade(user) {
     masqueradeUser.value = user
     sessionStorage.setItem('masquerade', JSON.stringify(user))
+    // Clear membership cache so next load fetches masquerade user's memberships
+    allMemberships.value = []
+    _membershipCacheUid = null
+    _membershipCacheTs = 0
   }
   function stopMasquerade() {
     masqueradeUser.value = null
     sessionStorage.removeItem('masquerade')
+    // Clear cache so it reloads real user's memberships
+    allMemberships.value = []
+    _membershipCacheUid = null
+    _membershipCacheTs = 0
   }
   const isMasquerading = computed(() => !!masqueradeUser.value)
   const effectiveUserId = computed(() => masqueradeUser.value?.id || currentUser.value?.id || null)
@@ -312,20 +320,21 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function getCurrentMembership(force = false) {
     if (!currentUser.value) return null
+    const uid = effectiveUserId.value  // use masquerade user if active
     const now = Date.now()
     // Return cached result if fresh and same user
     if (!force && allMemberships.value.length &&
-        _membershipCacheUid === currentUser.value.id &&
+        _membershipCacheUid === uid &&
         (now - _membershipCacheTs) < MEMBERSHIP_TTL) {
       return membership.value
     }
     const { data, error } = await supabase
       .from('class_memberships')
       .select('*, class:classes(*), group:groups(*)')
-      .eq('user_id', currentUser.value.id)
+      .eq('user_id', uid)
     if (error) return null
     allMemberships.value = data || []
-    _membershipCacheUid = currentUser.value.id
+    _membershipCacheUid = uid
     _membershipCacheTs = now
     // Set activeClassId to first if not set or not found
     if (allMemberships.value.length && !allMemberships.value.find(m => m.class_id === activeClassId.value)) {
