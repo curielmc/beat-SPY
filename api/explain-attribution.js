@@ -1,5 +1,3 @@
-import Anthropic from '@anthropic-ai/sdk'
-
 export const config = { runtime: 'edge' }
 
 export default async function handler(req) {
@@ -25,15 +23,12 @@ export default async function handler(req) {
     const chg = changes[ticker]
     newsContext += `\n\n${ticker} (${chg >= 0 ? '+' : ''}${chg?.toFixed(2) ?? '?'}% today):`
     if (articles.length) {
-      articles.forEach(a => {
-        newsContext += `\n  • ${a.title}`
-      })
+      articles.forEach(a => { newsContext += `\n  • ${a.title}` })
     } else {
       newsContext += `\n  • No recent news found`
     }
   })
 
-  // Build prompt based on mode (single stock vs whole portfolio)
   const isSingle = mode === 'stock'
   const prompt = isSingle
     ? `You are a financial educator helping high school students understand investing.
@@ -43,22 +38,33 @@ A student owns ${tickers[0]} which moved ${changes[tickers[0]] >= 0 ? 'up' : 'do
 Recent news for ${tickers[0]}:${newsContext}
 
 Write 2-3 clear sentences explaining WHY this stock moved today based on the news. Use plain language a high school student would understand. Be specific. If news is limited, explain what typically drives this type of stock. End with one short investing lesson.`
-    : `You are a financial educator helping high school students understand why their portfolio moved today.
+    : `You are a financial educator helping high school students understand investing.
 
 ${portfolioSummary}
 
 Recent news for their holdings:${newsContext}
 
-Write 3-4 engaging sentences explaining what drove today's portfolio performance. Use plain language a high school student would understand. Mention specific stocks and news when relevant. Be concrete about what went up and what went down. End with one sentence of educational insight about what this teaches about investing.`
+Write 3-4 engaging sentences explaining what drove today's portfolio performance. Use plain language a high school student would understand. Mention specific stocks and news. Be concrete about what went up and what went down. End with one investing lesson.`
 
-  const client = new Anthropic({ apiKey: ANTHROPIC_KEY })
-  const message = await client.messages.create({
-    model: 'claude-opus-4-5',
-    max_tokens: 400,
-    messages: [{ role: 'user', content: prompt }]
+  // Call Anthropic API directly via fetch (Edge-compatible)
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'x-api-key': ANTHROPIC_KEY,
+      'anthropic-version': '2023-06-01',
+      'content-type': 'application/json'
+    },
+    body: JSON.stringify({
+      model: 'claude-opus-4-5',
+      max_tokens: 400,
+      messages: [{ role: 'user', content: prompt }]
+    })
   })
 
-  return new Response(JSON.stringify({ explanation: message.content[0].text }), {
+  const data = await response.json()
+  const explanation = data.content?.[0]?.text || 'Could not generate explanation.'
+
+  return new Response(JSON.stringify({ explanation }), {
     headers: { 'Content-Type': 'application/json' }
   })
 }
