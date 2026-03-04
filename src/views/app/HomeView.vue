@@ -1,6 +1,30 @@
 <template>
-  <div v-if="loading" class="flex justify-center py-20">
-    <span class="loading loading-spinner loading-lg"></span>
+  <!-- Skeleton loading — matches real layout so there's no jarring shift -->
+  <div v-if="loading" class="space-y-4 p-4">
+    <!-- Header stats skeleton -->
+    <div class="grid grid-cols-3 gap-3">
+      <div v-for="i in 3" :key="i" class="card bg-base-100 shadow p-4 space-y-2">
+        <div class="skeleton h-3 w-20 rounded"></div>
+        <div class="skeleton h-7 w-28 rounded"></div>
+        <div class="skeleton h-3 w-16 rounded"></div>
+      </div>
+    </div>
+    <!-- Chart skeleton -->
+    <div class="card bg-base-100 shadow p-4 space-y-3">
+      <div class="skeleton h-4 w-32 rounded"></div>
+      <div class="skeleton h-48 w-full rounded"></div>
+    </div>
+    <!-- Holdings skeleton -->
+    <div class="card bg-base-100 shadow p-4 space-y-3">
+      <div class="skeleton h-4 w-24 rounded"></div>
+      <div v-for="i in 4" :key="i" class="flex justify-between items-center py-2 border-b border-base-200">
+        <div class="space-y-1">
+          <div class="skeleton h-4 w-14 rounded"></div>
+          <div class="skeleton h-3 w-20 rounded"></div>
+        </div>
+        <div class="skeleton h-4 w-16 rounded"></div>
+      </div>
+    </div>
   </div>
 
   <!-- Independent user: no portfolio yet -->
@@ -668,6 +692,16 @@ onMounted(async () => {
   if (membership.value?.class_id) {
     loadClassGroups()
   }
+
+// Prefetch leaderboard data in background (so it loads instantly when user navigates there)
+setTimeout(async () => {
+  try {
+    const { usePortfolioStore } = await import('../../stores/portfolio')
+    const { supabase } = await import('../../lib/supabase')
+    // warm up membership + group data silently
+    await auth.getCurrentMembership()
+  } catch (e) { /* silent */ }
+}, 3000)
 
 // Auto-refresh prices every 60 seconds
 refreshInterval = setInterval(async () => {

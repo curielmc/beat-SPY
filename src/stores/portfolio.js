@@ -84,11 +84,34 @@ export const usePortfolioStore = defineStore('portfolio', () => {
   }
 
   // Load portfolio for a given owner (groupId or userId)
+// Stale-while-revalidate cache
+  const _portfolioCache = {}
+  const PORTFOLIO_TTL = 30 * 1000 // 30 seconds
+
   async function loadPortfolio(ownerType, ownerId) {
     if (!ownerId) return
+    const cacheKey = `${ownerType}:${ownerId}`
+    const cached = _portfolioCache[cacheKey]
+    const now = Date.now()
+
+    // Serve from cache immediately (stale-while-revalidate)
+    if (cached && (now - cached.ts) < PORTFOLIO_TTL) {
+      return // data already in reactive state, still fresh
+    }
+    if (cached && portfolio.value?.id === cached.portfolioId) {
+      // Stale but we have data — show it immediately, refresh in background
+      _doLoadPortfolio(ownerType, ownerId, cacheKey)
+      return
+    }
+
+    // No cache — must wait for fresh load
     loading.value = true
+    await _doLoadPortfolio(ownerType, ownerId, cacheKey)
+    loading.value = false
+  }
+
+  async function _doLoadPortfolio(ownerType, ownerId, cacheKey) {
     try {
-      // Fetch active portfolio (skip closed ones)
       const { data: pData } = await supabase
         .from('portfolios')
         .select('*')
@@ -100,14 +123,14 @@ export const usePortfolioStore = defineStore('portfolio', () => {
         .maybeSingle()
 
       portfolio.value = pData
-
       if (pData) {
         await _loadPortfolioData(pData)
+        _portfolioCache[cacheKey] = { ts: Date.now(), portfolioId: pData.id }
       } else {
         _clearPortfolioData()
       }
-    } finally {
-      loading.value = false
+    } catch (e) {
+      console.warn('loadPortfolio error', e)
     }
   }
 

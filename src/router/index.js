@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { supabase } from '../lib/supabase'
+import { useAuthStore } from '../stores/auth'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -87,33 +87,11 @@ const router = createRouter({
   ]
 })
 
-// Cache role to avoid DB round-trip on every navigation
-let _cachedUserId = null
-let _cachedRole = null
-
-router.beforeEach(async (to) => {
-  const { data: { session } } = await supabase.auth.getSession()
-  const isLoggedIn = !!session?.user
-  let userRole = null
-
-  if (isLoggedIn) {
-    // Use cached role if same user, otherwise fetch once
-    if (session.user.id === _cachedUserId && _cachedRole) {
-      userRole = _cachedRole
-    } else {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', session.user.id)
-        .maybeSingle()
-      userRole = profile?.role || 'student'
-      _cachedUserId = session.user.id
-      _cachedRole = userRole
-    }
-  } else {
-    _cachedUserId = null
-    _cachedRole = null
-  }
+router.beforeEach((to) => {
+  // Auth store is initialized before app mount — no async calls needed here
+  const auth = useAuthStore()
+  const isLoggedIn = auth.isLoggedIn
+  const userRole = auth.userType
 
   // Redirect unauthenticated users away from protected routes
   if (to.matched.some(r => r.meta.requiresAuth) && !isLoggedIn) {
