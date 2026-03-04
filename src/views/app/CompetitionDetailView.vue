@@ -2,14 +2,14 @@
   <div class="space-y-4">
     <button class="btn btn-ghost btn-sm gap-1" @click="router.push('/competitions')">
       <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
-      Back to Competitions
+      Back to Challenges
     </button>
 
     <div v-if="loading" class="flex justify-center py-12">
       <span class="loading loading-spinner loading-lg"></span>
     </div>
 
-    <div v-else-if="!comp" class="text-center py-12 text-base-content/50">Competition not found.</div>
+    <div v-else-if="!comp" class="text-center py-12 text-base-content/50">Challenge not found.</div>
 
     <template v-else>
       <!-- Header -->
@@ -80,12 +80,12 @@
           <h3 class="font-semibold">Register</h3>
           <div v-if="comp.rules?.require_thesis" class="form-control">
             <label class="label py-1"><span class="label-text text-sm">Investment Thesis (required)</span></label>
-            <textarea v-model="registrationThesis" class="textarea textarea-bordered w-full" rows="3" placeholder="Describe your investment strategy for this competition..."></textarea>
+            <textarea v-model="registrationThesis" class="textarea textarea-bordered w-full" rows="3" placeholder="Describe your investment strategy for this challenge..."></textarea>
           </div>
           <div v-if="registerError" class="text-error text-sm">{{ registerError }}</div>
           <button class="btn btn-primary btn-block" :disabled="registering || (comp.rules?.require_thesis && !registrationThesis.trim())" @click="register">
             <span v-if="registering" class="loading loading-spinner loading-sm"></span>
-            Join Competition
+            Join Challenge
           </button>
         </div>
       </div>

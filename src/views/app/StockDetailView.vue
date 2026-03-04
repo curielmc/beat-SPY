@@ -39,8 +39,8 @@
       <!-- Competition Context Banner -->
       <div v-if="activeComp" class="alert alert-info">
         <div>
-          <p class="font-semibold text-sm">Active Competition: {{ activeComp.name }}</p>
-          <p class="text-xs">Trades are subject to competition rules. Benchmark: {{ activeComp.benchmark_ticker }}</p>
+          <p class="font-semibold text-sm">Active Challenge: {{ activeComp.name }}</p>
+          <p class="text-xs">Trades are subject to challenge rules. Benchmark: {{ activeComp.benchmark_ticker }}</p>
         </div>
       </div>
 

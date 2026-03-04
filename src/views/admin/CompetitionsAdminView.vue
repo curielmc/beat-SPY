@@ -1,16 +1,16 @@
 <template>
   <div class="space-y-4">
     <div class="flex items-center justify-between">
-      <h1 class="text-xl font-bold">Manage Competitions</h1>
+      <h1 class="text-xl font-bold">Manage Challenges</h1>
       <button class="btn btn-primary btn-sm" @click="showForm = !showForm">
-        {{ showForm ? 'Cancel' : '+ New Competition' }}
+        {{ showForm ? 'Cancel' : '+ New Challenge' }}
       </button>
     </div>
 
     <!-- Create/Edit Form -->
     <div v-if="showForm" class="card bg-base-100 shadow">
       <div class="card-body p-4 space-y-3">
-        <h3 class="font-bold">{{ editingId ? 'Edit Competition' : 'Create Competition' }}</h3>
+        <h3 class="font-bold">{{ editingId ? 'Edit Challenge' : 'Create Challenge' }}</h3>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div class="form-control">
@@ -121,7 +121,7 @@
           <button class="btn btn-sm btn-ghost" @click="resetForm">Cancel</button>
           <button class="btn btn-sm btn-primary flex-1" :disabled="!canSave || saving" @click="save">
             <span v-if="saving" class="loading loading-spinner loading-xs"></span>
-            {{ editingId ? 'Save Changes' : 'Create Competition' }}
+            {{ editingId ? 'Save Changes' : 'Create Challenge' }}
           </button>
         </div>
       </div>

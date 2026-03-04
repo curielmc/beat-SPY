@@ -89,30 +89,51 @@
               </div>
             </div>
 
-            <!-- Groups -->
-            <div v-if="cls.groups?.length" class="overflow-x-auto">
-              <table class="table table-sm">
-                <thead>
-                  <tr>
-                    <th>Group</th>
-                    <th>Members</th>
-                    <th>Created</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="group in cls.groups" :key="group.id">
-                    <td class="font-medium">{{ group.name }}</td>
-                    <td>
-                      <div class="flex gap-1 flex-wrap">
-                        <span v-for="m in getGroupMembers(cls, group.id)" :key="m.user_id" class="badge badge-sm badge-outline">
-                          {{ m.profiles?.full_name?.split(' ')[0] }}
-                        </span>
-                      </div>
-                    </td>
-                    <td class="text-sm text-base-content/60">{{ new Date(group.created_at).toLocaleDateString() }}</td>
-                  </tr>
-                </tbody>
-              </table>
+            <!-- Group Leaderboard -->
+            <div v-if="cls.groups?.length" class="card bg-base-200 p-4">
+              <div class="flex items-center justify-between mb-3">
+                <h3 class="font-semibold">Group Leaderboard</h3>
+                <button v-if="!leaderboards[cls.id]" class="btn btn-xs btn-outline btn-primary" :disabled="leaderboardLoading[cls.id]" @click="loadLeaderboard(cls)">
+                  {{ leaderboardLoading[cls.id] ? 'Loading...' : 'Load Leaderboard' }}
+                </button>
+              </div>
+              <div class="overflow-x-auto">
+                <table class="table table-sm">
+                  <thead>
+                    <tr>
+                      <th class="w-10">Rank</th>
+                      <th>Group</th>
+                      <th>Members</th>
+                      <th class="text-right">Return %</th>
+                      <th class="text-right">Portfolio Value</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(group, i) in (leaderboards[cls.id] || cls.groups)" :key="group.id">
+                      <td>
+                        <span v-if="leaderboards[cls.id]" class="badge badge-sm" :class="i === 0 ? 'badge-warning' : 'badge-ghost'">{{ i + 1 }}</span>
+                        <span v-else class="text-base-content/30">-</span>
+                      </td>
+                      <td class="font-medium">{{ group.name }}</td>
+                      <td>
+                        <div class="flex gap-1 flex-wrap">
+                          <span v-for="m in getGroupMembers(cls, group.id)" :key="m.user_id" class="badge badge-sm badge-outline">
+                            {{ m.profiles?.full_name?.split(' ')[0] }}
+                          </span>
+                        </div>
+                      </td>
+                      <td class="text-right font-mono" :class="group.returnPct > 0 ? 'text-success' : group.returnPct < 0 ? 'text-error' : ''">
+                        <template v-if="leaderboards[cls.id]">{{ group.returnPct >= 0 ? '+' : '' }}{{ group.returnPct.toFixed(2) }}%</template>
+                        <span v-else class="text-base-content/30">-</span>
+                      </td>
+                      <td class="text-right font-mono">
+                        <template v-if="leaderboards[cls.id]">${{ group.totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</template>
+                        <span v-else class="text-base-content/30">-</span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             <!-- Invites -->
@@ -193,6 +214,8 @@ const successMsg = ref('')
 const editState = reactive({})
 const invites = reactive({})
 const invitesLoaded = reactive({})
+const leaderboards = reactive({})
+const leaderboardLoading = reactive({})
 
 onMounted(async () => {
   await fetchClasses()
@@ -272,6 +295,40 @@ async function deleteInvite(classId, inviteId) {
   await supabase.from('class_invites').delete().eq('id', inviteId)
   invites[classId] = (invites[classId] || []).filter(i => i.id !== inviteId)
   showSuccess('Invite deleted')
+}
+
+async function loadLeaderboard(cls) {
+  leaderboardLoading[cls.id] = true
+  const ranked = []
+  for (const group of (cls.groups || [])) {
+    const { data: pData } = await supabase
+      .from('portfolios')
+      .select('id, cash_balance, starting_cash')
+      .eq('owner_type', 'group')
+      .eq('owner_id', group.id)
+      .maybeSingle()
+
+    let totalValue = cls.starting_cash || 100000
+    let returnPct = 0
+    const startCash = pData?.starting_cash || cls.starting_cash || 100000
+
+    if (pData) {
+      const { data: hData } = await supabase
+        .from('holdings')
+        .select('ticker, shares, avg_cost')
+        .eq('portfolio_id', pData.id)
+
+      // Use avg_cost as fallback price (avoids needing market data API)
+      const holdingsValue = (hData || []).reduce((sum, h) => sum + (h.shares * h.avg_cost), 0)
+      totalValue = holdingsValue + pData.cash_balance
+      returnPct = ((totalValue - startCash) / startCash) * 100
+    }
+
+    ranked.push({ ...group, totalValue, returnPct })
+  }
+  ranked.sort((a, b) => b.returnPct - a.returnPct)
+  leaderboards[cls.id] = ranked
+  leaderboardLoading[cls.id] = false
 }
 
 function viewAsTeacher(cls) {

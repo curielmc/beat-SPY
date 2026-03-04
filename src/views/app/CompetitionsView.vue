@@ -1,6 +1,6 @@
 <template>
   <div class="space-y-4">
-    <h1 class="text-xl font-bold">Competitions</h1>
+    <h1 class="text-xl font-bold">Challenges</h1>
     <p class="text-sm text-base-content/60">Time-bound investing challenges with sponsors, benchmarks, and prizes.</p>
 
     <!-- Status filter tabs -->
@@ -17,7 +17,7 @@
 
     <div v-else-if="filtered.length === 0" class="text-center py-16 space-y-3">
       <div class="text-5xl">&#127942;</div>
-      <p class="text-base-content/50">No competitions{{ statusFilter ? ' with this status' : '' }} right now.</p>
+      <p class="text-base-content/50">No challenges{{ statusFilter ? ' with this status' : '' }} right now.</p>
     </div>
 
     <div v-else class="space-y-3">
