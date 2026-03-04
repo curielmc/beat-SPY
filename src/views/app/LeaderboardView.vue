@@ -131,7 +131,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from '../../stores/auth'
 import { usePortfolioStore } from '../../stores/portfolio'
 import { useMarketDataStore } from '../../stores/marketData'
@@ -251,6 +251,7 @@ const sortedGroups = computed(() => {
   })
 })
 
+let refreshInterval = null
 onMounted(async () => {
   const membership = await auth.getCurrentMembership()
   myGroupId.value = membership?.group_id
@@ -352,6 +353,12 @@ onMounted(async () => {
   // Phase 2: background — period metrics + risk-adjusted
   computePeriodMetrics(enriched)
   computeRiskMetrics(enriched)
+
+refreshInterval = setInterval(async () => {
+  const allT = [...new Set(groups.value.flatMap(g => (g.holdings || []).map(h => h.ticker)).concat(['SPY']))]
+  if (allT.length) await market.fetchBatchQuotes(allT)
+}, 60000)
+
 })
 
 // Simple seeded random for synthetic data
@@ -639,4 +646,5 @@ async function computeRiskMetrics(entries) {
     riskMetricsLoading.value = false
   }
 }
+onUnmounted(() => { if (refreshInterval) clearInterval(refreshInterval) })
 </script>

@@ -474,7 +474,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
 import { usePortfolioStore } from '../../stores/portfolio'
@@ -564,6 +564,8 @@ function generateSyntheticHistory(startDate, endDate, startValue, endValue, seed
   }
   return points
 }
+
+let refreshInterval = null
 
 onMounted(async () => {
   // Admin "View as Student" mode
@@ -660,6 +662,15 @@ onMounted(async () => {
   if (membership.value?.class_id) {
     loadClassGroups()
   }
+
+// Auto-refresh prices every 60 seconds
+refreshInterval = setInterval(async () => {
+  if (portfolioStore.holdings.length) {
+    const tickers = portfolioStore.holdings.map(h => h.ticker)
+    if (tickers.length) await market.fetchBatchQuotes(tickers)
+  }
+}, 60000)
+
 })
 
 async function loadCharts() {
@@ -1080,4 +1091,8 @@ async function dismissBonus() {
     }
   }
 }
+onUnmounted(() => {
+  if (refreshInterval) clearInterval(refreshInterval)
+})
+
 </script>

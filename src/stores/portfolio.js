@@ -381,8 +381,10 @@ export const usePortfolioStore = defineStore('portfolio', () => {
       }
     }
 
-    // Reload portfolio data
-    await loadPortfolio(portfolio.value.owner_type, portfolio.value.owner_id)
+    // Lightweight refresh — update holdings + prices without full DB reload
+    const { data: freshHoldings } = await supabase.from('holdings').select('*').eq('portfolio_id', portfolioId)
+    rawHoldings.value = freshHoldings || []
+    await enrichHoldings()
     version.value++
 
     return { success: true, shares, price }
@@ -483,7 +485,10 @@ export const usePortfolioStore = defineStore('portfolio', () => {
       }
     }
 
-    await loadPortfolio(portfolio.value.owner_type, portfolio.value.owner_id)
+    // Lightweight refresh
+    const { data: freshHoldings2 } = await supabase.from('holdings').select('*').eq('portfolio_id', portfolioId)
+    rawHoldings.value = freshHoldings2 || []
+    await enrichHoldings()
     version.value++
 
     return { success: true, shares: sharesToSell, price }
