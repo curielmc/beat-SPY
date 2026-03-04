@@ -222,8 +222,8 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     if (dollars <= 0) return { success: false, error: 'Amount must be positive' }
     if (dollars > cashBalance.value) return { success: false, error: 'Insufficient cash' }
 
-    // ── Universe + Sector restrictions (from class settings) ──
-    {
+    // ── Universe + Sector restrictions (group portfolios only — personal is always free) ──
+    if (portfolio.value?.owner_type === 'group') {
       const membership = await auth.getCurrentMembership()
       const classRestrictions = membership?.class?.restrictions || {}
       // Use fund-specific restrictions if set, fall back to top-level
