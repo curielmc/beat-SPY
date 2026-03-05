@@ -13,8 +13,8 @@
     <div v-if="!loading && !quote" class="text-center py-12 text-base-content/50">Stock not found.</div>
 
     <template v-if="!loading && quote">
-      <!-- Header -->
-      <div class="flex items-start justify-between">
+      <!-- Header & Quick Trade -->
+      <div class="flex flex-col lg:flex-row lg:items-start justify-between gap-6">
         <div class="flex items-start gap-4">
           <div class="avatar">
             <div class="w-16 h-16 rounded-xl bg-base-200 flex items-center justify-center overflow-hidden border border-base-300 shadow-sm">
@@ -30,6 +30,40 @@
               <span v-if="companyProfile?.industry" class="badge badge-sm badge-ghost">{{ companyProfile.industry }}</span>
               <span v-if="companyProfile?.country" class="badge badge-sm badge-outline">{{ companyProfile.country }}</span>
               <span v-if="quote.exchange" class="badge badge-sm badge-primary">{{ quote.exchange }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Trade Actions (Brokerage Style) -->
+        <div v-if="!auth.isTeacher && !auth.isAdmin" class="flex flex-col sm:flex-row gap-3">
+          <!-- Buy Action -->
+          <div 
+            class="card bg-success/10 border border-success/20 p-3 flex flex-col gap-1 cursor-pointer hover:bg-success/20 transition-colors min-w-[180px]"
+            @click="tradeMode = 'buy'; scrollToTrade()"
+          >
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-success uppercase tracking-wider">Buy {{ ticker }}</span>
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-success" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" /></svg>
+            </div>
+            <div class="text-xl font-bold text-success">${{ Number(quote.price).toFixed(2) }}</div>
+            <div class="text-[10px] text-base-content/60">
+              <span class="font-semibold text-success/80">${{ portfolioStore.cashBalance.toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</span> available
+            </div>
+          </div>
+
+          <!-- Sell Action -->
+          <div 
+            class="card bg-error/10 border border-error/20 p-3 flex flex-col gap-1 cursor-pointer hover:bg-error/20 transition-colors min-w-[180px]"
+            :class="{ 'opacity-50 grayscale pointer-events-none': !currentHolding }"
+            @click="tradeMode = 'sell'; scrollToTrade()"
+          >
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-error uppercase tracking-wider">Sell {{ ticker }}</span>
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-error" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd" /></svg>
+            </div>
+            <div class="text-xl font-bold text-error">${{ Number(quote.price).toFixed(2) }}</div>
+            <div class="text-[10px] text-base-content/60">
+              <span class="font-semibold text-error/80">{{ Number(currentHolding?.shares || 0).toFixed(2) }}</span> shares held
             </div>
           </div>
         </div>
@@ -60,7 +94,7 @@
       </div>
 
       <!-- Trade Panel (students only) -->
-      <div v-if="!auth.isTeacher && !auth.isAdmin" class="card shadow" :class="isGroupPortfolio ? 'bg-secondary/10 border border-secondary/30' : 'bg-base-100'">
+      <div v-if="!auth.isTeacher && !auth.isAdmin" ref="tradePanel" class="card shadow" :class="isGroupPortfolio ? 'bg-secondary/10 border border-secondary/30' : 'bg-base-100'">
         <div class="card-body p-4">
           <!-- Active Portfolio Indicator -->
           <div class="flex items-center justify-between mb-3">
@@ -375,6 +409,15 @@ const activeComp = ref(null)
 const compRuleErrors = ref([])
 const switchingPortfolio = ref(false)
 const groupFunds = ref([])
+
+// Refs
+const tradePanel = ref(null)
+
+function scrollToTrade() {
+  if (tradePanel.value) {
+    tradePanel.value.scrollIntoView({ behavior: 'smooth' })
+  }
+}
 
 const tomorrowDate = computed(() => {
   const d = new Date()
