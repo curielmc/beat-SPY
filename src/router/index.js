@@ -89,9 +89,14 @@ const router = createRouter({
   ]
 })
 
-router.beforeEach((to) => {
-  // Auth store is initialized before app mount — no async calls needed here
+router.beforeEach(async (to) => {
   const auth = useAuthStore()
+
+  // Wait for auth to initialize before making routing decisions
+  if (!auth.initialized) {
+    await auth.init()
+  }
+
   const isLoggedIn = auth.isLoggedIn
   const userRole = auth.userType
 
