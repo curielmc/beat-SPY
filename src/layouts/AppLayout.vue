@@ -193,7 +193,13 @@ async function handleVisibilityChange() {
     if (session) return
 
     // getSession can briefly return null while restoring state on iOS/Safari.
-    // Try a token refresh before deciding the user is signed out.
+    // Wait a moment and retry before taking any action — don't force logout
+    // as this causes users to get kicked out on tab switches and refreshes.
+    await new Promise(r => setTimeout(r, 1000))
+    const { data: { session: retrySession } } = await supabase.auth.getSession()
+    if (retrySession) return
+
+    // Still no session — try a token refresh as last resort
     const { data: refreshed } = await supabase.auth.refreshSession()
     if (!refreshed?.session && auth.isLoggedIn) {
       await auth.logout()

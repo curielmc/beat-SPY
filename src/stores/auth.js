@@ -65,21 +65,10 @@ export const useAuthStore = defineStore('auth', () => {
     if (initialized.value) return
     loading.value = true
     try {
-      // Always try to recover session from storage on init (e.g. after deploy)
-      // First try getSession (reads from storage), then force refresh to ensure
-      // the token is valid — this prevents logout-on-deploy issues
+      // Recover session from localStorage — Supabase handles token refresh
+      // automatically via autoRefreshToken. Don't force refresh here as it
+      // can trigger SIGNED_OUT events on transient failures.
       let { data: { session } } = await supabase.auth.getSession()
-      if (session) {
-        // Always refresh on init to ensure token validity after deploys
-        const { data: refreshed, error: refreshErr } = await supabase.auth.refreshSession()
-        if (!refreshErr && refreshed?.session) {
-          session = refreshed.session
-        }
-        // If refresh failed but we have a non-expired session, keep using it
-        else if (session.expires_at && session.expires_at * 1000 < Date.now()) {
-          session = null // truly expired and can't refresh
-        }
-      }
       if (session?.user) {
         currentUser.value = session.user
         await fetchProfile(session.user.id)
