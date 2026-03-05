@@ -1,6 +1,12 @@
 <template>
   <div class="space-y-6">
-    <h1 class="text-xl font-bold">Active Class</h1>
+    <div class="flex items-center justify-between">
+      <h1 class="text-xl font-bold">Active Class</h1>
+      <RouterLink to="/attribution" class="btn btn-primary btn-sm gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+        Performance Attribution
+      </RouterLink>
+    </div>
 
     <!-- Multi-class tabs -->
     <div v-if="auth.allMemberships.length > 0" class="tabs tabs-bordered">
@@ -40,17 +46,25 @@
       <!-- My Group Card -->
       <div v-if="membership.group" class="card bg-base-100 shadow">
         <div class="card-body p-4">
-          <h2 class="font-semibold">My Group: {{ membership.group.name }}</h2>
-          <div v-if="groupMembers.length" class="flex flex-wrap gap-3 mt-2">
-            <div v-for="member in groupMembers" :key="member.id" class="flex items-center gap-2">
-              <div :class="['avatar', !member.avatar_url && 'placeholder']">
-                <div class="bg-primary text-primary-content rounded-full w-8 h-8">
-                  <img v-if="member.avatar_url" :src="member.avatar_url" :alt="member.full_name" class="rounded-full object-cover w-full h-full" />
-                  <span v-else class="text-xs">{{ (member.full_name || '?')[0].toUpperCase() }}</span>
+          <div class="flex items-start justify-between">
+            <div>
+              <h2 class="font-semibold">My Group: {{ membership.group.name }}</h2>
+              <div v-if="groupMembers.length" class="flex flex-wrap gap-3 mt-2">
+                <div v-for="member in groupMembers" :key="member.id" class="flex items-center gap-2">
+                  <div :class="['avatar', !member.avatar_url && 'placeholder']">
+                    <div class="bg-primary text-primary-content rounded-full w-8 h-8">
+                      <img v-if="member.avatar_url" :src="member.avatar_url" :alt="member.full_name" class="rounded-full object-cover w-full h-full" />
+                      <span v-else class="text-xs">{{ (member.full_name || '?')[0].toUpperCase() }}</span>
+                    </div>
+                  </div>
+                  <span class="text-sm">{{ member.full_name }}</span>
                 </div>
               </div>
-              <span class="text-sm">{{ member.full_name }}</span>
             </div>
+            <RouterLink to="/attribution" class="btn btn-ghost btn-xs text-primary gap-1">
+              Analyze Performance
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+            </RouterLink>
           </div>
         </div>
       </div>
