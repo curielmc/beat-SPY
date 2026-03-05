@@ -2,12 +2,21 @@
   <div class="space-y-6">
     <div class="flex items-center justify-between">
       <div>
-        <h1 class="text-2xl font-bold">Student Progress</h1>
+        <h1 class="text-2xl font-bold flex items-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+          Student Progress
+        </h1>
         <p class="text-base-content/70">View each group's performance, holdings, and allocation</p>
       </div>
       <div class="flex gap-2">
-        <button class="btn btn-outline btn-sm" @click="showCreateGroupModal = true">+ Create Group</button>
-        <button class="btn btn-primary btn-sm" @click="showOpenFundModal = true">Open New Fund for Class</button>
+        <button class="btn btn-outline btn-sm gap-2" @click="showCreateGroupModal = true">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+          Create Group
+        </button>
+        <button class="btn btn-primary btn-sm gap-2" @click="showOpenFundModal = true">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+          Open New Fund for Class
+        </button>
       </div>
     </div>
 
@@ -19,7 +28,10 @@
       <!-- Unassigned Students -->
       <div v-if="teacher.unassignedStudents.length > 0" class="card bg-warning/10 shadow border border-warning/30">
         <div class="card-body">
-          <h2 class="card-title text-lg">Unassigned Students ({{ teacher.unassignedStudents.length }})</h2>
+          <h2 class="card-title text-lg flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /></svg>
+            Unassigned Students ({{ teacher.unassignedStudents.length }})
+          </h2>
           <p class="text-sm text-base-content/60 mb-3">These students signed up but haven't been assigned to a group yet.</p>
           <div v-if="assignError" class="alert alert-error text-sm mb-3">⚠️ {{ assignError }}</div>
 

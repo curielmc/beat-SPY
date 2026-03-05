@@ -63,7 +63,10 @@
 
       <!-- Waterfall chart -->
       <div class="card bg-base-100 shadow p-5">
-        <h2 class="font-semibold mb-4">Contribution to Return (Today)</h2>
+        <h2 class="font-semibold mb-4 flex items-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+          Contribution to Return (Today)
+        </h2>
         <div class="space-y-3">
           <div v-for="a in attributions" :key="a.ticker">
             <div class="flex items-center gap-3">
@@ -118,9 +121,12 @@
 
       <!-- Stock-by-stock detail cards -->
       <div class="card bg-base-100 shadow p-5">
-        <h2 class="font-semibold mb-4">Stock Detail</h2>
+        <h2 class="font-semibold mb-4 flex items-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+          Stock Detail
+        </h2>
         <div class="overflow-x-auto">
-          <table class="table table-sm w-full">
+          <table class="table table-sm table-zebra w-full">
             <thead>
               <tr class="text-base-content/50 text-xs">
                 <th>Stock</th>
@@ -181,7 +187,10 @@
 
       <!-- Counterfactuals -->
       <div class="card bg-base-100 shadow p-5">
-        <h2 class="font-semibold mb-3">🤔 What If?</h2>
+        <h2 class="font-semibold mb-3 flex items-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
+          🤔 What If?
+        </h2>
         <div class="space-y-2">
           <div v-for="a in counterfactuals" :key="a.ticker" class="flex items-center justify-between py-2 border-b border-base-200 last:border-0">
             <div class="text-sm">

@@ -1,6 +1,6 @@
 <template>
   <div class="overflow-x-auto">
-    <table class="table table-sm">
+    <table class="table table-sm table-zebra">
       <thead>
         <tr class="text-base-content/60">
           <th class="text-left">Ticker</th>

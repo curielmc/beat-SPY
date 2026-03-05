@@ -5,7 +5,10 @@
 
   <div v-else class="space-y-4">
     <div class="flex items-center justify-between">
-      <h1 class="text-xl font-bold">My Funds</h1>
+      <h1 class="text-xl font-bold flex items-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+        My Funds
+      </h1>
     </div>
 
     <div v-if="!personalPortfolio && groupEnriched.length === 0" class="text-center py-10 text-base-content/50">
@@ -90,7 +93,10 @@
     <!-- All Funds Comparison Chart -->
     <div v-if="comparisonDatasets.length > 0" class="card bg-base-100 shadow">
       <div class="card-body p-4">
-        <h3 class="font-semibold mb-2">All Funds vs S&P 500</h3>
+        <h3 class="font-semibold mb-2 flex items-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" /></svg>
+          All Funds vs S&P 500
+        </h3>
         <PortfolioLineChart
           :datasets="comparisonDatasets"
           :show-percentage="true"
@@ -102,9 +108,12 @@
     <!-- Funds Summary Table -->
     <div v-if="allFundsEnriched.length > 0" class="card bg-base-100 shadow">
       <div class="card-body p-4">
-        <h3 class="font-semibold mb-2">Fund Summary</h3>
+        <h3 class="font-semibold mb-2 flex items-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+          Fund Summary
+        </h3>
         <div class="overflow-x-auto">
-          <table class="table table-sm">
+          <table class="table table-sm table-zebra">
             <thead>
               <tr>
                 <th>Fund</th>

@@ -2,7 +2,10 @@
   <div class="space-y-6">
     <div class="flex items-center justify-between flex-wrap gap-3">
       <div>
-        <h1 class="text-2xl font-bold">Trade Audit</h1>
+        <h1 class="text-2xl font-bold flex items-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
+          Trade Audit
+        </h1>
         <p class="text-base-content/70">View and filter all platform trades</p>
       </div>
       <button class="btn btn-sm btn-outline" @click="exportCSV">Export CSV</button>
@@ -25,10 +28,10 @@
       <span class="loading loading-spinner loading-lg"></span>
     </div>
 
-    <div v-else class="card bg-base-100 shadow">
+    <div v-else class="card bg-base-100 shadow border border-base-200">
       <div class="card-body p-0">
         <div class="overflow-x-auto">
-          <table class="table table-sm">
+          <table class="table table-sm table-zebra">
             <thead>
               <tr>
                 <th>Date</th>

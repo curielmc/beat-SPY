@@ -2,7 +2,10 @@
   <div class="space-y-6">
     <div class="flex items-center justify-between flex-wrap gap-3">
       <div>
-        <h1 class="text-2xl font-bold">Users</h1>
+        <h1 class="text-2xl font-bold flex items-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+          Users
+        </h1>
         <p class="text-base-content/70">Manage all platform users</p>
       </div>
       <div class="flex gap-2">
@@ -41,10 +44,10 @@
       <span class="loading loading-spinner loading-lg"></span>
     </div>
 
-    <div v-else class="card bg-base-100 shadow">
+    <div v-else class="card bg-base-100 shadow border border-base-200">
       <div class="card-body p-0">
         <div class="overflow-x-auto">
-          <table class="table">
+          <table class="table table-zebra">
             <thead>
               <tr>
                 <th class="w-10">

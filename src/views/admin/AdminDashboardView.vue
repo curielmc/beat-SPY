@@ -1,7 +1,10 @@
 <template>
   <div class="space-y-6">
     <div>
-      <h1 class="text-2xl font-bold">Admin Dashboard</h1>
+      <h1 class="text-2xl font-bold flex items-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+        Admin Dashboard
+      </h1>
       <p class="text-base-content/70">Platform overview and statistics</p>
     </div>
 
@@ -47,18 +50,24 @@
 
       <!-- Charts Row -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div class="card bg-base-100 shadow">
+        <div class="card bg-base-100 shadow border border-base-200">
           <div class="card-body">
-            <h2 class="card-title text-lg">Signups per Week (Last 12 Weeks)</h2>
+            <h2 class="card-title text-lg flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>
+              Signups per Week
+            </h2>
             <div style="height: 220px; position: relative;">
               <Bar v-if="signupChartData" :data="signupChartData" :options="barOptions" />
             </div>
           </div>
         </div>
 
-        <div class="card bg-base-100 shadow">
+        <div class="card bg-base-100 shadow border border-base-200">
           <div class="card-body">
-            <h2 class="card-title text-lg">Trading Volume per Week (Last 12 Weeks)</h2>
+            <h2 class="card-title text-lg flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-info" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
+              Trading Volume per Week
+            </h2>
             <div style="height: 220px; position: relative;">
               <Bar v-if="tradeVolumeChartData" :data="tradeVolumeChartData" :options="barOptions" />
             </div>
@@ -69,11 +78,14 @@
       <!-- Bottom Row -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <!-- Top Traded Tickers -->
-        <div class="card bg-base-100 shadow">
+        <div class="card bg-base-100 shadow border border-base-200">
           <div class="card-body">
-            <h2 class="card-title text-lg">Top Traded Tickers (This Week)</h2>
+            <h2 class="card-title text-lg flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
+              Top Traded Tickers (This Week)
+            </h2>
             <div v-if="topTickers.length === 0" class="text-base-content/50">No trades this week</div>
-            <table v-else class="table table-sm">
+            <table class="table table-sm table-zebra">
               <thead>
                 <tr>
                   <th>Ticker</th>
@@ -93,9 +105,12 @@
         </div>
 
         <!-- Users by Role -->
-        <div class="card bg-base-100 shadow">
+        <div class="card bg-base-100 shadow border border-base-200">
           <div class="card-body">
-            <h2 class="card-title text-lg">Users by Role</h2>
+            <h2 class="card-title text-lg flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+              Users by Role
+            </h2>
             <div class="space-y-2">
               <div class="flex justify-between items-center">
                 <span>Students</span>
@@ -115,9 +130,12 @@
       </div>
 
       <!-- Recent Activity -->
-      <div class="card bg-base-100 shadow">
+      <div class="card bg-base-100 shadow border border-base-200">
         <div class="card-body">
-          <h2 class="card-title text-lg">Recent Activity</h2>
+          <h2 class="card-title text-lg flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            Recent Activity
+          </h2>
           <div v-if="recentTrades.length === 0" class="text-base-content/50">No trades yet</div>
           <div v-for="trade in recentTrades" :key="trade.id" class="flex justify-between items-center text-sm border-b border-base-200 pb-1">
             <div>

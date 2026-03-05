@@ -37,7 +37,10 @@
       <!-- Rules -->
       <div v-if="hasRules" class="card bg-base-100 shadow">
         <div class="card-body p-4">
-          <h3 class="font-semibold mb-2">Rules</h3>
+          <h3 class="font-semibold mb-2 flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-info" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+            Rules
+          </h3>
           <ul class="space-y-1 text-sm">
             <li v-if="comp.rules.min_stocks" class="flex items-center gap-2">
               <span class="badge badge-xs badge-info">Min</span>
@@ -62,7 +65,10 @@
       <!-- Prizes -->
       <div v-if="comp.prizes?.length > 0" class="card bg-base-100 shadow">
         <div class="card-body p-4">
-          <h3 class="font-semibold mb-2">Prizes</h3>
+          <h3 class="font-semibold mb-2 flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" /></svg>
+            Prizes
+          </h3>
           <div class="space-y-2">
             <div v-for="prize in comp.prizes" :key="prize.place" class="flex items-center gap-3">
               <span class="badge badge-lg" :class="prize.place === 1 ? 'badge-warning' : prize.place === 2 ? 'badge-ghost' : 'badge-outline'">
@@ -107,7 +113,10 @@
       <!-- Tabs: Leaderboard -->
       <div class="card bg-base-100 shadow">
         <div class="card-body p-4">
-          <h3 class="font-semibold mb-3">Leaderboard</h3>
+          <h3 class="font-semibold mb-3 flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+            Leaderboard
+          </h3>
 
           <div v-if="leaderboardLoading" class="flex justify-center py-4">
             <span class="loading loading-spinner loading-sm"></span>
@@ -118,7 +127,7 @@
           </div>
 
           <div v-else class="overflow-x-auto">
-            <table class="table table-sm">
+            <table class="table table-sm table-zebra">
               <thead>
                 <tr>
                   <th>#</th>

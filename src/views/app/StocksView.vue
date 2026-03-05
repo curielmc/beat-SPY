@@ -1,6 +1,9 @@
 <template>
   <div class="space-y-4">
-    <h1 class="text-xl font-bold">Stocks & Securities</h1>
+    <h1 class="text-xl font-bold flex items-center gap-2">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
+      Stocks & Securities
+    </h1>
 
     <!-- Search -->
     <input v-model="searchQuery" type="text" placeholder="Search by ticker or company name..." class="input input-bordered w-full" @input="handleSearch" />
@@ -331,7 +334,7 @@
 
               <!-- Preview table -->
               <div v-if="basketBuyAmount > 0" class="overflow-x-auto">
-                <table class="table table-sm">
+                <table class="table table-sm table-zebra">
                   <thead>
                     <tr>
                       <th>Stock</th>
