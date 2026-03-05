@@ -282,38 +282,89 @@ export const usePortfolioStore = defineStore('portfolio', () => {
 
       // Universe check
       if (universe !== 'any') {
-        let allowed = []
+        let isAllowed = false
         if (universe === 'sp500') {
-          const data = await getSP500Constituents()
-          allowed = (data || []).map(s => s.symbol?.toUpperCase())
+          // Check local database first (it's faster for single checks)
+          const { data: dbMatch } = await supabase
+            .from('sp500_constituents')
+            .select('symbol')
+            .eq('symbol', ticker.toUpperCase())
+            .maybeSingle()
+
+          if (dbMatch) {
+            isAllowed = true
+          } else {
+            // Fallback to FMP API if DB is empty or ticker not found (might be newly added)
+            const data = await getSP500Constituents()
+            const allowedSymbols = (data || []).map(s => s.symbol?.toUpperCase())
+            isAllowed = allowedSymbols.includes(ticker.toUpperCase())
+          }
         } else if (universe === 'dow30') {
           const fmpKey = import.meta.env.VITE_FMP_API_KEY
           const data = await fetch(`https://financialmodelingprep.com/api/v3/dowjones_constituent?apikey=${fmpKey}`).then(r => r.json()).catch(() => [])
-          allowed = (data || []).map(s => s.symbol?.toUpperCase())
+          isAllowed = (data || []).some(s => s.symbol?.toUpperCase() === ticker.toUpperCase())
         } else if (universe === 'nasdaq100') {
           const fmpKey = import.meta.env.VITE_FMP_API_KEY
           const data = await fetch(`https://financialmodelingprep.com/api/v3/nasdaq_constituent?apikey=${fmpKey}`).then(r => r.json()).catch(() => [])
-          allowed = (data || []).map(s => s.symbol?.toUpperCase())
+          isAllowed = (data || []).some(s => s.symbol?.toUpperCase() === ticker.toUpperCase())
         }
-        const allowedSet = new Set(allowed)
-        if (allowedSet.size > 0 && !allowedSet.has(ticker.toUpperCase())) {
+
+        if (!isAllowed) {
           const label = universe === 'sp500' ? 'S&P 500' : universe === 'dow30' ? 'Dow Jones 30' : 'NASDAQ 100'
           return { success: false, error: `${ticker} is not in the ${label}. Your class is restricted to ${label} stocks only.` }
         }
       }
 
       // Sector checks (max stocks per sector, max sector %)
-      if (restrictions.maxStocksPerSector || restrictions.maxSectorPct) {
+      const allTickers = rawHoldings.value.map(h => h.ticker)
+      const isNewTicker = !allTickers.includes(ticker.toUpperCase())
+      const totalPortfolioValue = rawHoldings.value.reduce((sum, h) => {
+        const price = market.getCachedPrice(h.ticker) || h.avg_cost
+        return sum + (h.shares * price)
+      }, 0) + cashBalance.value
+
+      // Max Position Size check (Concentration)
+      if (restrictions.maxPositionPct) {
+        const currentHolding = rawHoldings.value.find(h => h.ticker === ticker.toUpperCase())
+        const currentValue = currentHolding ? (currentHolding.shares * (market.getCachedPrice(ticker) || currentHolding.avg_cost)) : 0
+        const newPositionValue = currentValue + dollars
+        const newPct = totalPortfolioValue > 0 ? (newPositionValue / totalPortfolioValue) * 100 : 0
+        if (newPct > restrictions.maxPositionPct) {
+          return { success: false, error: `This trade would put ${newPct.toFixed(1)}% of your portfolio in ${ticker.toUpperCase()}. Max ${restrictions.maxPositionPct}% per position allowed.` }
+        }
+      }
+
+      if (restrictions.maxStocksPerSector || restrictions.maxSectorPct || restrictions.maxStocksPerPortfolio || restrictions.minSectors) {
+        // Max stocks per portfolio check
+        if (restrictions.maxStocksPerPortfolio && isNewTicker) {
+          if (allTickers.length >= restrictions.maxStocksPerPortfolio) {
+            return { success: false, error: `Your portfolio already has ${allTickers.length} stocks. Your class is restricted to a maximum of ${restrictions.maxStocksPerPortfolio} unique stocks per fund.` }
+          }
+        }
+
         // Get sector for this ticker
         const tickerProfiles = await market.fetchBatchProfiles([ticker])
         const tickerSector = tickerProfiles?.[ticker]?.sector || 'Unknown'
 
         // Get current holdings sectors
-        const allTickers = rawHoldings.value.map(h => h.ticker)
         const holdingProfiles = allTickers.length ? await market.fetchBatchProfiles(allTickers) : {}
         const sectorMap = {}
         for (const [symbol, profile] of Object.entries(holdingProfiles)) {
           sectorMap[symbol] = profile?.sector || 'Unknown'
+        }
+        const currentSectors = new Set(Object.values(sectorMap))
+
+        // Min Sectors logic: If we are running out of slots, must buy a new sector
+        if (restrictions.minSectors && isNewTicker && !currentSectors.has(tickerSector)) {
+          // This is a new sector, which is good.
+        } else if (restrictions.minSectors && restrictions.maxStocksPerPortfolio) {
+          const slotsRemaining = restrictions.maxStocksPerPortfolio - allTickers.length
+          const sectorsNeeded = (restrictions.minSectors || 0) - currentSectors.size
+          const isExistingSector = currentSectors.has(tickerSector)
+          
+          if (isExistingSector && slotsRemaining <= sectorsNeeded && sectorsNeeded > 0) {
+            return { success: false, error: `You need ${sectorsNeeded} more sector(s) but only have ${slotsRemaining} stock slot(s) left. You must buy a stock in a new sector.` }
+          }
         }
 
         // Count stocks in this sector
@@ -326,10 +377,6 @@ export const usePortfolioStore = defineStore('portfolio', () => {
 
         // Check sector % allocation
         if (restrictions.maxSectorPct) {
-          const totalPortfolioValue = rawHoldings.value.reduce((sum, h) => {
-            const price = market.getCachedPrice(h.ticker) || h.avg_cost
-            return sum + (h.shares * price)
-          }, 0) + cashBalance.value
           const sectorValue = rawHoldings.value
             .filter(h => sectorMap[h.ticker] === tickerSector)
             .reduce((sum, h) => sum + (h.shares * (market.getCachedPrice(h.ticker) || h.avg_cost)), 0)
@@ -337,6 +384,16 @@ export const usePortfolioStore = defineStore('portfolio', () => {
           if (newSectorPct > restrictions.maxSectorPct) {
             return { success: false, error: `This trade would put ${newSectorPct.toFixed(1)}% of your portfolio in ${tickerSector}. Max ${restrictions.maxSectorPct}% per sector allowed.` }
           }
+        }
+      }
+
+      // Dividend Requirement
+      if (restrictions.requireDividends) {
+        const quote = await market.fetchQuote(ticker)
+        const profile = await market.fetchCompanyProfile(ticker)
+        const hasDiv = (quote?.dividendYield && quote.dividendYield > 0) || (profile?.lastDiv && profile.lastDiv > 0)
+        if (!hasDiv) {
+          return { success: false, error: `${ticker.toUpperCase()} does not pay a dividend. Your class is restricted to dividend-paying stocks only.` }
         }
       }
     }
@@ -451,6 +508,41 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     if (!quote) return { success: false, error: 'Could not fetch stock price' }
     const price = quote.price || quote.previousClose
     if (!price || price <= 0) return { success: false, error: 'Could not determine a valid price for ' + ticker }
+
+    // Min Sectors check: Prevent selling the last stock in a sector if it drops them below the minimum
+    if (portfolio.value?.owner_type === 'group') {
+      const membership = await auth.getCurrentMembership()
+      const classRestrictions = membership?.class?.restrictions || {}
+      const fundNum = String(portfolio.value?.fund_number || '1')
+      const restrictions = classRestrictions.byFund?.[fundNum] || classRestrictions
+      
+      if (restrictions.minSectors) {
+        const allTickers = rawHoldings.value.map(h => h.ticker)
+        const profiles = await market.fetchBatchProfiles(allTickers)
+        
+        const sectorMap = {}
+        for (const [symbol, profile] of Object.entries(profiles)) {
+          sectorMap[symbol] = profile?.sector || 'Unknown'
+        }
+        
+        const currentSectors = new Set(Object.values(sectorMap))
+        const tickerSector = profiles[ticker.toUpperCase()]?.sector || 'Unknown'
+        const stocksInThisSector = allTickers.filter(t => sectorMap[t] === tickerSector)
+        
+        // If this is the last stock in its sector and we are at the limit
+        if (stocksInThisSector.length === 1 && currentSectors.size <= restrictions.minSectors) {
+          // If selling ALL shares or most of them
+          const holding = rawHoldings.value.find(h => h.ticker === ticker.toUpperCase())
+          if (holding) {
+             const sellShares = dollars / price
+             // If we are selling more than 90% of the position, consider it "exiting" the sector for this check
+             if (sellShares >= holding.shares * 0.9) {
+                return { success: false, error: `You must maintain holdings in at least ${restrictions.minSectors} sectors. Selling ${ticker.toUpperCase()} would leave you with only ${currentSectors.size - 1} sectors.` }
+             }
+          }
+        }
+      }
+    }
 
     const bmTicker = benchmarkTicker.value
     const bmQuote = await market.fetchQuote(bmTicker)
