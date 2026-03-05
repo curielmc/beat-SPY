@@ -282,7 +282,7 @@ async function explainStock(a) {
 }
 
 onMounted(async () => {
-  if (!portfolioStore.holdings.length) await portfolioStore.loadPersonalPortfolio()
+  // Ensure holdings are loaded from the store's current active portfolio
   const tickers = portfolioStore.holdings.map(h => h.ticker)
   if (!tickers.length) { loading.value = false; return }
 
