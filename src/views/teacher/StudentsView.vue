@@ -250,7 +250,7 @@
 
           <!-- Holdings Table -->
           <div class="overflow-x-auto">
-            <table class="table table-sm">
+            <table class="table table-sm table-zebra">
               <thead>
                 <tr>
                   <th>Company</th>
@@ -285,7 +285,7 @@
           <div v-if="studentFunds[group.id]?.length" class="mt-4">
             <h4 class="font-semibold text-sm mb-2">Student Personal Funds</h4>
             <div class="overflow-x-auto">
-              <table class="table table-sm">
+              <table class="table table-sm table-zebra">
                 <thead>
                   <tr>
                     <th>Student</th>
