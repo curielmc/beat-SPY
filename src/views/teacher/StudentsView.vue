@@ -253,6 +253,7 @@
             <table class="table table-sm">
               <thead>
                 <tr>
+                  <th>Company</th>
                   <th>Ticker</th>
                   <th>Shares</th>
                   <th class="text-right">Avg Cost</th>
@@ -263,6 +264,7 @@
               </thead>
               <tbody>
                 <tr v-for="h in groupHoldings[group.id] || []" :key="h.ticker">
+                  <td class="max-w-[150px] truncate font-semibold" :title="h.companyName">{{ h.companyName }}</td>
                   <td class="font-mono font-bold">{{ h.ticker }}</td>
                   <td>{{ Number(h.shares).toFixed(4) }}</td>
                   <td class="text-right font-mono">${{ Number(h.avg_cost).toFixed(2) }}</td>
@@ -273,7 +275,7 @@
                   </td>
                 </tr>
                 <tr v-if="!groupHoldings[group.id]?.length">
-                  <td colspan="6" class="text-center text-base-content/50">No holdings yet</td>
+                  <td colspan="7" class="text-center text-base-content/50">No holdings yet</td>
                 </tr>
               </tbody>
             </table>

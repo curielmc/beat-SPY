@@ -340,15 +340,20 @@ export const useTeacherStore = defineStore('teacher', () => {
     const market = useMarketDataStore()
     const tickers = (hData || []).map(h => h.ticker)
     if (tickers.length > 0) {
-      await market.fetchBatchQuotes(tickers)
+      await Promise.all([
+        market.fetchBatchQuotes(tickers),
+        market.fetchBatchProfiles(tickers)
+      ])
     }
 
     return (hData || []).map(h => {
       const currentPrice = market.getCachedPrice(h.ticker) || h.avg_cost
       const marketValue = h.shares * currentPrice
       const costBasis = h.shares * h.avg_cost
+      const profile = market.profilesCache[h.ticker]?.data
       return {
         ...h,
+        companyName: profile?.companyName || h.ticker,
         currentPrice,
         marketValue,
         gainLoss: marketValue - costBasis
