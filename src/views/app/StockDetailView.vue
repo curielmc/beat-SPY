@@ -35,7 +35,7 @@
         </div>
 
         <!-- Quick Trade Actions (Brokerage Style) -->
-        <div v-if="!auth.isTeacher && !auth.isAdmin" class="flex flex-col sm:flex-row gap-3">
+        <div class="flex flex-col sm:flex-row gap-3">
           <!-- Buy Action -->
           <div 
             class="card bg-success/10 border border-success/20 p-3 flex flex-col gap-1 cursor-pointer hover:bg-success/20 transition-colors min-w-[180px]"
@@ -93,9 +93,14 @@
         </ul>
       </div>
 
-      <!-- Trade Panel (students only) -->
-      <div v-if="!auth.isTeacher && !auth.isAdmin" ref="tradePanel" class="card shadow" :class="isGroupPortfolio ? 'bg-secondary/10 border border-secondary/30' : 'bg-base-100'">
+      <!-- Trade Panel -->
+      <div ref="tradePanel" class="card shadow" :class="isGroupPortfolio ? 'bg-secondary/10 border border-secondary/30' : 'bg-base-100'">
         <div class="card-body p-4">
+          <!-- Educator Mode Warning -->
+          <div v-if="auth.isTeacher || auth.isAdmin" class="alert alert-warning mb-4 py-2 border border-warning/30 bg-warning/5">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            <span class="text-sm"><strong>Educator Mode:</strong> You can view this interface, but teachers and admins cannot execute trades.</span>
+          </div>
           <!-- Active Portfolio Indicator -->
           <div class="flex items-center justify-between mb-3">
             <div v-if="isGroupPortfolio" class="badge badge-secondary gap-1">
@@ -198,11 +203,12 @@
           <button
             class="btn btn-block"
             :class="tradeMode === 'buy' ? 'btn-success' : 'btn-error'"
-            :disabled="!canTrade || executing"
+            :disabled="!canTrade || executing || auth.isTeacher || auth.isAdmin"
             @click="executeTrade"
           >
             <span v-if="executing" class="loading loading-spinner loading-sm"></span>
-            {{ tradeMode === 'buy' ? 'Buy' : 'Sell' }} {{ ticker }}
+            <template v-if="auth.isTeacher || auth.isAdmin">Trading Disabled for Educators</template>
+            <template v-else>{{ tradeMode === 'buy' ? 'Buy' : 'Sell' }} {{ ticker }}</template>
           </button>
         </div>
       </div>
