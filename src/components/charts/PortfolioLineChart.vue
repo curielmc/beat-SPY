@@ -72,7 +72,9 @@ const chartData = computed(() => ({
     const color = COLORS[colorKey] || colorKey
     let data
     if (props.showPercentage) {
-      const baseline = ds.data.length > 0 ? ds.data[0].value : 100000
+      // Use starting cash (100000) as baseline for consistent % return calculation
+      // NOT the first data point, which could be mid-trading
+      const baseline = 100000
       data = ds.data.map(d => ({ x: d.date, y: ((d.value - baseline) / baseline) * 100 }))
     } else {
       data = ds.data.map(d => ({ x: d.date, y: d.value }))
