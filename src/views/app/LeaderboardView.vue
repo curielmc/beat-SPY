@@ -389,6 +389,7 @@ function generateSyntheticHistory(createdAt, returnPct, seed) {
 async function buildPortfolioHistory(portfolio, trades, startingCash) {
   if (!portfolio || !trades?.length) return null
   const holdingsMap = {}
+  const tradePriceMap = {} // Track last known price for each ticker from trades
   let runningCash = startingCash
   const history = []
   const firstDate = new Date(portfolio.created_at)
@@ -396,17 +397,27 @@ async function buildPortfolioHistory(portfolio, trades, startingCash) {
 
   for (const t of trades) {
     const date = new Date(t.executed_at)
+    const ticker = t.ticker
+    const tradePrice = Number(t.price)
+    
+    // Update trade price map with this trade's price
+    tradePriceMap[ticker] = tradePrice
+    
     if (t.side === 'buy') {
       runningCash -= Number(t.dollars)
-      holdingsMap[t.ticker] = (holdingsMap[t.ticker] || 0) + Number(t.shares)
+      holdingsMap[ticker] = (holdingsMap[ticker] || 0) + Number(t.shares)
     } else {
       runningCash += Number(t.dollars)
-      holdingsMap[t.ticker] = (holdingsMap[t.ticker] || 0) - Number(t.shares)
+      holdingsMap[ticker] = (holdingsMap[ticker] || 0) - Number(t.shares)
+      if (holdingsMap[ticker] <= 0) delete holdingsMap[ticker]
     }
+    
+    // Calculate holdings value using last known trade prices
     let holdingsValue = 0
-    for (const [ticker, shares] of Object.entries(holdingsMap)) {
+    for (const [tickerKey, shares] of Object.entries(holdingsMap)) {
       if (shares <= 0) continue
-      const price = t.ticker === ticker ? Number(t.price) : (market.getCachedPrice(ticker) || 0)
+      // Use trade price if available, fallback to cached market price
+      const price = tradePriceMap[tickerKey] || market.getCachedPrice(tickerKey) || 0
       holdingsValue += shares * price
     }
     history.push({ date, value: runningCash + holdingsValue })

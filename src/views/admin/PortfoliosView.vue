@@ -35,22 +35,7 @@
             <!-- Holdings -->
             <div v-if="p.holdings?.length" class="overflow-x-auto">
               <h3 class="font-semibold text-sm mb-1">Holdings</h3>
-              <table class="table table-sm">
-                <thead>
-                  <tr>
-                    <th>Ticker</th>
-                    <th class="text-right">Shares</th>
-                    <th class="text-right">Avg Cost</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="h in p.holdings" :key="h.id">
-                    <td class="font-mono font-bold">{{ h.ticker }}</td>
-                    <td class="text-right font-mono">{{ Number(h.shares).toFixed(4) }}</td>
-                    <td class="text-right font-mono">${{ Number(h.avg_cost).toFixed(2) }}</td>
-                  </tr>
-                </tbody>
-              </table>
+              <HoldingsTable :holdings="p.holdings" />
             </div>
 
             <!-- Actions -->
@@ -91,6 +76,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { supabase } from '../../lib/supabase'
+import HoldingsTable from '../../components/HoldingsTable.vue'
 
 const portfolios = ref([])
 const loading = ref(true)
