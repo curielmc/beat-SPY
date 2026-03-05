@@ -15,16 +15,24 @@
     <template v-if="!loading && quote">
       <!-- Header -->
       <div class="flex items-start justify-between">
-        <div>
-          <h1 class="text-2xl font-bold">{{ ticker }}</h1>
-          <p class="text-base-content/60">{{ companyProfile?.companyName || quote.name || ticker }}</p>
-          <div class="flex gap-1 mt-1">
-            <span v-if="companyProfile?.sector" class="badge badge-sm badge-ghost">{{ companyProfile.sector }}</span>
-            <span v-if="companyProfile?.country" class="badge badge-sm badge-outline">{{ companyProfile.country }}</span>
-            <span v-if="quote.exchange" class="badge badge-sm badge-primary">{{ quote.exchange }}</span>
+        <div class="flex items-start gap-4">
+          <div class="avatar">
+            <div class="w-16 h-16 rounded-xl bg-base-200 flex items-center justify-center overflow-hidden border border-base-300 shadow-sm">
+              <img v-if="companyProfile?.image" :src="companyProfile.image" :alt="ticker" />
+              <span v-else class="text-xl font-bold text-base-content/20">{{ ticker }}</span>
+            </div>
+          </div>
+          <div>
+            <h1 class="text-3xl font-bold">{{ ticker }}</h1>
+            <p class="text-base-content/60 text-lg">{{ companyProfile?.companyName || quote.name || ticker }}</p>
+            <div class="flex gap-1 mt-2">
+              <span v-if="companyProfile?.sector" class="badge badge-sm badge-ghost">{{ companyProfile.sector }}</span>
+              <span v-if="companyProfile?.industry" class="badge badge-sm badge-ghost">{{ companyProfile.industry }}</span>
+              <span v-if="companyProfile?.country" class="badge badge-sm badge-outline">{{ companyProfile.country }}</span>
+              <span v-if="quote.exchange" class="badge badge-sm badge-primary">{{ quote.exchange }}</span>
+            </div>
           </div>
         </div>
-
       </div>
 
       <!-- Robinhood-style Chart -->
@@ -392,6 +400,11 @@ onMounted(async () => {
     requiresApproval.value = true
   }
   rationaleRequired.value = membership.value?.class?.restrictions?.requireRationale !== false
+
+  // Set initial trade mode from query param
+  if (route.query.mode === 'buy' || route.query.mode === 'sell') {
+    tradeMode.value = route.query.mode
+  }
 
   // Ensure portfolio is loaded (handles direct navigation / page refresh)
   if (!portfolioStore.portfolio && auth.isLoggedIn) {

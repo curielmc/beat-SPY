@@ -200,7 +200,7 @@ export const usePortfolioStore = defineStore('portfolio', () => {
       await market.fetchBatchQuotes([bmTicker])
     }
 
-    // Also fetch company names (non-blocking)
+    // Also fetch company names and images (non-blocking)
     if (tickers.length > 0) {
       try { await market.fetchBatchProfiles(tickers) } catch(e) { /* non-fatal */ }
     }
@@ -219,9 +219,39 @@ export const usePortfolioStore = defineStore('portfolio', () => {
         costBasis,
         gainLoss,
         gainLossPct,
-        companyName: profile?.companyName || profile?.name || null
+        companyName: profile?.companyName || profile?.name || null,
+        image: profile?.image || null
       }
     })
+  }
+
+  async function sellAll(approvalCode, rationale) {
+    if (!auth.currentUser) return { success: false, error: 'Not logged in' }
+    if (!portfolio.value) return { success: false, error: 'Portfolio not found' }
+    if (holdings.value.length === 0) return { success: false, error: 'No holdings to sell' }
+
+    loading.value = true
+    const results = []
+    const errors = []
+
+    // Work on a copy of holdings to avoid issues with array modification during loop
+    const toSell = [...holdings.value]
+
+    for (const h of toSell) {
+      const dollars = h.shares * h.currentPrice
+      const res = await sellStock(h.ticker, dollars, approvalCode, rationale)
+      if (res.success) {
+        results.push({ ticker: h.ticker, shares: h.shares })
+      } else {
+        errors.push({ ticker: h.ticker, error: res.error })
+      }
+    }
+
+    loading.value = false
+    if (errors.length > 0 && results.length === 0) {
+      return { success: false, error: errors[0].error, details: errors }
+    }
+    return { success: true, results, errors }
   }
 
   function getFrequencyWindowStart(frequency) {

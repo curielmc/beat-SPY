@@ -160,7 +160,15 @@
               <tr v-for="(stock, i) in visibleConstituents" :key="stock.symbol" class="hover">
                 <td class="text-base-content/50">{{ i + 1 }}</td>
                 <td>
-                  <RouterLink :to="`/stocks/${stock.symbol}`" class="link link-primary font-mono font-semibold">{{ stock.symbol }}</RouterLink>
+                  <RouterLink :to="`/stocks/${stock.symbol}`" class="flex items-center gap-3 group">
+                    <div class="avatar">
+                      <div class="w-8 h-8 rounded bg-base-200 flex items-center justify-center overflow-hidden border border-base-300">
+                        <img v-if="market.profilesCache[stock.symbol]?.data?.image" :src="market.profilesCache[stock.symbol].data.image" :alt="stock.symbol" />
+                        <span v-else class="text-[10px] font-bold text-base-content/20">{{ stock.symbol }}</span>
+                      </div>
+                    </div>
+                    <span class="link link-primary font-mono font-semibold group-hover:text-primary-focus transition-colors">{{ stock.symbol }}</span>
+                  </RouterLink>
                 </td>
                 <td class="max-w-[200px] truncate">{{ stock.name }}</td>
                 <td class="text-xs">{{ stock.sector || '—' }}</td>
@@ -209,6 +217,7 @@ import { RouterLink } from 'vue-router'
 import PortfolioLineChart from '../../components/charts/PortfolioLineChart.vue'
 import PortfolioPieChart from '../../components/charts/PortfolioPieChart.vue'
 import TimeRangeSelector from '../../components/charts/TimeRangeSelector.vue'
+import { useMarketDataStore } from '../../stores/marketData'
 import {
   getQuote,
   getCompanyProfile,
@@ -220,6 +229,7 @@ import {
 } from '../../services/fmpApi.js'
 
 // --- State ---
+const market = useMarketDataStore()
 const spyQuote = ref(null)
 const spyProfile = ref(null)
 const ytdReturn = ref(0)

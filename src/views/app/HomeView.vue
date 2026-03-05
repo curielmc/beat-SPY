@@ -267,34 +267,63 @@
     <!-- Holdings -->
     <div class="card bg-base-100 shadow">
       <div class="card-body p-4">
-        <h3 class="font-semibold mb-2">Holdings</h3>
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="font-semibold">Holdings</h3>
+          <button
+            v-if="portfolioStore.holdings.length > 0"
+            class="btn btn-error btn-outline btn-xs gap-1"
+            @click="showSellAllModal = true"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+            Sell All Positions
+          </button>
+        </div>
         <div v-if="portfolioStore.holdings.length === 0" class="text-base-content/50 text-center py-6 text-lg">
           No holdings yet. <RouterLink to="/stocks" class="link link-primary">Buy some stocks, ETFs, or other investments!</RouterLink>
         </div>
         <div class="overflow-x-auto" v-else>
-          <table class="table table-sm">
+          <table class="table table-sm table-zebra">
             <thead>
               <tr>
-                <th>Ticker</th>
+                <th>Stock</th>
                 <th class="text-right">Shares</th>
                 <th class="text-right">Price</th>
                 <th class="text-right">Value</th>
                 <th class="text-right">Gain/Loss</th>
+                <th class="text-center">Quick Trade</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="h in portfolioStore.holdings" :key="h.ticker">
                 <td>
-                  <RouterLink :to="`/stocks/${h.ticker}`" class="link link-hover">
-                    <span class="font-mono font-bold">{{ h.ticker }}</span>
-                    <span v-if="h.companyName" class="block text-xs text-base-content/50 font-normal">{{ h.companyName }}</span>
+                  <RouterLink :to="`/stocks/${h.ticker}`" class="flex items-center gap-2 group">
+                    <div class="avatar">
+                      <div class="w-8 h-8 rounded bg-base-200 flex items-center justify-center overflow-hidden border border-base-300">
+                        <img v-if="h.image" :src="h.image" :alt="h.ticker" />
+                        <span v-else class="text-[10px] font-bold text-base-content/40">{{ h.ticker }}</span>
+                      </div>
+                    </div>
+                    <div>
+                      <span class="font-mono font-bold group-hover:text-primary transition-colors">{{ h.ticker }}</span>
+                      <span v-if="h.companyName" class="block text-[10px] leading-tight text-base-content/50 font-normal max-w-[120px] truncate">{{ h.companyName }}</span>
+                    </div>
                   </RouterLink>
                 </td>
-                <td class="text-right font-mono">{{ Number(h.shares).toFixed(2) }}</td>
-                <td class="text-right font-mono">${{ h.currentPrice.toFixed(2) }}</td>
-                <td class="text-right font-mono">${{ h.marketValue.toLocaleString('en-US', { maximumFractionDigits: 2 }) }}</td>
-                <td class="text-right font-mono" :class="h.gainLoss >= 0 ? 'text-success' : 'text-error'">
+                <td class="text-right font-mono text-xs">{{ Number(h.shares).toFixed(2) }}</td>
+                <td class="text-right font-mono text-xs">${{ h.currentPrice.toFixed(2) }}</td>
+                <td class="text-right font-mono text-xs font-semibold">${{ h.marketValue.toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</td>
+                <td class="text-right font-mono text-xs" :class="h.gainLoss >= 0 ? 'text-success' : 'text-error'">
                   {{ h.gainLoss >= 0 ? '+' : '' }}{{ h.gainLossPct.toFixed(2) }}%
+                </td>
+                <td class="text-center">
+                  <div class="flex items-center justify-center gap-1">
+                    <RouterLink :to="{ path: `/stocks/${h.ticker}`, query: { mode: 'buy' } }" class="btn btn-ghost btn-xs text-success px-1 hover:bg-success/10" title="Buy more">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" /></svg>
+                    </RouterLink>
+                    <RouterLink :to="{ path: `/stocks/${h.ticker}`, query: { mode: 'sell' } }" class="btn btn-ghost btn-xs text-error px-1 hover:bg-error/10" title="Sell shares">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd" /></svg>
+                    </RouterLink>
+                  </div>
                 </td>
               </tr>
             </tbody>
@@ -302,6 +331,51 @@
         </div>
       </div>
     </div>
+
+    <!-- Sell All Confirmation Modal -->
+    <dialog class="modal" :class="{ 'modal-open': showSellAllModal }">
+      <div class="modal-box max-w-lg border-t-4 border-error">
+        <h3 class="font-bold text-xl flex items-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-error" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /></svg>
+          Confirm Sell All Positions
+        </h3>
+        <p class="py-4 text-base-content/70">
+          You are about to liquidate all <strong>{{ portfolioStore.holdings.length }}</strong> positions in your {{ activeTab === 'personal' ? 'personal portfolio' : 'group fund' }}. This will convert all holdings back into cash.
+        </p>
+        
+        <div class="bg-base-200 rounded-lg p-3 mb-4 max-h-40 overflow-y-auto">
+          <div v-for="h in portfolioStore.holdings" :key="h.ticker" class="flex justify-between items-center py-1 border-b border-base-300 last:border-0">
+            <span class="font-mono font-bold">{{ h.ticker }}</span>
+            <span class="text-sm font-mono text-base-content/60">{{ Number(h.shares).toFixed(2) }} shares ≈ ${{ h.marketValue.toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</span>
+          </div>
+        </div>
+
+        <div v-if="sellAllError" class="alert alert-error text-sm mb-4">
+          <span>{{ sellAllError }}</span>
+        </div>
+
+        <div class="form-control mb-4">
+          <label class="label py-1">
+            <span class="label-text text-sm">Reason for liquidating (optional)</span>
+          </label>
+          <textarea
+            v-model="sellAllRationale"
+            class="textarea textarea-bordered w-full"
+            rows="2"
+            placeholder="e.g. Taking profits, market volatility, sector rotation..."
+          ></textarea>
+        </div>
+
+        <div class="modal-action">
+          <button class="btn btn-ghost" @click="showSellAllModal = false; sellAllRationale = ''; sellAllError = ''">Cancel</button>
+          <button class="btn btn-error" @click="handleSellAll" :disabled="sellingAll">
+            <span v-if="sellingAll" class="loading loading-spinner loading-sm"></span>
+            Confirm Liquidation
+          </button>
+        </div>
+      </div>
+      <form method="dialog" class="modal-backdrop" @click="showSellAllModal = false"><button>close</button></form>
+    </dialog>
 
     <!-- Portfolio Settings -->
     <div class="card bg-base-100 shadow" v-if="portfolioStore.portfolio">
@@ -421,19 +495,31 @@
             </thead>
             <tbody>
               <template v-for="t in portfolioStore.trades.slice(0, 10)" :key="t.id">
-                <tr>
-                  <td class="text-sm">{{ new Date(t.executed_at).toLocaleDateString() }}</td>
+                <tr class="hover">
+                  <td class="text-[10px] text-base-content/50">{{ new Date(t.executed_at).toLocaleDateString() }}</td>
                   <td>
-                    <span class="font-mono font-bold">{{ t.ticker }}</span>
-                    <span class="block text-xs text-base-content/50">{{ portfolioStore.holdings.find(h => h.ticker === t.ticker)?.companyName || '' }}</span>
+                    <RouterLink :to="`/stocks/${t.ticker}`" class="flex items-center gap-2 group">
+                      <div class="avatar">
+                        <div class="w-6 h-6 rounded bg-base-200 flex items-center justify-center overflow-hidden border border-base-300">
+                          <img v-if="market.profilesCache[t.ticker]?.data?.image" :src="market.profilesCache[t.ticker].data.image" :alt="t.ticker" />
+                          <span v-else class="text-[8px] font-bold text-base-content/40">{{ t.ticker }}</span>
+                        </div>
+                      </div>
+                      <div>
+                        <span class="font-mono font-bold text-xs group-hover:text-primary transition-colors">{{ t.ticker }}</span>
+                        <span class="block text-[10px] text-base-content/40">{{ market.profilesCache[t.ticker]?.data?.companyName || '' }}</span>
+                      </div>
+                    </RouterLink>
                   </td>
-                  <td><span class="badge badge-xs" :class="t.side === 'buy' ? 'badge-success' : 'badge-error'">{{ t.side }}</span></td>
-                  <td class="text-right font-mono">${{ Number(t.dollars).toFixed(2) }}</td>
-                  <td class="text-right font-mono">${{ Number(t.price).toFixed(2) }}</td>
+                  <td><span class="badge badge-xs font-bold" :class="t.side === 'buy' ? 'badge-success' : 'badge-error'">{{ t.side.toUpperCase() }}</span></td>
+                  <td class="text-right font-mono text-xs font-semibold">${{ Number(t.dollars).toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</td>
+                  <td class="text-right font-mono text-xs text-base-content/60">${{ Number(t.price).toFixed(2) }}</td>
                 </tr>
                 <tr v-if="t.rationale">
-                  <td colspan="5" class="pt-0 pb-2">
-                    <p class="text-xs italic text-base-content/50">"{{ t.rationale }}"</p>
+                  <td colspan="5" class="pt-0 pb-3 pl-10">
+                    <div class="bg-base-200/50 rounded p-1.5 border-l-2 border-primary/20">
+                      <p class="text-[10px] italic text-base-content/60">"{{ t.rationale }}"</p>
+                    </div>
                   </td>
                 </tr>
               </template>
@@ -616,6 +702,38 @@ const isPersonalPortfolio = computed(() => {
 const settingsMsg = ref('')
 const settingsMsgType = ref('success')
 const settingsForm = ref({ name: '', description: '' })
+
+// Sell All state
+const showSellAllModal = ref(false)
+const sellingAll = ref(false)
+const sellAllRationale = ref('')
+const sellAllError = ref('')
+
+async function handleSellAll() {
+  sellAllError.value = ''
+  sellingAll.value = true
+  try {
+    const res = await portfolioStore.sellAll(undefined, sellAllRationale.value)
+    if (res.success) {
+      showSellAllModal.value = false
+      sellAllRationale.value = ''
+      showFeedback(`Successfully sold all ${res.results.length} positions.`)
+      // Refresh charts and data
+      resetCharts()
+      if (portfolioStore.holdings.length > 0) loadCharts()
+    } else {
+      sellAllError.value = res.error || 'Failed to liquidate positions'
+    }
+  } finally {
+    sellingAll.value = false
+  }
+}
+
+function showFeedback(msg, type = 'success') {
+  settingsMsg.value = msg
+  settingsMsgType.value = type
+  setTimeout(() => { settingsMsg.value = '' }, 3000)
+}
 
 const vsSP500 = computed(() => portfolioStore.totalReturnPct - portfolioStore.benchmarkReturnPct)
 const isIndependent = computed(() => membership.value?.group_id === 'personal')

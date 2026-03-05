@@ -116,10 +116,18 @@
     <div v-if="searchQuery && !loading" class="space-y-2">
       <RouterLink v-for="stock in displayStocks" :key="stock.symbol || stock.ticker" :to="`/stocks/${stock.symbol || stock.ticker}`" class="card bg-base-100 shadow hover:shadow-md transition-shadow cursor-pointer block">
         <div class="card-body p-4 flex-row justify-between items-center">
-          <div>
-            <p class="font-bold">{{ stock.symbol || stock.ticker }}</p>
-            <p class="text-xs text-base-content/60">{{ stock.name }}</p>
-            <span v-if="stock.exchangeShortName" class="badge badge-ghost badge-xs mt-1">{{ stock.exchangeShortName }}</span>
+          <div class="flex items-center gap-3">
+            <div class="avatar">
+              <div class="w-10 h-10 rounded bg-base-200 flex items-center justify-center overflow-hidden border border-base-300">
+                <img v-if="market.profilesCache[stock.symbol || stock.ticker]?.data?.image" :src="market.profilesCache[stock.symbol || stock.ticker].data.image" :alt="stock.symbol || stock.ticker" />
+                <span v-else class="text-xs font-bold text-base-content/20">{{ stock.symbol || stock.ticker }}</span>
+              </div>
+            </div>
+            <div>
+              <p class="font-bold">{{ stock.symbol || stock.ticker }}</p>
+              <p class="text-xs text-base-content/60">{{ stock.name }}</p>
+              <span v-if="stock.exchangeShortName" class="badge badge-ghost badge-xs mt-1">{{ stock.exchangeShortName }}</span>
+            </div>
           </div>
           <div class="text-right" v-if="stock.price">
             <p class="font-semibold">${{ Number(stock.price).toFixed(2) }}</p>
@@ -137,12 +145,20 @@
       <p class="text-sm text-base-content/60">{{ filteredStocks.length }} results</p>
       <RouterLink v-for="stock in filteredStocks" :key="stock.symbol" :to="`/stocks/${stock.symbol}`" class="card bg-base-100 shadow hover:shadow-md transition-shadow cursor-pointer block">
         <div class="card-body p-4 flex-row justify-between items-center">
-          <div>
-            <p class="font-bold">{{ stock.symbol }}</p>
-            <p class="text-xs text-base-content/60">{{ stock.companyName }}</p>
-            <div class="flex gap-1 mt-1">
-              <span v-if="stock.sector" class="badge badge-ghost badge-xs">{{ stock.sector }}</span>
-              <span v-if="stock.exchangeShortName" class="badge badge-ghost badge-xs">{{ stock.exchangeShortName }}</span>
+          <div class="flex items-center gap-3">
+            <div class="avatar">
+              <div class="w-10 h-10 rounded bg-base-200 flex items-center justify-center overflow-hidden border border-base-300">
+                <img v-if="market.profilesCache[stock.symbol]?.data?.image" :src="market.profilesCache[stock.symbol].data.image" :alt="stock.symbol" />
+                <span v-else class="text-xs font-bold text-base-content/20">{{ stock.symbol }}</span>
+              </div>
+            </div>
+            <div>
+              <p class="font-bold">{{ stock.symbol }}</p>
+              <p class="text-xs text-base-content/60">{{ stock.companyName }}</p>
+              <div class="flex gap-1 mt-1">
+                <span v-if="stock.sector" class="badge badge-ghost badge-xs">{{ stock.sector }}</span>
+                <span v-if="stock.exchangeShortName" class="badge badge-ghost badge-xs">{{ stock.exchangeShortName }}</span>
+              </div>
             </div>
           </div>
           <div class="text-right">
