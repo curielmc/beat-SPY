@@ -99,7 +99,7 @@
 
       <p v-if="sortedGroups.length === 0" class="text-center text-base-content/50 py-8">No groups found in your class.</p>
 
-      <!-- Comparison Chart -->
+      <!-- Comparison Chart (disabled for now — will revisit later)
       <div v-if="!loading" class="card bg-base-100 shadow-sm mt-8">
         <div class="card-body p-4 space-y-3">
           <div class="flex items-center justify-between flex-wrap gap-2">
@@ -127,6 +127,7 @@
           <p v-else class="text-center text-base-content/50 py-4 text-sm">No chart data available yet.</p>
         </div>
       </div>
+      -->
     </template>
   </div>
 </template>
