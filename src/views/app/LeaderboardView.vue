@@ -441,7 +441,25 @@ async function buildPortfolioHistory(portfolio, trades, startingCash) {
     
     history.push({ date, value: totalValue })
   }
-  return history
+  
+  // Aggregate to daily buckets (end-of-day) to match SPY daily data format
+  return aggregateToDaily(history)
+}
+
+// Aggregate intraday history to daily end-of-day values
+function aggregateToDaily(history) {
+  if (!history || history.length === 0) return history
+  
+  const dailyMap = new Map()
+  
+  for (const point of history) {
+    const dateKey = point.date.toISOString().split('T')[0] // YYYY-MM-DD
+    // Keep the last value of each day (end-of-day)
+    dailyMap.set(dateKey, { date: new Date(dateKey), value: point.value })
+  }
+  
+  // Convert map to sorted array
+  return [...dailyMap.values()].sort((a, b) => a.date - b.date)
 }
 
 async function buildChartDatasets(enriched, portfolioByGroup, tradesMap) {
