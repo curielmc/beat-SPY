@@ -388,6 +388,10 @@ function generateSyntheticHistory(createdAt, returnPct, seed) {
 
 async function buildPortfolioHistory(portfolio, trades, startingCash) {
   if (!portfolio || !trades?.length) return null
+  
+  // Sort trades chronologically by executed_at
+  const sortedTrades = [...trades].sort((a, b) => new Date(a.executed_at) - new Date(b.executed_at))
+  
   const holdingsMap = {}
   const tradePriceMap = {} // Track last known price for each ticker from trades
   let runningCash = startingCash
@@ -395,7 +399,7 @@ async function buildPortfolioHistory(portfolio, trades, startingCash) {
   const firstDate = new Date(portfolio.created_at)
   history.push({ date: firstDate, value: startingCash })
 
-  for (const t of trades) {
+  for (const t of sortedTrades) {
     const date = new Date(t.executed_at)
     const ticker = t.ticker
     const tradePrice = Number(t.price)
