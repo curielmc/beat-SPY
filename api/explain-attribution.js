@@ -1,11 +1,58 @@
 export const config = { runtime: 'edge' }
 
+const RATE_LIMIT_WINDOW_MS = 60 * 1000
+const RATE_LIMIT_MAX = 20
+const requestLog = new Map()
+
+function getClientIp(req) {
+  return req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
+}
+
+function checkRateLimit(req) {
+  const now = Date.now()
+  const key = getClientIp(req)
+  const windowStart = now - RATE_LIMIT_WINDOW_MS
+  const entries = (requestLog.get(key) || []).filter(ts => ts > windowStart)
+  if (entries.length >= RATE_LIMIT_MAX) return false
+  entries.push(now)
+  requestLog.set(key, entries)
+  return true
+}
+
+async function requireUser(req) {
+  const authHeader = req.headers.get('authorization') || ''
+  if (!authHeader.startsWith('Bearer ')) return null
+
+  const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
+  const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return null
+
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: authHeader
+    }
+  })
+  if (!res.ok) return null
+  return res.json()
+}
+
 export default async function handler(req) {
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 })
+  if (!checkRateLimit(req)) return new Response('Too many requests', { status: 429 })
+
+  const user = await requireUser(req)
+  if (!user?.id) return new Response('Unauthorized', { status: 401 })
 
   const { tickers, changes, portfolioSummary, mode } = await req.json()
+  if (!Array.isArray(tickers) || tickers.length === 0 || tickers.length > 25) {
+    return new Response(JSON.stringify({ error: 'Invalid tickers payload' }), { status: 400 })
+  }
   const FMP_KEY = process.env.VITE_FMP_API_KEY
   const ANTHROPIC_KEY = process.env.ANTHROPIC_KEY
+  if (!FMP_KEY || !ANTHROPIC_KEY) {
+    return new Response(JSON.stringify({ error: 'Server not configured' }), { status: 500 })
+  }
 
   // Fetch recent news for each ticker in parallel
   const newsResults = await Promise.all(
@@ -61,6 +108,9 @@ Write 3-4 engaging sentences explaining what drove today's portfolio performance
     })
   })
 
+  if (!response.ok) {
+    return new Response(JSON.stringify({ error: 'AI provider error' }), { status: 502 })
+  }
   const data = await response.json()
   const explanation = data.content?.[0]?.text || 'Could not generate explanation.'
 

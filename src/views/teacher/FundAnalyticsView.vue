@@ -307,9 +307,18 @@ async function runAiAnalysis() {
     .map(t => ({ ...t, group: portIdToGroup[t.portfolio_id] }))
 
   try {
+    const { data: { session } } = await supabase.auth.getSession()
+    const accessToken = session?.access_token
+    if (!accessToken) {
+      aiError.value = 'Login required'
+      return
+    }
     const res = await fetch('/api/score-theses', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`
+      },
       body: JSON.stringify({ groups: payload, individualTrades })
     })
     const data = await res.json()

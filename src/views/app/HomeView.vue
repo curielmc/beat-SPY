@@ -508,6 +508,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
 import { usePortfolioStore } from '../../stores/portfolio'
+import { useMarketDataStore } from '../../stores/marketData'
 import { supabase } from '../../lib/supabase'
 import { getHistoricalDaily, getBatchProfiles } from '../../services/fmpApi'
 import PortfolioLineChart from '../../components/charts/PortfolioLineChart.vue'
@@ -517,6 +518,7 @@ import TimeRangeSelector from '../../components/charts/TimeRangeSelector.vue'
 const route = useRoute()
 const auth = useAuthStore()
 const portfolioStore = usePortfolioStore()
+const market = useMarketDataStore()
 
 const loading = ref(true)
 const creatingPortfolio = ref(false)

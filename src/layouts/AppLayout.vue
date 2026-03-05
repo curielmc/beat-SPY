@@ -162,14 +162,24 @@ function exitMasquerade() {
 }
 
 // iOS Safari fix: refresh session when app returns from background
-function handleVisibilityChange() {
-  if (document.visibilityState === 'visible') {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
-        // Session expired while backgrounded — redirect to login
-        router.push({ name: 'login' })
-      }
-    })
+let visibilityCheckInFlight = false
+async function handleVisibilityChange() {
+  if (document.visibilityState !== 'visible' || visibilityCheckInFlight) return
+
+  visibilityCheckInFlight = true
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session) return
+
+    // getSession can briefly return null while restoring state on iOS/Safari.
+    // Try a token refresh before deciding the user is signed out.
+    const { data: refreshed } = await supabase.auth.refreshSession()
+    if (!refreshed?.session && auth.isLoggedIn) {
+      await auth.logout()
+      router.push({ name: 'login' })
+    }
+  } finally {
+    visibilityCheckInFlight = false
   }
 }
 

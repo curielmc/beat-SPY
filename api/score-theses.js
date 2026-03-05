@@ -1,8 +1,65 @@
 export const config = { runtime: 'edge' }
 
+const RATE_LIMIT_WINDOW_MS = 60 * 1000
+const RATE_LIMIT_MAX = 10
+const requestLog = new Map()
+
+function getClientIp(req) {
+  return req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
+}
+
+function checkRateLimit(req) {
+  const now = Date.now()
+  const key = getClientIp(req)
+  const windowStart = now - RATE_LIMIT_WINDOW_MS
+  const entries = (requestLog.get(key) || []).filter(ts => ts > windowStart)
+  if (entries.length >= RATE_LIMIT_MAX) return false
+  entries.push(now)
+  requestLog.set(key, entries)
+  return true
+}
+
+async function requireTeacherOrAdmin(req) {
+  const authHeader = req.headers.get('authorization') || ''
+  if (!authHeader.startsWith('Bearer ')) return null
+
+  const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
+  const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return null
+
+  const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: authHeader
+    }
+  })
+  if (!userRes.ok) return null
+  const user = await userRes.json()
+  if (!user?.id) return null
+
+  const roleRes = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${user.id}&select=role`, {
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: authHeader
+    }
+  })
+  if (!roleRes.ok) return null
+  const rows = await roleRes.json()
+  const role = rows?.[0]?.role
+  return role === 'teacher' || role === 'admin' ? user : null
+}
+
 export default async function handler(req) {
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405 })
+  }
+  if (!checkRateLimit(req)) {
+    return new Response(JSON.stringify({ error: 'Too many requests' }), { status: 429 })
+  }
+
+  const user = await requireTeacherOrAdmin(req)
+  if (!user?.id) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
   }
 
   const { groups, individualTrades } = await req.json()
@@ -26,6 +83,9 @@ export default async function handler(req) {
         messages: [{ role: 'user', content: prompt }]
       })
     })
+    if (!response.ok) {
+      throw new Error('AI provider error')
+    }
     const data = await response.json()
     return data.content?.[0]?.text || '[]'
   }

@@ -269,6 +269,7 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     if (!portfolio.value) return { success: false, error: 'Portfolio not found' }
     if (dollars <= 0) return { success: false, error: 'Amount must be positive' }
     if (dollars > cashBalance.value) return { success: false, error: 'Insufficient cash' }
+    const market = useMarketDataStore()
 
     // ── Universe + Sector restrictions (group portfolios only — personal is always free) ──
     if (portfolio.value?.owner_type === 'group') {
@@ -304,14 +305,16 @@ export const usePortfolioStore = defineStore('portfolio', () => {
       // Sector checks (max stocks per sector, max sector %)
       if (restrictions.maxStocksPerSector || restrictions.maxSectorPct) {
         // Get sector for this ticker
-        const profiles = await getBatchProfiles([ticker])
-        const tickerSector = profiles?.[0]?.sector || 'Unknown'
+        const tickerProfiles = await market.fetchBatchProfiles([ticker])
+        const tickerSector = tickerProfiles?.[ticker]?.sector || 'Unknown'
 
         // Get current holdings sectors
         const allTickers = rawHoldings.value.map(h => h.ticker)
-        const holdingProfiles = allTickers.length ? await getBatchProfiles(allTickers) : []
+        const holdingProfiles = allTickers.length ? await market.fetchBatchProfiles(allTickers) : {}
         const sectorMap = {}
-        for (const p of holdingProfiles) sectorMap[p.symbol] = p.sector || 'Unknown'
+        for (const [symbol, profile] of Object.entries(holdingProfiles)) {
+          sectorMap[symbol] = profile?.sector || 'Unknown'
+        }
 
         // Count stocks in this sector
         if (restrictions.maxStocksPerSector) {
@@ -337,8 +340,6 @@ export const usePortfolioStore = defineStore('portfolio', () => {
         }
       }
     }
-
-    const market = useMarketDataStore()
 
     // Fetch price (uses last close on weekends/after-hours)
     const quote = await market.fetchQuote(ticker)

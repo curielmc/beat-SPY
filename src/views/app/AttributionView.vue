@@ -221,6 +221,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { usePortfolioStore } from '../../stores/portfolio'
 import { useMarketDataStore } from '../../stores/marketData'
+import { supabase } from '../../lib/supabase'
 
 const portfolioStore = usePortfolioStore()
 const market = useMarketDataStore()
@@ -238,11 +239,18 @@ async function explainPortfolio() {
   explainTicker.value = ''
   explanation.value = ''
   try {
+    const { data: { session } } = await supabase.auth.getSession()
+    const accessToken = session?.access_token
+    if (!accessToken) throw new Error('Login required')
     const tickers = attributions.value.map(a => a.ticker)
     const changes = Object.fromEntries(attributions.value.map(a => [a.ticker, a.stockReturn]))
     const summary = `Portfolio return: ${totalReturn.value.toFixed(2)}%. Best: ${topHelper.value?.ticker}. Worst: ${topDrag.value?.ticker}. vs SPY: ${alpha.value.toFixed(2)}%.`
     const res = await fetch('/api/explain-attribution', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`
+      },
       body: JSON.stringify({ tickers, changes, portfolioSummary: summary, mode: 'portfolio' })
     })
     const data = await res.json()
@@ -256,8 +264,15 @@ async function explainStock(a) {
   explainTicker.value = a.ticker
   explanation.value = ''
   try {
+    const { data: { session } } = await supabase.auth.getSession()
+    const accessToken = session?.access_token
+    if (!accessToken) throw new Error('Login required')
     const res = await fetch('/api/explain-attribution', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`
+      },
       body: JSON.stringify({ tickers: [a.ticker], changes: { [a.ticker]: a.stockReturn }, mode: 'stock' })
     })
     const data = await res.json()
@@ -267,7 +282,7 @@ async function explainStock(a) {
 }
 
 onMounted(async () => {
-  if (!portfolioStore.holdings.length) await portfolioStore.loadPortfolio('user', null)
+  if (!portfolioStore.holdings.length) await portfolioStore.loadPersonalPortfolio()
   const tickers = portfolioStore.holdings.map(h => h.ticker)
   if (!tickers.length) { loading.value = false; return }
 
@@ -281,7 +296,8 @@ onMounted(async () => {
       prevPrices.value[q.symbol] = q.previousClose || q.price
       if (q.symbol === 'SPY') spyPrevClose.value = q.previousClose || q.price
     })
-    // Also update market data store prices
+    // Keep quote cache warm for current prices + SPY
+    await market.fetchBatchQuotes(all)
     await market.fetchBatchProfiles(tickers)
   } catch (e) {
     console.warn('Attribution fetch error', e)
