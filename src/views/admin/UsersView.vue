@@ -148,7 +148,7 @@ const auth = useAuthStore()
 
 function masqueradeAs(user) {
   auth.startMasquerade(user)
-  router.push('/home')
+  router.push('/leaderboard')
 }
 
 async function fetchUsers() {

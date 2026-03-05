@@ -19,6 +19,7 @@ const router = createRouter({
       component: () => import('../layouts/AppLayout.vue'),
       meta: { requiresAuth: true, role: 'student' },
       children: [
+        { path: '', redirect: { name: 'leaderboard' } },
         { path: 'home', name: 'home', component: () => import('../views/app/HomeView.vue') },
         { path: 'attribution', name: 'attribution', component: () => import('../views/app/AttributionView.vue'), meta: { requiresAuth: true } },
       { path: 'leaderboard', name: 'leaderboard', component: () => import('../views/app/LeaderboardView.vue') },
@@ -102,11 +103,11 @@ router.beforeEach((to) => {
   // Role-based access control
   if (to.matched.some(r => r.meta.role === 'admin') && userRole !== 'admin') {
     if (userRole === 'teacher') return { name: 'teacher-dashboard' }
-    return { name: 'home' }
+    return { name: 'leaderboard' }
   }
 
   if (to.matched.some(r => r.meta.role === 'teacher') && userRole !== 'teacher' && userRole !== 'admin') {
-    return { name: 'home' }
+    return { name: 'leaderboard' }
   }
 
   if (to.matched.some(r => r.meta.role === 'student') && userRole === 'teacher') {
