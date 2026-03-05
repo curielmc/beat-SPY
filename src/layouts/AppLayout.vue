@@ -189,19 +189,22 @@ async function handleVisibilityChange() {
 
   visibilityCheckInFlight = true
   try {
+    console.log('[AUTH] visibilitychange: visible, checking session...')
     const { data: { session } } = await supabase.auth.getSession()
+    console.log('[AUTH] visibilitychange: getSession =', !!session)
     if (session) return
 
-    // getSession can briefly return null while restoring state on iOS/Safari.
-    // Wait a moment and retry before taking any action — don't force logout
-    // as this causes users to get kicked out on tab switches and refreshes.
-    await new Promise(r => setTimeout(r, 1000))
+    // Wait and retry — don't force logout on transient null
+    await new Promise(r => setTimeout(r, 1500))
     const { data: { session: retrySession } } = await supabase.auth.getSession()
+    console.log('[AUTH] visibilitychange: retry getSession =', !!retrySession)
     if (retrySession) return
 
-    // Still no session — try a token refresh as last resort
-    const { data: refreshed } = await supabase.auth.refreshSession()
+    // Last resort — try refresh
+    const { data: refreshed, error: refreshErr } = await supabase.auth.refreshSession()
+    console.log('[AUTH] visibilitychange: refreshSession =', !!refreshed?.session, 'error:', refreshErr?.message)
     if (!refreshed?.session && auth.isLoggedIn) {
+      console.log('[AUTH] visibilitychange: LOGGING OUT — no session recovered')
       await auth.logout()
       router.push({ name: 'login' })
     }
