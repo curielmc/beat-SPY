@@ -87,16 +87,17 @@
             </div>
 
             <div class="space-y-2">
-            <div v-for="row in activeGroupData.sectors" :key="row.sector" class="space-y-1">
-              <div class="flex justify-between text-sm">
-                <span class="flex items-center gap-2">
-                  <span class="inline-block w-2.5 h-2.5 rounded-full" :style="{ backgroundColor: row.color }"></span>
-                  {{ row.sector }}
-                </span>
-                <span class="text-base-content/60">${{ row.dollars.toLocaleString() }} · {{ row.pct.toFixed(1) }}%</span>
-              </div>
-              <div class="w-full bg-base-200 rounded-full h-2">
-                <div class="h-2 rounded-full transition-all" :style="{ width: row.pct + '%', backgroundColor: row.color }"></div>
+              <div v-for="row in activeGroupData.sectors" :key="row.sector" class="space-y-1">
+                <div class="flex justify-between text-sm">
+                  <span class="flex items-center gap-2">
+                    <span class="inline-block w-2.5 h-2.5 rounded-full" :style="{ backgroundColor: row.color }"></span>
+                    {{ row.sector }}
+                  </span>
+                  <span class="text-base-content/60">${{ row.dollars.toLocaleString() }} · {{ row.pct.toFixed(1) }}%</span>
+                </div>
+                <div class="w-full bg-base-200 rounded-full h-2">
+                  <div class="h-2 rounded-full transition-all" :style="{ width: row.pct + '%', backgroundColor: row.color }"></div>
+                </div>
               </div>
             </div>
           </div>

@@ -729,13 +729,7 @@ async function handleSellAll() {
   }
 }
 
-function showFeedback(msg, type = 'success') {
-  settingsMsg.value = msg
-  settingsMsgType.value = type
-  setTimeout(() => { settingsMsg.value = '' }, 3000)
-}
-
-const vsSP500 = computed(() => portfolioStore.totalReturnPct - portfolioStore.benchmarkReturnPct)
+  const vsSP500 = computed(() => portfolioStore.totalReturnPct - portfolioStore.benchmarkReturnPct)
 const isIndependent = computed(() => membership.value?.group_id === 'personal')
 
 const activeRestrictions = computed(() => {
