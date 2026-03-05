@@ -419,12 +419,27 @@ async function buildPortfolioHistory(portfolio, trades, startingCash) {
     // Calculate holdings value using last known trade prices
     let holdingsValue = 0
     for (const [tickerKey, shares] of Object.entries(holdingsMap)) {
-      if (shares <= 0) continue
+      if (shares <= 0 || !tickerKey) continue
       // Use trade price if available, fallback to cached market price
       const price = tradePriceMap[tickerKey] || market.getCachedPrice(tickerKey) || 0
+      if (price <= 0) {
+        console.warn(`[Leaderboard] No price for ${tickerKey} in portfolio ${portfolio.id}, using 0`)
+      }
       holdingsValue += shares * price
     }
-    history.push({ date, value: runningCash + holdingsValue })
+    const totalValue = runningCash + holdingsValue
+    
+    // Debug logging for anomalous values
+    if (totalValue > 200000 || totalValue < 50000) {
+      console.warn(`[Leaderboard] Anomalous portfolio value: $${totalValue.toFixed(2)} for ${portfolio.id} at ${date}`, {
+        cash: runningCash,
+        holdingsValue,
+        holdings: {...holdingsMap},
+        tradePrices: {...tradePriceMap}
+      })
+    }
+    
+    history.push({ date, value: totalValue })
   }
   return history
 }
