@@ -18,34 +18,6 @@
       </div>
     </div>
 
-    <!-- Comparison Chart -->
-    <div v-if="!loading" class="card bg-base-100 shadow-sm">
-      <div class="card-body p-4 space-y-3">
-        <div class="flex items-center justify-between flex-wrap gap-2">
-          <div class="flex gap-2">
-            <button class="btn btn-sm btn-primary btn-disabled">Groups</button>
-            <button
-              class="btn btn-sm"
-              :class="showIndividuals ? 'btn-secondary' : 'btn-ghost'"
-              @click="showIndividuals = !showIndividuals"
-            >Individuals</button>
-          </div>
-          <TimeRangeSelector v-model="chartTimeRange" />
-        </div>
-        <div v-if="chartLoading" class="flex justify-center py-8">
-          <span class="loading loading-spinner loading-md"></span>
-        </div>
-        <PortfolioLineChart
-          v-else-if="visibleDatasets.length > 0"
-          :datasets="visibleDatasets"
-          :time-range="chartTimeRange"
-          :show-percentage="true"
-          height="260px"
-        />
-        <p v-else class="text-center text-base-content/50 py-4 text-sm">No chart data available yet.</p>
-      </div>
-    </div>
-
     <div v-if="loading" class="flex justify-center py-12">
       <span class="loading loading-spinner loading-lg"></span>
     </div>
@@ -126,6 +98,35 @@
       </div>
 
       <p v-if="sortedGroups.length === 0" class="text-center text-base-content/50 py-8">No groups found in your class.</p>
+
+      <!-- Comparison Chart -->
+      <div v-if="!loading" class="card bg-base-100 shadow-sm mt-8">
+        <div class="card-body p-4 space-y-3">
+          <div class="flex items-center justify-between flex-wrap gap-2">
+            <h3 class="font-bold text-lg">Performance Comparison</h3>
+            <TimeRangeSelector v-model="chartTimeRange" />
+          </div>
+          <div class="flex gap-2">
+            <button class="btn btn-xs" :class="!showIndividuals ? 'btn-primary' : 'btn-ghost'" @click="showIndividuals = false">Groups</button>
+            <button
+              class="btn btn-xs"
+              :class="showIndividuals ? 'btn-secondary' : 'btn-ghost'"
+              @click="showIndividuals = true"
+            >Individuals</button>
+          </div>
+          <div v-if="chartLoading" class="flex justify-center py-8">
+            <span class="loading loading-spinner loading-md"></span>
+          </div>
+          <PortfolioLineChart
+            v-else-if="visibleDatasets.length > 0"
+            :datasets="visibleDatasets"
+            :time-range="chartTimeRange"
+            :show-percentage="true"
+            height="260px"
+          />
+          <p v-else class="text-center text-base-content/50 py-4 text-sm">No chart data available yet.</p>
+        </div>
+      </div>
     </template>
   </div>
 </template>
