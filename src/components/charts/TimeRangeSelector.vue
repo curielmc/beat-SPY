@@ -13,5 +13,5 @@
 <script setup>
 defineProps({ modelValue: String })
 defineEmits(['update:modelValue'])
-const ranges = ['1W', '3W', '1M', '3M', '1Y', '5Y', 'All']
+const ranges = ['1D', '1W', '3W', '1M', '3M', '1Y', '5Y', 'All']
 </script>

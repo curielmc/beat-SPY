@@ -48,6 +48,7 @@ const COLORS = {
 function getCutoffDate(range) {
   const now = new Date('2026-02-27')
   switch (range) {
+    case '1D': return new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1)
     case '1W': return new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7)
     case '3W': return new Date(now.getFullYear(), now.getMonth(), now.getDate() - 21)
     case '1M': return new Date(now.getFullYear(), now.getMonth() - 1, now.getDate())
