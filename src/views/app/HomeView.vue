@@ -310,8 +310,6 @@
           <h3 class="font-semibold">Portfolio Settings</h3>
           <div class="flex items-center gap-2">
             <template v-if="activeTab === 'personal'">
-              <button class="btn btn-xs btn-error btn-outline" @click="showResetConfirm = true">Reset</button>
-              <button class="btn btn-xs btn-outline" @click="showCloseConfirm = true">Close</button>
             </template>
             <button class="btn btn-xs btn-ghost" @click="showSettings = !showSettings">
               {{ showSettings ? 'Hide' : 'Show' }}
@@ -366,13 +364,17 @@
     <!-- Reset Confirmation Modal -->
     <dialog class="modal" :class="{ 'modal-open': showResetConfirm }">
       <div class="modal-box">
-        <h3 class="font-bold text-lg">Reset Portfolio?</h3>
-        <p class="py-4 text-base-content/70">This will clear all holdings and restore $100k. Your trade history is preserved.</p>
+        <h3 class="font-bold text-lg">⚠️ Reset Portfolio?</h3>
+        <p class="py-4 text-base-content/70">This will <strong>permanently clear all holdings</strong> and restore your cash to $100k. Your trade history is preserved but your current positions will be lost.</p>
+        <div class="form-control mb-4">
+          <label class="label"><span class="label-text text-sm">Type <strong>RESET</strong> to confirm</span></label>
+          <input type="text" v-model="resetConfirmText" class="input input-bordered input-sm" placeholder="Type RESET here" />
+        </div>
         <div class="modal-action">
-          <button class="btn btn-ghost" @click="showResetConfirm = false">Cancel</button>
-          <button class="btn btn-error" @click="handleReset" :disabled="resetting">
+          <button class="btn btn-ghost" @click="showResetConfirm = false; resetConfirmText = ''">Cancel</button>
+          <button class="btn btn-error" @click="handleReset" :disabled="resetting || resetConfirmText !== 'RESET'">
             <span v-if="resetting" class="loading loading-spinner loading-sm"></span>
-            Reset
+            Reset Portfolio
           </button>
         </div>
       </div>
@@ -588,6 +590,7 @@ const showBonusModal = ref(false)
 const bonusTotal = ref(0)
 const showSettings = ref(false)
 const showResetConfirm = ref(false)
+const resetConfirmText = ref('')
 const showCloseConfirm = ref(false)
 const personalVisibility = ref('private')
 
@@ -1087,6 +1090,7 @@ async function handleReset() {
   resetting.value = true
   const result = await portfolioStore.resetPortfolio()
   showResetConfirm.value = false
+  resetConfirmText.value = ''
   resetting.value = false
   if (result.error) return showFeedback(result.error, 'error')
   showFeedback('Portfolio has been reset!')
