@@ -123,7 +123,7 @@ router.beforeEach((to) => {
   if (authPages.includes(to.name) && isLoggedIn) {
     if (userRole === 'admin') return { name: 'admin-dashboard' }
     if (userRole === 'teacher') return { name: 'teacher-dashboard' }
-    return { name: 'home' }
+    return { name: 'leaderboard' }
   }
 })
 

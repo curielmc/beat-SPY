@@ -101,7 +101,7 @@ async function signUpWithEmail() {
     const role = auth.profile?.role
     if (role === 'admin') router.push('/admin')
     else if (role === 'teacher') router.push('/teacher')
-    else router.push('/home')
+    else router.push('/leaderboard')
     return
   }
 
@@ -128,6 +128,6 @@ async function signUpWithEmail() {
   }
 
   submitting.value = false
-  router.push('/home')
+  router.push('/leaderboard')
 }
 </script>

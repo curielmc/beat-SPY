@@ -241,7 +241,7 @@ async function completeSignup() {
       cash_balance: 100000
     })
     submitting.value = false
-    router.push('/home')
+    router.push('/leaderboard')
     return
   }
 
@@ -262,6 +262,6 @@ async function completeSignup() {
   }
 
   submitting.value = false
-  router.push('/home')
+  router.push('/leaderboard')
 }
 </script>
