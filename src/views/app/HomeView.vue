@@ -145,6 +145,56 @@
       <span class="text-xs"><strong>Team Portfolio</strong> — Trades here affect all members of {{ membership?.group?.name }}. Coordinate with your team before buying or selling.</span>
     </div>
 
+    <!-- Active Restrictions Card -->
+    <div v-if="activeTab === 'group' && activeRestrictions" class="card bg-primary/5 border border-primary/20 shadow-sm">
+      <div class="card-body p-4">
+        <div class="flex items-center gap-2 mb-3">
+          <div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+          </div>
+          <h3 class="font-bold text-primary">Class Parameters & Restrictions</h3>
+        </div>
+        
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div v-if="activeRestrictions.universe === 'sp500'" class="flex items-start gap-2 text-sm">
+            <span class="text-success mt-0.5">✔</span>
+            <div>
+              <span class="font-semibold">S&P 500 Universe</span>
+              <p class="text-xs text-base-content/60">Only stocks in the S&P 500 (SPY) allowed.</p>
+            </div>
+          </div>
+          <div v-if="activeRestrictions.maxStocksPerPortfolio" class="flex items-start gap-2 text-sm">
+            <span class="text-info mt-0.5">ℹ</span>
+            <div>
+              <span class="font-semibold">Max {{ activeRestrictions.maxStocksPerPortfolio }} Stocks</span>
+              <p class="text-xs text-base-content/60">Portfolio limited to {{ activeRestrictions.maxStocksPerPortfolio }} unique tickers.</p>
+            </div>
+          </div>
+          <div v-if="activeRestrictions.minSectors" class="flex items-start gap-2 text-sm">
+            <span class="text-info mt-0.5">ℹ</span>
+            <div>
+              <span class="font-semibold">Min {{ activeRestrictions.minSectors }} Sectors</span>
+              <p class="text-xs text-base-content/60">Must diversify across at least {{ activeRestrictions.minSectors }} unique sectors.</p>
+            </div>
+          </div>
+          <div v-if="activeRestrictions.requireDividends" class="flex items-start gap-2 text-sm">
+            <span class="text-success mt-0.5">✔</span>
+            <div>
+              <span class="font-semibold">Dividend Mandate</span>
+              <p class="text-xs text-base-content/60">All holdings must be dividend-paying stocks.</p>
+            </div>
+          </div>
+          <div v-if="activeRestrictions.maxPositionPct" class="flex items-start gap-2 text-sm">
+            <span class="text-info mt-0.5">ℹ</span>
+            <div>
+              <span class="font-semibold">Max Position Size: {{ activeRestrictions.maxPositionPct }}%</span>
+              <p class="text-xs text-base-content/60">No single stock can exceed {{ activeRestrictions.maxPositionPct }}% of total value.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- My Team (group tab only) -->
     <div v-if="activeTab === 'group' && membership?.group_id && groupMembers.length > 0" class="card bg-base-100 shadow">
       <div class="card-body p-3">
@@ -560,6 +610,16 @@ const settingsForm = ref({ name: '', description: '' })
 
 const vsSP500 = computed(() => portfolioStore.totalReturnPct - portfolioStore.benchmarkReturnPct)
 const isIndependent = computed(() => membership.value?.group_id === 'personal')
+
+const activeRestrictions = computed(() => {
+  if (activeTab.value !== 'group') return null
+  const classRestrictions = membership.value?.class?.restrictions
+  if (!classRestrictions) return null
+  
+  const fundNum = String(portfolioStore.portfolio?.fund_number || '1')
+  // Use fund-specific overrides if they exist, otherwise use global defaults
+  return classRestrictions.byFund?.[fundNum] || classRestrictions
+})
 
 // Charts state
 const chartTimeRange = ref('3M')
