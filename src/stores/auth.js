@@ -65,12 +65,20 @@ export const useAuthStore = defineStore('auth', () => {
     if (initialized.value) return
     loading.value = true
     try {
-      // getSession returns cached session; if the access token is expired
-      // we need to refresh it so the user stays logged in across deploys
+      // Always try to recover session from storage on init (e.g. after deploy)
+      // First try getSession (reads from storage), then force refresh to ensure
+      // the token is valid — this prevents logout-on-deploy issues
       let { data: { session } } = await supabase.auth.getSession()
-      if (session?.expires_at && session.expires_at * 1000 < Date.now()) {
-        const { data: refreshed } = await supabase.auth.refreshSession()
-        session = refreshed?.session || null
+      if (session) {
+        // Always refresh on init to ensure token validity after deploys
+        const { data: refreshed, error: refreshErr } = await supabase.auth.refreshSession()
+        if (!refreshErr && refreshed?.session) {
+          session = refreshed.session
+        }
+        // If refresh failed but we have a non-expired session, keep using it
+        else if (session.expires_at && session.expires_at * 1000 < Date.now()) {
+          session = null // truly expired and can't refresh
+        }
       }
       if (session?.user) {
         currentUser.value = session.user
