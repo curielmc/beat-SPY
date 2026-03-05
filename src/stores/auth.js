@@ -65,10 +65,10 @@ export const useAuthStore = defineStore('auth', () => {
     if (initialized.value) return
     loading.value = true
     try {
-      // Recover session from localStorage — Supabase handles token refresh
-      // automatically via autoRefreshToken. Don't force refresh here as it
-      // can trigger SIGNED_OUT events on transient failures.
-      let { data: { session } } = await supabase.auth.getSession()
+      // Recover session from localStorage
+      console.log('[AUTH] init: calling getSession...')
+      let { data: { session }, error: sessionErr } = await supabase.auth.getSession()
+      console.log('[AUTH] init: getSession result:', { hasSession: !!session, userId: session?.user?.id, expiresAt: session?.expires_at, error: sessionErr })
       if (session?.user) {
         currentUser.value = session.user
         await fetchProfile(session.user.id)
@@ -80,6 +80,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     // Listen for auth state changes
     supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('[AUTH] onAuthStateChange:', event, { hasSession: !!session, userId: session?.user?.id })
       if (event === 'SIGNED_IN' && session?.user) {
         currentUser.value = session.user
         await fetchProfile(session.user.id)
