@@ -162,7 +162,7 @@ export const useAuthStore = defineStore('auth', () => {
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: window.location.origin + '/home'
+        redirectTo: window.location.origin + '/leaderboard'
       }
     })
     if (error) return { error: error.message }
