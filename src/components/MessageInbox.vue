@@ -128,8 +128,8 @@ import { useAuthStore } from '../stores/auth'
 const auth = useAuthStore()
 const currentUserId = computed(() => auth.currentUser?.id)
 
-const CLASS_ID = 'c0ee1de7-bf4d-4598-8285-44c8f89f3b22'
 const myGroup = ref(null)
+const currentClassId = ref(null)
 const teacherId = ref(null)
 const senderNames = ref({})
 
@@ -160,6 +160,7 @@ async function markRead(msg) {
 }
 
 async function loadThread() {
+  if (!currentClassId.value) return
   loadingMessages.value = true
   thread.value = []
 
@@ -168,7 +169,7 @@ async function loadThread() {
     // Messages FROM teacher TO me, my group, or whole class
     const groupId = myGroup.value?.id
     const { data: msgs } = await supabase.from('messages').select('*')
-      .eq('class_id', CLASS_ID)
+      .eq('class_id', currentClassId.value)
       .order('created_at', { ascending: true })
     // Filter client-side (RLS handles actual access)
     data = (msgs || []).filter(m =>
@@ -210,13 +211,13 @@ async function loadThread() {
 }
 
 async function send() {
-  if (!draft.value.trim()) return
+  if (!draft.value.trim() || !currentClassId.value) return
   sending.value = true
   const content = draft.value.trim()
   draft.value = ''
 
   await supabase.from('messages').insert({
-    class_id: CLASS_ID,
+    class_id: currentClassId.value,
     sender_id: currentUserId.value,
     recipient_type: activeThread.value === 'group' ? 'group' : 'user',
     recipient_id: activeThread.value === 'group' ? myGroup.value?.id : teacherId.value,
@@ -253,19 +254,23 @@ function scrollToBottom() {
 }
 
 async function loadMeta() {
-  // Get my group
-  const { data: mem } = await supabase.from('class_memberships')
-    .select('group_id, groups:groups(id, name)')
-    .eq('class_id', CLASS_ID).eq('user_id', currentUserId.value).single()
-  if (mem?.group_id) myGroup.value = mem.groups
+  const membership = await auth.getCurrentMembership()
+  if (membership?.class_id) {
+    currentClassId.value = membership.class_id
+    if (membership.group_id) {
+       myGroup.value = membership.group
+    }
+  }
 
   // Get teacher id
   const { data: teacher } = await supabase.from('profiles')
     .select('id, full_name').eq('role', 'teacher').single()
   if (teacher) { teacherId.value = teacher.id; senderNames.value[teacher.id] = teacher.full_name || 'Teacher' }
 
-  await loadThread()
-  subscribeRealtime()
+  if (currentClassId.value) {
+    await loadThread()
+    subscribeRealtime()
+  }
 }
 
 onMounted(loadMeta)
