@@ -78,16 +78,26 @@ export default async function handler(req) {
         'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
-        model: 'claude-3-5-haiku-20241022',
+        model: 'claude-3-haiku-20240307',
         max_tokens: 2048,
         messages: [{ role: 'user', content: prompt }]
       })
     })
     if (!response.ok) {
-      throw new Error('AI provider error')
+      const errData = await response.json().catch(() => ({}))
+      console.error('Anthropic API Error:', errData)
+      throw new Error(`AI provider error: ${response.status} ${errData?.error?.message || ''}`)
     }
     const data = await response.json()
-    return data.content?.[0]?.text || '[]'
+    const text = data.content?.[0]?.text || '[]'
+    // Strip markdown code blocks if present
+    const cleaned = text.replace(/```json\n?|```\n?/g, '').trim()
+    try {
+      return JSON.parse(cleaned)
+    } catch (e) {
+      console.error('JSON Parse Error for Claude output:', cleaned)
+      throw new Error('Claude returned invalid JSON: ' + e.message)
+    }
   }
 
   // ── 1. Fund-level scoring ──
@@ -137,19 +147,17 @@ Trades:
 ${tradeSummaries}`
 
   try {
-    const [fundText, stockText] = await Promise.all([
-      groupSummaries ? callClaude(fundPrompt) : Promise.resolve('[]'),
-      tradeSummaries ? callClaude(stockPrompt) : Promise.resolve('[]')
+    const [fundScores, stockScores] = await Promise.all([
+      groupSummaries ? callClaude(fundPrompt) : Promise.resolve([]),
+      tradeSummaries ? callClaude(stockPrompt) : Promise.resolve([])
     ])
-
-    const fundScores = JSON.parse(fundText)
-    const stockScores = JSON.parse(stockText)
 
     return new Response(JSON.stringify({ fundScores, stockScores }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
     })
   } catch (e) {
-    return new Response(JSON.stringify({ error: 'Failed to parse AI response: ' + e.message }), { status: 500 })
+    console.error('AI Analysis failed:', e)
+    return new Response(JSON.stringify({ error: e.message }), { status: 500 })
   }
 }

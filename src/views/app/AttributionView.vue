@@ -219,10 +219,12 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { usePortfolioStore } from '../../stores/portfolio'
 import { useMarketDataStore } from '../../stores/marketData'
 import { supabase } from '../../lib/supabase'
 
+const route = useRoute()
 const portfolioStore = usePortfolioStore()
 const market = useMarketDataStore()
 const loading = ref(true)
@@ -282,6 +284,11 @@ async function explainStock(a) {
 }
 
 onMounted(async () => {
+  const portfolioId = route.query.portfolioId
+  if (portfolioId) {
+    await portfolioStore.loadPortfolioById(portfolioId)
+  }
+
   // Ensure holdings are loaded from the store's current active portfolio
   const tickers = portfolioStore.holdings.map(h => h.ticker)
   if (!tickers.length) { loading.value = false; return }

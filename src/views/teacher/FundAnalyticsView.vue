@@ -64,7 +64,23 @@
           </div>
 
           <!-- Active group breakdown -->
-          <div v-if="activeGroupData" class="space-y-2">
+          <div v-if="activeGroupData" class="space-y-4">
+            <div class="flex items-center justify-between bg-primary/5 rounded-lg p-3 border border-primary/20">
+              <div>
+                <p class="text-xs text-base-content/60 uppercase font-semibold">Performance Review</p>
+                <p class="text-sm">Analyze what moved <strong>{{ activeGroupData.name }}</strong>'s portfolio today.</p>
+              </div>
+              <RouterLink 
+                v-if="activeGroupPortfolioId"
+                :to="{ name: 'attribution', query: { portfolioId: activeGroupPortfolioId } }" 
+                class="btn btn-primary btn-sm gap-2"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+                Performance Attribution
+              </RouterLink>
+            </div>
+
+            <div class="space-y-2">
             <div v-for="row in activeGroupData.sectors" :key="row.sector" class="space-y-1">
               <div class="flex justify-between text-sm">
                 <span class="flex items-center gap-2">
@@ -208,7 +224,9 @@ import { ref, computed, onMounted } from 'vue'
 import { supabase } from '../../lib/supabase'
 import { getBatchProfiles } from '../../services/fmpApi'
 import PortfolioPieChart from '../../components/charts/PortfolioPieChart.vue'
+import { useTeacherStore } from '../../stores/teacher'
 
+const teacherStore = useTeacherStore()
 const loading = ref(true)
 const aiLoading = ref(false)
 const aiScores = ref([])
@@ -219,6 +237,8 @@ const activeGroup = ref(null)
 const aggregateSectors = ref([])
 const overlappingStocks = ref([])
 const uniqueStocks = ref([])
+
+const activeGroupPortfolioId = computed(() => activeGroupData.value?.portfolioId)
 
 const COLORS = [
   '#6366f1','#f59e0b','#10b981','#ef4444','#3b82f6',
@@ -333,7 +353,12 @@ async function runAiAnalysis() {
 }
 
 onMounted(async () => {
-  const CLASS_ID = 'c0ee1de7-bf4d-4598-8285-44c8f89f3b22'
+  await teacherStore.loadTeacherData()
+  const CLASS_ID = teacherStore.classes[0]?.id
+  if (!CLASS_ID) {
+    loading.value = false
+    return
+  }
 
   // Fetch groups, portfolios, holdings
   const [{ data: groups }, { data: ports }, { data: allHoldings }] = await Promise.all([
@@ -406,6 +431,7 @@ onMounted(async () => {
     breakdowns.push({
       id: g.id,
       name: g.name,
+      portfolioId: port.id,
       sectors: buildSectorRows(sectorMap, totalDollars)
     })
   }
