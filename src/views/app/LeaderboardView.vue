@@ -325,6 +325,25 @@ onMounted(async () => {
     }
     const today = computeTodayReturn(pHoldings, quotesMap, cashBalance)
 
+    // Performance drivers (helper/hurter)
+    let topHelper = null
+    let topHurter = null
+    let maxGain = -Infinity
+    let maxLoss = Infinity
+
+    for (const h of pHoldings) {
+      const currentPrice = market.getCachedPrice(h.ticker) || Number(h.avg_cost)
+      const gainLoss = (currentPrice - Number(h.avg_cost)) * Number(h.shares)
+      if (gainLoss > 0 && gainLoss > maxGain) {
+        maxGain = gainLoss
+        topHelper = h.ticker
+      }
+      if (gainLoss < 0 && gainLoss < maxLoss) {
+        maxLoss = gainLoss
+        topHurter = h.ticker
+      }
+    }
+
     // Annualized
     const createdAt = p?.created_at || new Date().toISOString()
     const annualized = computeAnnualizedReturn(sinceInception, createdAt)
@@ -334,6 +353,7 @@ onMounted(async () => {
       portfolioId: p?.id,
       totalValue,
       metrics: { sinceInception, today, annualized },
+      drivers: { helper: topHelper, hurter: topHurter },
       memberNames: (group.memberships || []).map(m => m.profiles?.full_name?.split(' ')[0]).filter(Boolean),
       holdings: pHoldings,
       trades: p ? (tradesMap[p.id] || []) : [],

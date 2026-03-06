@@ -20,6 +20,9 @@
             <span v-if="entry.follower_count > 0" class="badge badge-ghost badge-xs">{{ entry.follower_count }} follower{{ entry.follower_count !== 1 ? 's' : '' }}</span>
           </div>
           <p class="text-xs text-base-content/60">{{ subtitle }}</p>
+          <p v-if="driverPhrase" class="text-[10px] mt-1 font-medium italic opacity-80" :class="metricValue >= 0 ? 'text-success' : 'text-error'">
+            {{ driverPhrase }}
+          </p>
         </div>
 
         <!-- Performance -->
@@ -85,5 +88,17 @@ const rankClass = computed(() => {
   if (props.rank === 2) return 'bg-base-300 text-base-content'
   if (props.rank === 3) return 'bg-accent/30 text-accent-content'
   return 'bg-base-200 text-base-content/60'
+})
+
+const driverPhrase = computed(() => {
+  const drivers = props.entry.drivers
+  if (!drivers) return null
+  
+  if (metricValue.value >= 0 && drivers.helper) {
+    return `Helped by ${drivers.helper}`
+  } else if (metricValue.value < 0 && drivers.hurter) {
+    return `Hurt by ${drivers.hurter}`
+  }
+  return null
 })
 </script>
