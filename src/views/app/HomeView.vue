@@ -658,6 +658,7 @@ import { getHistoricalDaily, getBatchProfiles } from '../../services/fmpApi'
 import PortfolioLineChart from '../../components/charts/PortfolioLineChart.vue'
 import PortfolioPieChart from '../../components/charts/PortfolioPieChart.vue'
 import TimeRangeSelector from '../../components/charts/TimeRangeSelector.vue'
+import { isMarketOpen } from '../../utils/marketHours'
 
 const route = useRoute()
 const auth = useAuthStore()
@@ -879,20 +880,24 @@ onMounted(async () => {
 // Prefetch leaderboard data in background (so it loads instantly when user navigates there)
 setTimeout(async () => {
   try {
-    const { usePortfolioStore } = await import('../../stores/portfolio')
-    const { supabase } = await import('../../lib/supabase')
+    await import('../../stores/portfolio')
+    await import('../../lib/supabase')
     // warm up membership + group data silently
     await auth.getCurrentMembership()
   } catch (e) { /* silent */ }
 }, 3000)
 
-// Auto-refresh prices every 60 seconds
+// Auto-refresh prices every 5 minutes (300,000ms)
+// Only if market is open and tab is focused to save API calls
 refreshInterval = setInterval(async () => {
+  if (document.hidden) return
+  if (!isMarketOpen()) return
+
   if (portfolioStore.holdings.length) {
     const tickers = portfolioStore.holdings.map(h => h.ticker)
     if (tickers.length) await market.fetchBatchQuotes(tickers)
   }
-}, 60000)
+}, 300000)
 
 })
 

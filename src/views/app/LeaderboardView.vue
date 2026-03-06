@@ -145,6 +145,7 @@ import LeaderboardEntry from '../../components/LeaderboardEntry.vue'
 import PortfolioLineChart from '../../components/charts/PortfolioLineChart.vue'
 import TimeRangeSelector from '../../components/charts/TimeRangeSelector.vue'
 import { getHistoricalDaily } from '../../services/fmpApi'
+import { isMarketOpen } from '../../utils/marketHours'
 import {
   reconstructHoldingsAsOf,
   reconstructCashAsOf,
@@ -362,10 +363,15 @@ onMounted(async () => {
   computePeriodMetrics(enriched)
   computeRiskMetrics(enriched)
 
+// Auto-refresh prices every 5 minutes (300,000ms)
+// Only if market is open and tab is focused to save API calls
 refreshInterval = setInterval(async () => {
+  if (document.hidden) return
+  if (!isMarketOpen()) return
+
   const allT = [...new Set(groups.value.flatMap(g => (g.holdings || []).map(h => h.ticker)).concat(['SPY']))]
   if (allT.length) await market.fetchBatchQuotes(allT)
-}, 60000)
+}, 300000)
 
 })
 
