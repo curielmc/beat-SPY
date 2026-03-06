@@ -13,351 +13,335 @@
     <div v-if="!loading && !quote" class="text-center py-12 text-base-content/50">Stock not found.</div>
 
     <template v-if="!loading && quote">
-      <!-- Header & Quick Trade -->
-      <div class="flex flex-col lg:flex-row lg:items-start justify-between gap-6">
-        <div class="flex items-start gap-4">
+      <!-- Header Area -->
+      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-2">
+        <div class="flex items-center gap-4">
           <div class="avatar">
-            <div class="w-16 h-16 rounded-xl bg-base-200 flex items-center justify-center overflow-hidden border border-base-300 shadow-sm">
+            <div class="w-14 h-14 rounded-xl bg-base-200 flex items-center justify-center overflow-hidden border border-base-300 shadow-sm">
               <img v-if="companyProfile?.image" :src="companyProfile.image" :alt="ticker" />
               <span v-else class="text-xl font-bold text-base-content/20">{{ ticker }}</span>
             </div>
           </div>
           <div>
-            <h1 class="text-3xl font-bold">{{ ticker }}</h1>
-            <p class="text-base-content/60 text-lg">{{ companyProfile?.companyName || quote.name || ticker }}</p>
-            <div class="flex gap-1 mt-2">
-              <span v-if="companyProfile?.sector" class="badge badge-sm badge-ghost">{{ companyProfile.sector }}</span>
-              <span v-if="companyProfile?.industry" class="badge badge-sm badge-ghost">{{ companyProfile.industry }}</span>
-              <span v-if="companyProfile?.country" class="badge badge-sm badge-outline">{{ companyProfile.country }}</span>
-              <span v-if="quote.exchange" class="badge badge-sm badge-primary">{{ quote.exchange }}</span>
+            <div class="flex items-center gap-2">
+              <h1 class="text-3xl font-bold leading-none">{{ ticker }}</h1>
+              <span v-if="quote.exchange" class="badge badge-sm badge-primary opacity-80">{{ quote.exchange }}</span>
             </div>
+            <p class="text-base-content/60 font-medium">{{ companyProfile?.companyName || quote.name || ticker }}</p>
           </div>
         </div>
 
-        <!-- Quick Trade Actions (Brokerage Style) -->
-        <div class="flex flex-col sm:flex-row gap-3">
-          <!-- Buy Action -->
+        <!-- Quick Trade Actions -->
+        <div class="flex gap-2">
           <div 
-            class="card bg-success/10 border border-success/20 p-3 flex flex-col gap-1 cursor-pointer hover:bg-success/20 transition-colors min-w-[180px]"
+            class="bg-success/10 border border-success/20 px-4 py-2 rounded-xl flex flex-col cursor-pointer hover:bg-success/20 transition-all min-w-[140px]"
             @click="tradeMode = 'buy'; scrollToTrade()"
           >
-            <div class="flex items-center justify-between">
-              <span class="text-xs font-bold text-success uppercase tracking-wider">Buy {{ ticker }}</span>
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-success" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" /></svg>
-            </div>
-            <div class="text-xl font-bold text-success">${{ Number(quote.price).toFixed(2) }}</div>
-            <div class="text-[10px] text-base-content/60">
-              <span class="font-semibold text-success/80">${{ portfolioStore.cashBalance.toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</span> available
-            </div>
+            <span class="text-[10px] font-bold text-success uppercase tracking-wider">Buy</span>
+            <span class="text-lg font-bold text-success">${{ Number(quote.price).toFixed(2) }}</span>
           </div>
-
-          <!-- Sell Action -->
           <div 
-            class="card bg-error/10 border border-error/20 p-3 flex flex-col gap-1 cursor-pointer hover:bg-error/20 transition-colors min-w-[180px]"
+            class="bg-error/10 border border-error/20 px-4 py-2 rounded-xl flex flex-col cursor-pointer hover:bg-error/20 transition-all min-w-[140px]"
             :class="{ 'opacity-50 grayscale pointer-events-none': !currentHolding }"
             @click="tradeMode = 'sell'; scrollToTrade()"
           >
-            <div class="flex items-center justify-between">
-              <span class="text-xs font-bold text-error uppercase tracking-wider">Sell {{ ticker }}</span>
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-error" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd" /></svg>
-            </div>
-            <div class="text-xl font-bold text-error">${{ Number(quote.price).toFixed(2) }}</div>
-            <div class="text-[10px] text-base-content/60">
-              <span class="font-semibold text-error/80">{{ Number(currentHolding?.shares || 0).toFixed(2) }}</span> shares held
-            </div>
+            <span class="text-[10px] font-bold text-error uppercase tracking-wider">Sell</span>
+            <span class="text-lg font-bold text-error">${{ Number(quote.price).toFixed(2) }}</span>
           </div>
         </div>
       </div>
 
-      <!-- Robinhood-style Chart -->
-      <StockChart
-        :ticker="ticker"
-        :current-price="Number(quote.price)"
-        :change="Number(quote.change)"
-        :change-pct="Number(quote.changesPercentage)"
-        :is-positive="quote.change >= 0"
-      />
-
-      <!-- Competition Context Banner -->
-      <div v-if="activeComp" class="alert alert-info">
-        <div>
-          <p class="font-semibold text-sm">Active Challenge: {{ activeComp.name }}</p>
-          <p class="text-xs">Trades are subject to challenge rules. Benchmark: {{ activeComp.benchmark_ticker }}</p>
-        </div>
-      </div>
-
-      <!-- Competition Rule Warnings -->
-      <div v-if="compRuleErrors.length > 0" class="alert alert-warning">
-        <ul class="text-sm list-disc list-inside">
-          <li v-for="err in compRuleErrors" :key="err">{{ err }}</li>
-        </ul>
-      </div>
-
-      <!-- Trade Panel -->
-      <div ref="tradePanel" class="card shadow" :class="isGroupPortfolio ? 'bg-secondary/10 border border-secondary/30' : 'bg-base-100'">
-        <div class="card-body p-4">
-          <!-- Educator Mode Warning -->
-          <div v-if="auth.isTeacher || auth.isAdmin" class="alert alert-warning mb-4 py-2 border border-warning/30 bg-warning/5">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-            <span class="text-sm"><strong>Educator Mode:</strong> You can view this interface, but teachers and admins cannot execute trades.</span>
-          </div>
-          <!-- Active Portfolio Indicator -->
-          <div class="flex items-center justify-between mb-3">
-            <div v-if="isGroupPortfolio" class="badge badge-secondary gap-1">
-              {{ membership?.group?.name }} — {{ portfolioStore.portfolio?.fund_name || 'Group Fund' }}
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        <!-- LEFT COLUMN: Chart, Trade, Stats -->
+        <div class="lg:col-span-2 space-y-6">
+          <!-- Main Chart -->
+          <div class="card bg-base-100 shadow-sm border border-base-200 overflow-hidden">
+            <div class="p-4 border-b border-base-200 flex justify-between items-center bg-base-200/30">
+              <div class="flex flex-col">
+                <span class="text-3xl font-bold">${{ Number(quote.price).toFixed(2) }}</span>
+                <span class="text-sm font-medium" :class="quote.change >= 0 ? 'text-success' : 'text-error'">
+                  {{ quote.change >= 0 ? '+' : '' }}{{ Number(quote.change).toFixed(2) }} 
+                  ({{ Number(quote.changesPercentage).toFixed(2) }}%) 
+                  <span class="text-base-content/40 text-xs ml-1 font-normal">Today</span>
+                </span>
+              </div>
+              <div class="flex gap-1">
+                <span v-if="companyProfile?.sector" class="badge badge-ghost">{{ companyProfile.sector }}</span>
+              </div>
             </div>
-            <div v-else class="badge badge-primary">Personal Portfolio</div>
-            <button
-              v-if="canSwitchPortfolio"
-              class="btn btn-ghost btn-xs"
-              :disabled="switchingPortfolio"
-              @click="switchPortfolio"
-            >
-              <span v-if="switchingPortfolio" class="loading loading-spinner loading-xs"></span>
-              <template v-else>Switch to {{ isGroupPortfolio ? 'Personal' : 'Group' }}</template>
-            </button>
-          </div>
-
-          <!-- Tabs -->
-          <div class="tabs tabs-boxed mb-3">
-            <button class="tab" :class="{ 'tab-active': tradeMode === 'buy' }" @click="tradeMode = 'buy'">Buy</button>
-            <button class="tab" :class="{ 'tab-active': tradeMode === 'sell' }" @click="tradeMode = 'sell'">Sell</button>
-          </div>
-
-          <!-- Current Position -->
-          <div v-if="currentHolding" class="flex justify-between text-sm mb-2 bg-base-200 rounded-lg p-2">
-            <span class="text-base-content/60">Your position</span>
-            <span class="font-medium">{{ Number(currentHolding.shares).toFixed(4) }} shares (${{ (currentHolding.shares * quote.price).toLocaleString('en-US', { maximumFractionDigits: 2 }) }})</span>
-          </div>
-          <div class="flex justify-between text-sm mb-3 bg-base-200 rounded-lg p-2">
-            <span class="text-base-content/60">Cash available</span>
-            <span class="font-medium">${{ portfolioStore.cashBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span>
-          </div>
-
-          <!-- Dollar Input -->
-          <div class="form-control mb-2">
-            <label class="label py-1"><span class="label-text text-sm">Amount ($)</span></label>
-            <input
-              v-model.number="tradeAmount"
-              type="number"
-              min="0"
-              :max="tradeMode === 'buy' ? portfolioStore.cashBalance : maxSellDollars"
-              step="0.01"
-              class="input input-bordered w-full"
-              :placeholder="tradeMode === 'buy' ? 'Enter $ to invest' : 'Enter $ to sell'"
+            <StockChart
+              :ticker="ticker"
+              :current-price="Number(quote.price)"
+              :change="Number(quote.change)"
+              :change-pct="Number(quote.changesPercentage)"
+              :is-positive="quote.change >= 0"
             />
           </div>
 
-          <!-- Quick Amount Buttons -->
-          <div class="flex gap-1 mb-3">
-            <button v-for="pct in [25, 50, 75, 100]" :key="pct" class="btn btn-xs btn-ghost flex-1" @click="setQuickAmount(pct)">{{ pct }}%</button>
-          </div>
-
-          <!-- Order Preview -->
-          <div v-if="tradeAmount > 0" class="bg-base-200 rounded-lg p-3 mb-3 space-y-1">
-            <div class="flex justify-between text-sm">
-              <span class="text-base-content/60">{{ tradeMode === 'buy' ? 'Buying' : 'Selling' }}</span>
-              <span class="font-mono">{{ previewShares.toFixed(4) }} shares</span>
-            </div>
-            <div class="flex justify-between text-sm">
-              <span class="text-base-content/60">Price per share</span>
-              <span class="font-mono">${{ Number(quote.price).toFixed(2) }}</span>
-            </div>
-            <div class="flex justify-between text-sm font-medium border-t border-base-300 pt-1">
-              <span>Total</span>
-              <span class="font-mono">${{ tradeAmount.toFixed(2) }}</span>
-            </div>
-          </div>
-
-          <!-- Trade Rationale -->
-          <div class="form-control mb-3">
-            <label class="label py-1">
-              <span class="label-text text-sm">Why are you making this trade?{{ rationaleRequired ? '' : ' (optional)' }}</span>
-            </label>
-            <textarea
-              v-model="tradeRationale"
-              class="textarea textarea-bordered w-full"
-              rows="2"
-              maxlength="300"
-              placeholder="e.g. Strong earnings beat, oversold RSI, sector rotation..."
-            ></textarea>
-            <label v-if="tradeRationale.length > 0" class="label py-0.5">
-              <span></span>
-              <span class="label-text-alt">{{ tradeRationale.length }}/300</span>
-            </label>
-            <p v-if="rationaleError" class="text-error text-xs mt-1">{{ rationaleError }}</p>
-          </div>
-
-          <!-- Approval Code -->
-          <div v-if="requiresApproval" class="form-control mb-3">
-            <label class="label py-1"><span class="label-text text-sm">Teacher Approval Code</span></label>
-            <input v-model="approvalCode" type="text" class="input input-bordered w-full uppercase" placeholder="Enter approval code" />
-          </div>
-
-          <!-- Trade Result -->
-          <div v-if="tradeResult" class="alert mb-3" :class="tradeResult.success ? 'alert-success' : 'alert-error'">
-            <span>{{ tradeResult.message }}</span>
-          </div>
-
-          <!-- Execute Button -->
-          <button
-            class="btn btn-block"
-            :class="tradeMode === 'buy' ? 'btn-success' : 'btn-error'"
-            :disabled="!canTrade || executing || auth.isTeacher || auth.isAdmin"
-            @click="executeTrade"
-          >
-            <span v-if="executing" class="loading loading-spinner loading-sm"></span>
-            <template v-if="auth.isTeacher || auth.isAdmin">Trading Disabled for Educators</template>
-            <template v-else>{{ tradeMode === 'buy' ? 'Buy' : 'Sell' }} {{ ticker }}</template>
-          </button>
-        </div>
-      </div>
-
-      <!-- Key Statistics -->
-      <div class="card bg-base-100 shadow">
-        <div class="card-body p-4">
-          <h3 class="font-semibold mb-3">Key Statistics</h3>
-          <div class="grid grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-3">
-            <div v-if="quote.previousClose" class="flex justify-between border-b border-base-200 pb-1">
-              <span class="text-sm text-base-content/60">Previous Close</span>
-              <span class="text-sm font-medium">${{ Number(quote.previousClose).toFixed(2) }}</span>
-            </div>
-            <div v-if="quote.open" class="flex justify-between border-b border-base-200 pb-1">
-              <span class="text-sm text-base-content/60">Open</span>
-              <span class="text-sm font-medium">${{ Number(quote.open).toFixed(2) }}</span>
-            </div>
-            <div v-if="quote.marketCap" class="flex justify-between border-b border-base-200 pb-1">
-              <span class="text-sm text-base-content/60">Market Cap</span>
-              <span class="text-sm font-medium">{{ formatMarketCap(quote.marketCap) }}</span>
-            </div>
-            <div v-if="quote.pe" class="flex justify-between border-b border-base-200 pb-1">
-              <span class="text-sm text-base-content/60">P/E Ratio</span>
-              <span class="text-sm font-medium">{{ Number(quote.pe).toFixed(1) }}</span>
-            </div>
-            <div v-if="quote.eps" class="flex justify-between border-b border-base-200 pb-1">
-              <span class="text-sm text-base-content/60">EPS</span>
-              <span class="text-sm font-medium">${{ Number(quote.eps).toFixed(2) }}</span>
-            </div>
-            <div v-if="quote.volume" class="flex justify-between border-b border-base-200 pb-1">
-              <span class="text-sm text-base-content/60">Volume</span>
-              <span class="text-sm font-medium">{{ Number(quote.volume).toLocaleString() }}</span>
-            </div>
-            <div v-if="quote.avgVolume" class="flex justify-between border-b border-base-200 pb-1">
-              <span class="text-sm text-base-content/60">Avg Volume</span>
-              <span class="text-sm font-medium">{{ Number(quote.avgVolume).toLocaleString() }}</span>
-            </div>
-            <div v-if="quote.yearHigh" class="flex justify-between border-b border-base-200 pb-1">
-              <span class="text-sm text-base-content/60">52-Week High</span>
-              <span class="text-sm font-medium">${{ Number(quote.yearHigh).toFixed(2) }}</span>
-            </div>
-            <div v-if="quote.yearLow" class="flex justify-between border-b border-base-200 pb-1">
-              <span class="text-sm text-base-content/60">52-Week Low</span>
-              <span class="text-sm font-medium">${{ Number(quote.yearLow).toFixed(2) }}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 52-Week Range Bar -->
-      <div v-if="quote.yearHigh && quote.yearLow" class="card bg-base-100 shadow">
-        <div class="card-body p-4">
-          <h3 class="font-semibold mb-2">52-Week Range</h3>
-          <div class="flex items-center gap-2">
-            <span class="text-xs font-mono">${{ Number(quote.yearLow).toFixed(0) }}</span>
-            <div class="flex-1 relative h-2 bg-base-300 rounded-full">
-              <div class="absolute h-2 bg-primary rounded-full" :style="{ width: rangePosition + '%' }"></div>
-              <div class="absolute w-3 h-3 bg-primary rounded-full -top-0.5 border-2 border-base-100" :style="{ left: rangePosition + '%', transform: 'translateX(-50%)' }"></div>
-            </div>
-            <span class="text-xs font-mono">${{ Number(quote.yearHigh).toFixed(0) }}</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- About -->
-      <div v-if="companyProfile?.description" class="card bg-base-100 shadow">
-        <div class="card-body p-4">
-          <h3 class="font-semibold mb-2">About {{ companyProfile.companyName }}</h3>
-          <p class="text-sm text-base-content/70 leading-relaxed">{{ companyProfile.description }}</p>
-        </div>
-      </div>
-
-      <!-- Community Takes -->
-      <div class="card bg-base-100 shadow">
-        <div class="card-body p-4">
-          <div class="flex items-center justify-between mb-3">
-            <h3 class="font-semibold">Community Takes</h3>
-            <button
-              v-if="auth.isLoggedIn && auth.profile?.username && canPostTake && !showTakeForm"
-              class="btn btn-primary btn-sm"
-              @click="showTakeForm = true"
-            >Post Take</button>
-          </div>
-
-          <!-- No username warning -->
-          <p v-if="auth.isLoggedIn && !auth.profile?.username" class="text-sm text-warning mb-3">
-            Set a username in your profile to post takes.
-          </p>
-
-          <!-- Already posted today -->
-          <p v-if="auth.isLoggedIn && auth.profile?.username && !canPostTake && !showTakeForm" class="text-xs text-base-content/40 mb-3">
-            You already posted a take on {{ ticker }} today.
-          </p>
-
-          <!-- Take Form -->
-          <div v-if="showTakeForm" class="space-y-3 mb-4 p-3 bg-base-200 rounded-lg">
-            <div class="flex gap-2">
-              <button class="btn btn-sm flex-1" :class="takeSide === 'bull' ? 'btn-success' : 'btn-ghost'" @click="takeSide = 'bull'">Bull</button>
-              <button class="btn btn-sm flex-1" :class="takeSide === 'bear' ? 'btn-error' : 'btn-ghost'" @click="takeSide = 'bear'">Bear</button>
-            </div>
-            <div class="form-control">
-              <textarea
-                v-model="takeBody"
-                class="textarea textarea-bordered w-full"
-                :maxlength="280"
-                rows="3"
-                placeholder="What's your thesis? (280 chars max)"
-              ></textarea>
-              <label class="label py-0.5">
-                <span></span>
-                <span class="label-text-alt" :class="takeBody.length > 260 ? 'text-warning' : ''">{{ takeBody.length }}/280</span>
-              </label>
-            </div>
-            <div class="grid grid-cols-2 gap-2">
-              <div class="form-control">
-                <label class="label py-0.5"><span class="label-text text-xs">Target Price ($)</span></label>
-                <input v-model.number="takeTargetPrice" type="number" min="0" step="0.01" class="input input-bordered input-sm w-full" />
+          <!-- Trade Panel -->
+          <div ref="tradePanel" class="card shadow-md border-2 overflow-hidden" :class="isGroupPortfolio ? 'border-secondary/30 bg-secondary/5' : 'border-primary/20 bg-base-100'">
+            <div class="p-4 bg-base-200/50 border-b border-base-200 flex justify-between items-center">
+              <h2 class="font-bold flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
+                Place Order
+              </h2>
+              <div v-if="isGroupPortfolio" class="badge badge-secondary gap-1 font-bold">
+                Group: {{ membership?.group?.name }}
               </div>
-              <div class="form-control">
-                <label class="label py-0.5"><span class="label-text text-xs">Target Date</span></label>
-                <input v-model="takeTargetDate" type="date" :min="tomorrowDate" class="input input-bordered input-sm w-full" />
+              <div v-else class="badge badge-primary font-bold">Personal Portfolio</div>
+            </div>
+
+            <div class="card-body p-4 space-y-4">
+              <!-- Educator Mode Warning -->
+              <div v-if="auth.isTeacher || auth.isAdmin" class="alert alert-warning py-2 rounded-lg">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                <span class="text-xs font-semibold">Educator Mode: Execution Disabled</span>
+              </div>
+
+              <!-- Competition Context Banner -->
+              <div v-if="activeComp" class="alert alert-info py-2 rounded-lg text-xs">
+                <span class="font-bold">Active Challenge:</span> {{ activeComp.name }} (Subject to Rules)
+              </div>
+
+              <!-- Portfolio Switcher -->
+              <div v-if="canSwitchPortfolio" class="flex justify-end">
+                <button class="btn btn-ghost btn-xs underline text-primary" :disabled="switchingPortfolio" @click="switchPortfolio">
+                  Switch to {{ isGroupPortfolio ? 'Personal' : 'Group' }}
+                </button>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Inputs Side -->
+                <div class="space-y-4">
+                  <div class="tabs tabs-boxed w-full">
+                    <button class="tab flex-1" :class="{ 'tab-active': tradeMode === 'buy' }" @click="tradeMode = 'buy'">Buy</button>
+                    <button class="tab flex-1" :class="{ 'tab-active': tradeMode === 'sell' }" @click="tradeMode = 'sell'">Sell</button>
+                  </div>
+
+                  <div class="form-control">
+                    <label class="label py-1"><span class="label-text text-sm font-bold">Amount to {{ tradeMode }}</span></label>
+                    <div class="relative">
+                      <span class="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-base-content/40">$</span>
+                      <input
+                        v-model.number="tradeAmount"
+                        type="number"
+                        min="0"
+                        :max="tradeMode === 'buy' ? portfolioStore.cashBalance : maxSellDollars"
+                        step="0.01"
+                        class="input input-bordered w-full pl-7 font-mono text-lg"
+                        placeholder="0.00"
+                      />
+                    </div>
+                    <div class="flex gap-1 mt-2">
+                      <button v-for="pct in [25, 50, 75, 100]" :key="pct" class="btn btn-xs btn-ghost border border-base-300 flex-1" @click="setQuickAmount(pct)">{{ pct }}%</button>
+                    </div>
+                  </div>
+
+                  <div v-if="tradeAmount > 0" class="bg-base-200 rounded-lg p-3 space-y-1 text-sm border border-base-300">
+                    <div class="flex justify-between">
+                      <span class="text-base-content/60">Estimated Shares</span>
+                      <span class="font-bold font-mono">{{ previewShares.toFixed(4) }}</span>
+                    </div>
+                    <div class="flex justify-between border-t border-base-300 pt-1 mt-1">
+                      <span class="text-base-content/60 font-bold">Total Cost</span>
+                      <span class="font-bold font-mono">${{ tradeAmount.toFixed(2) }}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Context & Rationale Side -->
+                <div class="space-y-4">
+                  <div class="bg-base-200/50 p-3 rounded-lg space-y-2 text-xs border border-base-300">
+                    <div class="flex justify-between">
+                      <span class="text-base-content/60">Cash Available</span>
+                      <span class="font-bold text-success">${{ portfolioStore.cashBalance.toLocaleString('en-US', { minimumFractionDigits: 2 }) }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-base-content/60">Current Position</span>
+                      <span class="font-bold">{{ Number(currentHolding?.shares || 0).toFixed(2) }} shares</span>
+                    </div>
+                  </div>
+
+                  <div class="form-control">
+                    <label class="label py-1"><span class="label-text text-sm font-bold">Trade Rationale{{ rationaleRequired ? '' : ' (Optional)' }}</span></label>
+                    <textarea
+                      v-model="tradeRationale"
+                      class="textarea textarea-bordered w-full h-24 text-sm"
+                      placeholder="Why are you making this trade?"
+                    ></textarea>
+                    <p v-if="rationaleError" class="text-error text-[10px] mt-1 font-bold uppercase">{{ rationaleError }}</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Approval Code -->
+              <div v-if="requiresApproval" class="form-control">
+                <label class="label py-1"><span class="label-text text-xs font-bold uppercase">Teacher Approval Code</span></label>
+                <input v-model="approvalCode" type="text" class="input input-bordered input-sm w-full uppercase font-mono" placeholder="Enter code" />
+              </div>
+
+              <!-- Execute Button -->
+              <div class="pt-2">
+                <button
+                  class="btn btn-block shadow-lg"
+                  :class="tradeMode === 'buy' ? 'btn-success' : 'btn-error'"
+                  :disabled="!canTrade || executing || auth.isTeacher || auth.isAdmin"
+                  @click="executeTrade"
+                >
+                  <span v-if="executing" class="loading loading-spinner loading-sm"></span>
+                  <template v-if="auth.isTeacher || auth.isAdmin">Trading Disabled for Educators</template>
+                  <template v-else>{{ tradeMode === 'buy' ? 'Execute Buy Order' : 'Execute Sell Order' }}</template>
+                </button>
+                <div v-if="tradeResult" class="alert mt-3 py-2" :class="tradeResult.success ? 'alert-success' : 'alert-error'">
+                  <span class="text-sm font-medium">{{ tradeResult.message }}</span>
+                </div>
+                <!-- Rule Errors -->
+                <div v-if="compRuleErrors.length > 0" class="mt-3 text-error text-xs space-y-1">
+                  <p v-for="err in compRuleErrors" :key="err" class="flex items-center gap-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
+                    {{ err }}
+                  </p>
+                </div>
               </div>
             </div>
-            <div v-if="takeError" class="text-error text-sm">{{ takeError }}</div>
-            <div class="flex gap-2">
-              <button class="btn btn-sm btn-ghost" @click="showTakeForm = false; takeError = ''">Cancel</button>
-              <button class="btn btn-sm btn-primary flex-1" :disabled="!canSubmitTake || postingTake" @click="submitTake">
-                <span v-if="postingTake" class="loading loading-spinner loading-xs"></span>
-                Post
-              </button>
-            </div>
           </div>
 
-          <!-- Takes list -->
-          <div v-if="takesLoading" class="flex justify-center py-4">
-            <span class="loading loading-spinner loading-sm"></span>
+          <!-- Stats & About Grid -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="card bg-base-100 shadow-sm border border-base-200">
+              <div class="card-body p-4">
+                <h3 class="font-bold text-sm uppercase tracking-wider text-base-content/50 mb-3 flex items-center gap-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+                  Key Statistics
+                </h3>
+                <div class="grid grid-cols-2 gap-x-4 gap-y-2">
+                  <div class="flex flex-col border-b border-base-200 pb-1">
+                    <span class="text-[10px] text-base-content/50 uppercase">Open</span>
+                    <span class="font-mono text-sm">${{ Number(quote.open).toFixed(2) }}</span>
+                  </div>
+                  <div class="flex flex-col border-b border-base-200 pb-1">
+                    <span class="text-[10px] text-base-content/50 uppercase">Prev Close</span>
+                    <span class="font-mono text-sm">${{ Number(quote.previousClose).toFixed(2) }}</span>
+                  </div>
+                  <div class="flex flex-col border-b border-base-200 pb-1">
+                    <span class="text-[10px] text-base-content/50 uppercase">Market Cap</span>
+                    <span class="font-mono text-sm">{{ formatMarketCap(quote.marketCap) }}</span>
+                  </div>
+                  <div class="flex flex-col border-b border-base-200 pb-1">
+                    <span class="text-[10px] text-base-content/50 uppercase">P/E Ratio</span>
+                    <span class="font-mono text-sm">{{ Number(quote.pe || 0).toFixed(1) }}</span>
+                  </div>
+                  <div class="flex flex-col border-b border-base-200 pb-1">
+                    <span class="text-[10px] text-base-content/50 uppercase">Volume</span>
+                    <span class="font-mono text-sm">{{ Number(quote.volume || 0).toLocaleString() }}</span>
+                  </div>
+                  <div class="flex flex-col border-b border-base-200 pb-1">
+                    <span class="text-[10px] text-base-content/50 uppercase">Avg Vol</span>
+                    <span class="font-mono text-sm">{{ Number(quote.avgVolume || 0).toLocaleString() }}</span>
+                  </div>
+                </div>
+                <!-- 52-Week Range inside Stats -->
+                <div class="mt-4 pt-2 border-t border-base-200">
+                  <span class="text-[10px] text-base-content/50 uppercase block mb-1">52-Week Range</span>
+                  <div class="flex items-center gap-2">
+                    <span class="text-[10px] font-mono">${{ Number(quote.yearLow).toFixed(0) }}</span>
+                    <div class="flex-1 relative h-1.5 bg-base-300 rounded-full">
+                      <div class="absolute h-1.5 bg-primary rounded-full" :style="{ width: rangePosition + '%' }"></div>
+                      <div class="absolute w-2.5 h-2.5 bg-primary rounded-full -top-0.5 border border-base-100" :style="{ left: rangePosition + '%', transform: 'translateX(-50%)' }"></div>
+                    </div>
+                    <span class="text-[10px] font-mono">${{ Number(quote.yearHigh).toFixed(0) }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card bg-base-100 shadow-sm border border-base-200">
+              <div class="card-body p-4 overflow-hidden">
+                <h3 class="font-bold text-sm uppercase tracking-wider text-base-content/50 mb-3 flex items-center gap-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  About {{ ticker }}
+                </h3>
+                <div class="max-h-40 overflow-y-auto pr-2 custom-scrollbar text-xs leading-relaxed text-base-content/70">
+                  {{ companyProfile?.description || 'No description available for this stock.' }}
+                </div>
+                <div v-if="companyProfile?.industry" class="mt-3 flex flex-wrap gap-1">
+                  <span class="badge badge-xs badge-outline opacity-50">{{ companyProfile.industry }}</span>
+                  <span class="badge badge-xs badge-outline opacity-50">{{ companyProfile.country }}</span>
+                </div>
+              </div>
+            </div>
           </div>
-          <div v-else-if="takes.length === 0" class="text-center py-6 text-base-content/40 text-sm">
-            No takes yet. Be the first to share your view on {{ ticker }}.
-          </div>
-          <div v-else class="space-y-3">
-            <TakeCard
-              v-for="take in takes"
-              :key="take.id"
-              :take="take"
-              :showTicker="false"
-              :showFollowButton="true"
-              :currentPrice="quote?.price"
-            />
+        </div>
+
+        <!-- RIGHT COLUMN: Community Takes Sidebar -->
+        <div class="lg:col-span-1 space-y-6 lg:sticky lg:top-4">
+          <div class="card bg-base-100 shadow-md border border-base-200">
+            <div class="card-body p-4">
+              <div class="flex items-center justify-between mb-4 pb-2 border-b border-base-200">
+                <h3 class="font-bold text-base flex items-center gap-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z" /></svg>
+                  Community Takes
+                </h3>
+                <button
+                  v-if="auth.isLoggedIn && auth.profile?.username && canPostTake && !showTakeForm"
+                  class="btn btn-primary btn-xs"
+                  @click="showTakeForm = true"
+                >Post Take</button>
+              </div>
+
+              <!-- Take Form -->
+              <div v-if="showTakeForm" class="space-y-3 mb-6 p-3 bg-base-200 rounded-xl border border-base-300 shadow-inner">
+                <div class="flex gap-2">
+                  <button class="btn btn-xs flex-1 font-bold" :class="takeSide === 'bull' ? 'btn-success' : 'btn-ghost'" @click="takeSide = 'bull'">Bull</button>
+                  <button class="btn btn-xs flex-1 font-bold" :class="takeSide === 'bear' ? 'btn-error' : 'btn-ghost'" @click="takeSide = 'bear'">Bear</button>
+                </div>
+                <div class="form-control">
+                  <textarea
+                    v-model="takeBody"
+                    class="textarea textarea-bordered w-full text-xs"
+                    :maxlength="280"
+                    rows="3"
+                    placeholder="Your thesis..."
+                  ></textarea>
+                  <label class="label py-0.5"><span class="label-text-alt text-[10px] opacity-50">{{ takeBody.length }}/280</span></label>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                  <div class="form-control">
+                    <label class="label py-0.5"><span class="label-text text-[10px] font-bold uppercase">Target $</span></label>
+                    <input v-model.number="takeTargetPrice" type="number" min="0" step="0.01" class="input input-bordered input-xs w-full font-mono" />
+                  </div>
+                  <div class="form-control">
+                    <label class="label py-0.5"><span class="label-text text-[10px] font-bold uppercase">Date</span></label>
+                    <input v-model="takeTargetDate" type="date" :min="tomorrowDate" class="input input-bordered input-xs w-full" />
+                  </div>
+                </div>
+                <div v-if="takeError" class="text-error text-[10px] font-bold">{{ takeError }}</div>
+                <div class="flex gap-2">
+                  <button class="btn btn-xs btn-ghost" @click="showTakeForm = false">Cancel</button>
+                  <button class="btn btn-xs btn-primary flex-1 shadow-sm" :disabled="!canSubmitTake || postingTake" @click="submitTake">Post Take</button>
+                </div>
+              </div>
+
+              <!-- Takes List (Scrollable) -->
+              <div class="max-h-[600px] overflow-y-auto pr-1 custom-scrollbar">
+                <div v-if="takesLoading" class="flex justify-center py-8">
+                  <span class="loading loading-spinner loading-md"></span>
+                </div>
+                <div v-else-if="takes.length === 0" class="text-center py-12 text-base-content/30 text-xs italic">
+                  Be the first to share your view.
+                </div>
+                <div v-else class="space-y-4">
+                  <TakeCard
+                    v-for="take in takes"
+                    :key="take.id"
+                    :take="take"
+                    :showTicker="false"
+                    :showFollowButton="true"
+                    :currentPrice="quote?.price"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -367,7 +351,7 @@
 
 <script setup>
 import StockChart from '../../components/StockChart.vue'
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMarketDataStore } from '../../stores/marketData'
 import { usePortfolioStore } from '../../stores/portfolio'
@@ -647,4 +631,24 @@ function formatMarketCap(value) {
 function goBack() {
   router.back()
 }
+
+onUnmounted(() => {
+  // cleanup
+})
 </script>
+
+<style scoped>
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: hsl(var(--bc) / 0.1);
+  border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--bc) / 0.2);
+}
+</style>
