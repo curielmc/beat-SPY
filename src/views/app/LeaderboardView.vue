@@ -66,7 +66,10 @@
         <div class="card bg-base-100 shadow-sm border border-warning/30">
           <div class="card-body p-3 text-center space-y-1">
             <p class="text-xs text-base-content/50 uppercase tracking-wide">⭐ Best Pick</p>
-            <p class="font-bold text-sm leading-tight">{{ highlights.bestStock || '—' }}</p>
+            <div class="leading-tight">
+              <p class="font-bold text-sm">{{ highlights.bestStock || '—' }}</p>
+              <p v-if="highlights.bestStockName" class="text-[10px] text-base-content/60 truncate px-1" :title="highlights.bestStockName">{{ highlights.bestStockName }}</p>
+            </div>
             <p class="text-warning font-bold text-base">
               {{ highlights.bestStockReturn >= 0 ? '+' : '' }}{{ highlights.bestStockReturn?.toFixed(2) }}%
             </p>
@@ -183,7 +186,8 @@ const highlights = computed(() => {
   const topFund = sorted[0]
 
   // 2. Best single stock pick across all groups (always since inception for now as it's a badge of honor)
-  let bestStock = null
+  let bestStockTicker = null
+  let bestStockName = null
   let bestStockReturn = -Infinity
   let bestStockGroup = null
   for (const g of gs) {
@@ -192,7 +196,9 @@ const highlights = computed(() => {
       const ret = ((currentPrice - Number(h.avg_cost)) / Number(h.avg_cost)) * 100
       if (ret > bestStockReturn) {
         bestStockReturn = ret
-        bestStock = h.ticker
+        bestStockTicker = h.ticker
+        const profile = market.profilesCache[h.ticker]?.data
+        bestStockName = profile?.companyName || profile?.name || null
         bestStockGroup = g.name
       }
     }
@@ -202,7 +208,16 @@ const highlights = computed(() => {
   const spy = activeBenchmarkValue.value
   const beatingCount = spy !== null ? gs.filter(g => (g.metrics?.[mKey] ?? -Infinity) > spy).length : null
 
-  return { topFund, bestStock, bestStockReturn, bestStockGroup, beatingCount, total: gs.length, activeMetric: mKey }
+  return { 
+    topFund, 
+    bestStock: bestStockTicker,
+    bestStockName,
+    bestStockReturn, 
+    bestStockGroup, 
+    beatingCount, 
+    total: gs.length, 
+    activeMetric: mKey 
+  }
 })
 
 const PERIOD_METRICS = {
@@ -376,11 +391,15 @@ onMounted(async () => {
 
   // Benchmark Phase 1
   const spyQuote = market.getCachedQuote('SPY')
-  if (spyQuote) {
+  if (spyQuote && spyQuote.price > 0) {
     benchmarkMetrics.value.sinceInception = portfolioStore.benchmarkReturnPct
     const spyPrevClose = spyQuote.previousClose || spyQuote.price
     benchmarkMetrics.value.today = spyPrevClose > 0 ? ((spyQuote.price - spyPrevClose) / spyPrevClose) * 100 : 0
     benchmarkMetrics.value.annualized = benchmarkMetrics.value.sinceInception // SPY is already annualized-ish
+  } else {
+    benchmarkMetrics.value.sinceInception = null
+    benchmarkMetrics.value.today = null
+    benchmarkMetrics.value.annualized = null
   }
 
   loading.value = false
@@ -697,12 +716,13 @@ async function computePeriodMetrics(entries) {
       const spyHistorical = historicalByDate[key]?.SPY
       
       // If SPY has historical data for this period
-      if (spyPrice && spyHistorical) {
+      if (spyPrice && spyHistorical && spyHistorical > 0) {
         benchmarkMetrics.value[key] = computePeriodReturn(spyHistorical, spyPrice)
-      } else if (spyPrice) {
-        // Fallback: if period is too long ago for FMP historical data,
-        // use the total SPY return (since inception of the first portfolio)
+      } else if (spyPrice && key === 'sinceInception') {
+        // For sinceInception, use the total SPY return if we have a current price
         benchmarkMetrics.value[key] = portfolioStore.benchmarkReturnPct
+      } else {
+        benchmarkMetrics.value[key] = null
       }
     }
 
