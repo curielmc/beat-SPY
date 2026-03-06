@@ -54,7 +54,10 @@
             <p class="text-xs text-base-content/50 uppercase tracking-wide">🏆 Top Fund</p>
             <p class="font-bold text-sm leading-tight">{{ highlights.topFund?.name || '—' }}</p>
             <p class="text-success font-bold text-base">
-              {{ highlights.topFund?.metrics?.sinceInception >= 0 ? '+' : '' }}{{ highlights.topFund?.metrics?.sinceInception?.toFixed(2) }}%
+              <template v-if="highlights.topFund?.metrics?.[highlights.activeMetric] !== undefined">
+                {{ highlights.topFund.metrics[highlights.activeMetric] >= 0 ? '+' : '' }}{{ highlights.topFund.metrics[highlights.activeMetric]?.toFixed(2) }}%
+              </template>
+              <template v-else>—</template>
             </p>
           </div>
         </div>
@@ -172,10 +175,13 @@ const highlights = computed(() => {
   const gs = groups.value
   if (!gs.length) return null
 
-  // 1. Top fund (highest sinceInception return)
-  const topFund = [...gs].sort((a, b) => (b.metrics?.sinceInception || 0) - (a.metrics?.sinceInception || 0))[0]
+  const mKey = activeMetric.value
 
-  // 2. Best single stock pick across all groups
+  // 1. Top fund for the ACTIVE metric
+  const sorted = [...gs].sort((a, b) => (b.metrics?.[mKey] ?? -Infinity) - (a.metrics?.[mKey] ?? -Infinity))
+  const topFund = sorted[0]
+
+  // 2. Best single stock pick across all groups (always since inception for now as it's a badge of honor)
   let bestStock = null
   let bestStockReturn = -Infinity
   let bestStockGroup = null
@@ -191,11 +197,11 @@ const highlights = computed(() => {
     }
   }
 
-  // 3. How many groups beat SPY
+  // 3. How many groups beat SPY for the ACTIVE metric
   const spy = activeBenchmarkValue.value
-  const beatingCount = spy !== null ? gs.filter(g => (g.metrics?.sinceInception || 0) > spy).length : null
+  const beatingCount = spy !== null ? gs.filter(g => (g.metrics?.[mKey] ?? -Infinity) > spy).length : null
 
-  return { topFund, bestStock, bestStockReturn, bestStockGroup, beatingCount, total: gs.length }
+  return { topFund, bestStock, bestStockReturn, bestStockGroup, beatingCount, total: gs.length, activeMetric: mKey }
 })
 
 const PERIOD_METRICS = {
@@ -630,9 +636,10 @@ async function computePeriodMetrics(entries) {
         const asOfDate = new Date(dateStr)
         const created = new Date(entry.createdAt)
 
-        // Portfolio too young for this period
+        // If portfolio was created AFTER the start of this period, 
+        // the return for this period is effectively the return "Since Inception"
         if (created > asOfDate) {
-          entry.metrics[key] = null
+          entry.metrics[key] = entry.metrics.sinceInception
           continue
         }
 
@@ -653,8 +660,14 @@ async function computePeriodMetrics(entries) {
     for (const [key, dateStr] of Object.entries(periodDates)) {
       const spyPrice = market.getCachedPrice('SPY')
       const spyHistorical = historicalByDate[key]?.SPY
+      
+      // If SPY has historical data for this period
       if (spyPrice && spyHistorical) {
         benchmarkMetrics.value[key] = computePeriodReturn(spyHistorical, spyPrice)
+      } else if (spyPrice) {
+        // Fallback: if period is too long ago for FMP historical data,
+        // use the total SPY return (since inception of the first portfolio)
+        benchmarkMetrics.value[key] = portfolioStore.benchmarkReturnPct
       }
     }
 
