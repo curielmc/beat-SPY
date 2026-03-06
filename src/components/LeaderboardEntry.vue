@@ -95,9 +95,11 @@ const driverPhrase = computed(() => {
   if (!drivers) return null
   
   if (metricValue.value >= 0 && drivers.helper) {
-    return `Helped by ${drivers.helper}`
+    const { ticker, name } = drivers.helper
+    return `Helped by ${ticker}${name ? ` (${name})` : ''}`
   } else if (metricValue.value < 0 && drivers.hurter) {
-    return `Hurt by ${drivers.hurter}`
+    const { ticker, name } = drivers.hurter
+    return `Hurt by ${ticker}${name ? ` (${name})` : ''}`
   }
   return null
 })

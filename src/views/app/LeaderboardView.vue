@@ -299,8 +299,11 @@ onMounted(async () => {
   }
   allTickers.add('SPY')
 
-  // Fetch all quotes in one batch
-  await market.fetchBatchQuotes([...allTickers])
+  // Fetch all quotes and profiles in one batch
+  await Promise.all([
+    market.fetchBatchQuotes([...allTickers]),
+    market.fetchBatchProfiles([...allTickers])
+  ])
 
   // Phase 1: compute instant metrics
   const enriched = []
@@ -334,13 +337,19 @@ onMounted(async () => {
     for (const h of pHoldings) {
       const currentPrice = market.getCachedPrice(h.ticker) || Number(h.avg_cost)
       const gainLoss = (currentPrice - Number(h.avg_cost)) * Number(h.shares)
+      const profile = market.profilesCache[h.ticker]?.data
+      const driverObj = { 
+        ticker: h.ticker, 
+        name: profile?.companyName || profile?.name || null 
+      }
+
       if (gainLoss > 0 && gainLoss > maxGain) {
         maxGain = gainLoss
-        topHelper = h.ticker
+        topHelper = driverObj
       }
       if (gainLoss < 0 && gainLoss < maxLoss) {
         maxLoss = gainLoss
-        topHurter = h.ticker
+        topHurter = driverObj
       }
     }
 
