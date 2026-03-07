@@ -449,6 +449,54 @@ export const useTeacherStore = defineStore('teacher', () => {
     return { success: true }
   }
 
+  // ── Weekly Email actions ──
+
+  // Send or preview weekly portfolio emails
+  // audience: 'groups' | 'individuals' | 'both'
+  async function sendWeeklyEmail(classId, { preview = false, audience = 'groups' } = {}) {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.access_token) return { error: 'Not authenticated' }
+
+    const res = await fetch('/api/weekly-portfolio-email', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`
+      },
+      body: JSON.stringify({ classId, preview, audience })
+    })
+
+    const data = await res.json()
+    if (!res.ok) return { error: data.error || 'Failed to send emails' }
+    return data
+  }
+
+  // Get email logs for a class
+  async function getEmailLogs(classId) {
+    const { data, error } = await supabase
+      .from('weekly_email_logs')
+      .select('*')
+      .eq('class_id', classId)
+      .order('sent_at', { ascending: false })
+      .limit(20)
+
+    if (error) return []
+    return data || []
+  }
+
+  // Toggle auto-email preference
+  async function toggleAutoEmail(classId, enabled) {
+    const { error } = await supabase
+      .from('classes')
+      .update({ auto_email_enabled: enabled })
+      .eq('id', classId)
+
+    if (error) return { error: error.message }
+    const cls = classes.value.find(c => c.id === classId)
+    if (cls) cls.auto_email_enabled = enabled
+    return { success: true }
+  }
+
   return {
     classes, groups, students, unassignedStudents, loading,
     loadTeacherData, getRankedGroups, createClass, generateClassCode,
@@ -456,6 +504,7 @@ export const useTeacherStore = defineStore('teacher', () => {
     kickFromGroup, kickStudent, awardBonusCash,
     updateRestrictions, updateGroupMode, setApprovalCode,
     generateApprovalCode, getGroupHoldings, updateClassSettings,
-    loadInvites, addInvites, removeInvite
+    loadInvites, addInvites, removeInvite,
+    sendWeeklyEmail, getEmailLogs, toggleAutoEmail
   }
 })
