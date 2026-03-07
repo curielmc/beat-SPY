@@ -8,7 +8,8 @@
 
     <div class="navbar bg-base-100 shadow-sm">
       <div class="max-w-6xl mx-auto w-full flex items-center">
-        <div class="flex-none">
+        <div class="flex-none flex items-center gap-2">
+          <img src="/logo.jpg" alt="Beat the S&P 500" class="h-8 w-8 rounded-lg" />
           <span class="text-lg font-bold text-primary">Beat the S&P 500</span>
           <span class="badge badge-ghost ml-2">Teacher</span>
         </div>

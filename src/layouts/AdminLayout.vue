@@ -7,6 +7,7 @@
     <aside class="fixed lg:sticky top-0 left-0 z-40 h-screen w-60 bg-base-100 border-r border-base-300 flex flex-col transition-transform lg:translate-x-0" :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'">
       <div class="p-4 border-b border-base-300 flex items-start justify-between">
         <div>
+          <img src="/logo.jpg" alt="Beat the S&P 500" class="h-10 w-10 rounded-lg mb-1" />
           <h1 class="text-lg font-bold text-primary">Beat the S&P 500</h1>
           <span class="badge badge-error badge-sm">Admin</span>
         </div>
