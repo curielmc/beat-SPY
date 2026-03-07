@@ -439,7 +439,6 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     const bmQuote = await market.fetchQuote(bmTicker)
     const bmPrice = bmQuote?.price || bmQuote?.previousClose
 
-    const shares = dollars / price
     const portfolioId = portfolio.value.id
 
     // Check approval code and restrictions
@@ -462,37 +461,19 @@ export const usePortfolioStore = defineStore('portfolio', () => {
       }
     }
 
-    // Insert trade
-    const { error: tradeError } = await supabase.from('trades').insert({
-      portfolio_id: portfolioId,
-      user_id: auth.currentUser.id,
-      ticker, side: 'buy', dollars, shares, price,
-      rationale: rationale?.trim() || null
-    })
-    if (tradeError) return { success: false, error: tradeError.message }
-
-    // Upsert holding
-    const existing = rawHoldings.value.find(h => h.ticker === ticker)
-    if (existing) {
-      const totalCost = (existing.shares * existing.avg_cost) + dollars
-      const newShares = existing.shares + shares
-      const newAvgCost = totalCost / newShares
-      await supabase.from('holdings')
-        .update({ shares: newShares, avg_cost: newAvgCost })
-        .eq('id', existing.id)
-    } else {
-      await supabase.from('holdings').insert({
-        portfolio_id: portfolioId,
-        ticker, shares, avg_cost: price
-      })
-    }
-
-    // Atomic cash update to prevent race conditions with concurrent group trades
-    const { data: newCash } = await supabase.rpc('adjust_cash_balance', {
+    // Server-side execution with hard constraints (approval/rationale/frequency) and atomic updates.
+    const { data: tradeExec, error: tradeExecError } = await supabase.rpc('execute_trade', {
       p_portfolio_id: portfolioId,
-      p_delta: -dollars
+      p_ticker: ticker,
+      p_side: 'buy',
+      p_dollars: dollars,
+      p_price: price,
+      p_rationale: rationale?.trim() || null,
+      p_approval_code: approvalCode ?? null
     })
-    portfolio.value.cash_balance = newCash
+    if (tradeExecError) return { success: false, error: tradeExecError.message }
+    portfolio.value.cash_balance = Number(tradeExec?.cash_balance ?? portfolio.value.cash_balance)
+    const shares = Number(tradeExec?.shares || 0)
 
     // Benchmark: buy same dollars of benchmark index
     if (bmPrice) {
@@ -607,30 +588,19 @@ export const usePortfolioStore = defineStore('portfolio', () => {
 
     const portfolioId = portfolio.value.id
 
-    // Insert trade
-    await supabase.from('trades').insert({
-      portfolio_id: portfolioId,
-      user_id: auth.currentUser.id,
-      ticker, side: 'sell', dollars, shares: sharesToSell, price,
-      rationale: rationale?.trim() || null
-    })
-
-    // Update or remove holding
-    const newShares = existing.shares - sharesToSell
-    if (newShares < 0.001) {
-      await supabase.from('holdings').delete().eq('id', existing.id)
-    } else {
-      await supabase.from('holdings')
-        .update({ shares: newShares })
-        .eq('id', existing.id)
-    }
-
-    // Atomic cash update to prevent race conditions with concurrent group trades
-    const { data: newCashSell } = await supabase.rpc('adjust_cash_balance', {
+    // Server-side execution with hard constraints (approval/rationale/frequency) and atomic updates.
+    const { data: tradeExec, error: tradeExecError } = await supabase.rpc('execute_trade', {
       p_portfolio_id: portfolioId,
-      p_delta: dollars
+      p_ticker: ticker,
+      p_side: 'sell',
+      p_dollars: dollars,
+      p_price: price,
+      p_rationale: rationale?.trim() || null,
+      p_approval_code: approvalCode ?? null
     })
-    portfolio.value.cash_balance = newCashSell
+    if (tradeExecError) return { success: false, error: tradeExecError.message }
+    portfolio.value.cash_balance = Number(tradeExec?.cash_balance ?? portfolio.value.cash_balance)
+    const executedShares = Number(tradeExec?.shares || sharesToSell)
 
     // Benchmark: sell proportional benchmark index
     if (bmPrice) {
@@ -662,7 +632,7 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     await enrichHoldings()
     version.value++
 
-    return { success: true, shares: sharesToSell, price }
+    return { success: true, shares: executedShares, price }
   }
 
   // Benchmark ticker for this portfolio (default SPY)
