@@ -55,6 +55,8 @@ export const useAuthStore = defineStore('auth', () => {
       || allMemberships.value[0]
   })
 
+  const isLoggedIn = computed(() => !!currentUser.value)
+  const isTeacher = computed(() => userType.value === 'teacher')
   const isAdmin = computed(() => {
     const role = profile.value?.role
     const email = currentUser.value?.email?.toLowerCase()
