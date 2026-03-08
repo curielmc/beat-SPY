@@ -72,6 +72,26 @@ export const useAuthStore = defineStore('auth', () => {
     return profile.value?.role || null
   })
 
+  async function ensureOwnerAdminProfile() {
+    const email = currentUser.value?.email?.toLowerCase()
+    if (email !== 'martin@myecfo.com' || profile.value?.role === 'admin') return
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .update({ role: 'admin' })
+      .eq('id', currentUser.value.id)
+      .select()
+      .single()
+
+    if (error) {
+      console.error('[AUTH] ensureOwnerAdminProfile error:', error)
+      return
+    }
+
+    profile.value = data
+    console.log('[AUTH] ensureOwnerAdminProfile: promoted owner account to admin')
+  }
+
   async function handleDisabledProfile(profileData) {
     if (!profileData?.is_disabled) return null
     const message = profileData.merge_note || 'This account has been merged into another account. Please use the surviving login.'
@@ -94,6 +114,7 @@ export const useAuthStore = defineStore('auth', () => {
         currentUser.value = session.user
         const profileResult = await fetchProfile(session.user.id)
         if (await handleDisabledProfile(profileResult)) return
+        await ensureOwnerAdminProfile()
       }
     } finally {
       loading.value = false
@@ -107,6 +128,7 @@ export const useAuthStore = defineStore('auth', () => {
         currentUser.value = session.user
         const profileResult = await fetchProfile(session.user.id)
         if (await handleDisabledProfile(profileResult)) return
+        await ensureOwnerAdminProfile()
 
         // Auto-join class if student has a pending invite and no memberships
         if (profile.value?.role === 'student' && session.user.email) {
