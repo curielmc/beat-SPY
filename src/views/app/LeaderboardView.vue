@@ -23,6 +23,10 @@
     </div>
 
     <template v-else>
+      <div v-if="errorMsg" class="alert alert-error">
+        <span>{{ errorMsg }}</span>
+      </div>
+
       <!-- S&P 500 Benchmark -->
       <div class="card bg-primary/10 border border-primary/30">
         <div class="card-body p-4 flex-row justify-between items-center">
@@ -146,7 +150,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useAuthStore } from '../../stores/auth'
 import { usePortfolioStore } from '../../stores/portfolio'
 import { useMarketDataStore } from '../../stores/marketData'
@@ -235,6 +239,7 @@ const activeMetric = ref('today')
 const loading = ref(true)
 const groups = ref([])
 const myGroupId = ref(null)
+const errorMsg = ref('')
 
 // Chart state
 const chartTimeRange = ref('3M')
@@ -283,172 +288,203 @@ const sortedGroups = computed(() => {
 })
 
 let refreshInterval = null
-onMounted(async () => {
-  const membership = await auth.getCurrentMembership()
-  myGroupId.value = membership?.group_id
+async function loadLeaderboard() {
+  if (refreshInterval) {
+    clearInterval(refreshInterval)
+    refreshInterval = null
+  }
 
-  if (!membership?.class_id) {
+  loading.value = true
+  errorMsg.value = ''
+  groups.value = []
+  myGroupId.value = null
+  benchmarkMetrics.value = {}
+  chartDatasets.value = []
+  individualDatasets.value = []
+  periodMetricsLoading.value = true
+  riskMetricsLoading.value = true
+
+  try {
+    const membership = await auth.getCurrentMembership(true)
+    myGroupId.value = membership?.group_id
+
+    if (!membership?.class_id) {
+      return
+    }
+
+    // Get all groups in this class with member names
+    const { data: groupData, error: groupError } = await supabase
+      .from('groups')
+      .select('*, memberships:class_memberships(user_id, profiles:profiles(full_name))')
+      .eq('class_id', membership.class_id)
+
+    if (groupError) {
+      throw groupError
+    }
+
+    if (!groupData?.length) {
+      return
+    }
+
+    const groupIds = groupData.map(g => g.id)
+
+    // Bulk fetch portfolios, holdings, trades
+    const { portfolios, holdingsMap, tradesMap } = await portfolioStore.getLeaderboardData(groupIds)
+
+    // Build portfolio lookup by owner_id
+    const portfolioByGroup = {}
+    for (const p of portfolios) {
+      portfolioByGroup[p.owner_id] = p
+    }
+
+    // Collect all unique tickers for batch quote fetch
+    const allTickers = new Set()
+    for (const holdings of Object.values(holdingsMap)) {
+      for (const h of holdings) allTickers.add(h.ticker)
+    }
+    allTickers.add('SPY')
+
+    // Fetch all quotes and profiles in one batch
+    await Promise.all([
+      market.fetchBatchQuotes([...allTickers]),
+      market.fetchBatchProfiles([...allTickers])
+    ])
+
+    // Phase 1: compute instant metrics
+    const enriched = []
+    for (const group of groupData) {
+      const p = portfolioByGroup[group.id]
+      const pHoldings = p ? (holdingsMap[p.id] || []) : []
+      const startingCash = p ? Number(p.starting_cash) : 100000
+      const cashBalance = p ? Number(p.cash_balance) : 100000
+
+      // Current value
+      const holdingsValue = pHoldings.reduce((sum, h) => {
+        const price = market.getCachedPrice(h.ticker) || Number(h.avg_cost)
+        return sum + (Number(h.shares) * price)
+      }, 0)
+      const totalValue = holdingsValue + cashBalance
+      const sinceInception = startingCash > 0 ? ((totalValue - startingCash) / startingCash) * 100 : 0
+
+      // Today's return
+      const quotesMap = {}
+      for (const h of pHoldings) {
+        quotesMap[h.ticker] = market.getCachedQuote(h.ticker)
+      }
+      const today = computeTodayReturn(pHoldings, quotesMap, cashBalance)
+
+      // Performance drivers (helper/hurter)
+      let topHelper = null
+      let topHurter = null
+      let maxGain = -Infinity
+      let maxLoss = Infinity
+
+      for (const h of pHoldings) {
+        const currentPrice = market.getCachedPrice(h.ticker) || Number(h.avg_cost)
+        const gainLoss = (currentPrice - Number(h.avg_cost)) * Number(h.shares)
+        const profile = market.profilesCache[h.ticker]?.data
+        const driverObj = {
+          ticker: h.ticker,
+          name: profile?.companyName || profile?.name || null
+        }
+
+        if (gainLoss > 0 && gainLoss > maxGain) {
+          maxGain = gainLoss
+          topHelper = driverObj
+        }
+        if (gainLoss < 0 && gainLoss < maxLoss) {
+          maxLoss = gainLoss
+          topHurter = driverObj
+        }
+      }
+
+      // Annualized
+      const createdAt = p?.created_at || new Date().toISOString()
+      const annualized = computeAnnualizedReturn(sinceInception, createdAt)
+
+      enriched.push({
+        ...group,
+        portfolioId: p?.id,
+        totalValue,
+        metrics: { sinceInception, today, annualized },
+        drivers: { helper: topHelper, hurter: topHurter },
+        memberNames: (group.memberships || []).map(m => m.profiles?.full_name?.split(' ')[0]).filter(Boolean),
+        holdings: pHoldings,
+        trades: p ? (tradesMap[p.id] || []) : [],
+        cashBalance,
+        startingCash,
+        createdAt
+      })
+    }
+
+    groups.value = enriched
+
+    // Benchmark Phase 1
+    const spyQuote = market.getCachedQuote('SPY')
+    if (spyQuote && spyQuote.price > 0) {
+      const benchmarkStartDate = enriched
+        .map(group => group.createdAt)
+        .filter(Boolean)
+        .sort((a, b) => new Date(a) - new Date(b))[0]
+
+      let spySinceInception = null
+      if (benchmarkStartDate) {
+        const fromStr = new Date(benchmarkStartDate).toISOString().slice(0, 10)
+        const toStr = new Date().toISOString().slice(0, 10)
+        const spyHistory = await getHistoricalDaily('SPY', fromStr, toStr)
+        const firstValidClose = spyHistory
+          ?.map(point => Number(point.close ?? point.adjClose ?? point.price))
+          .find(price => Number.isFinite(price) && price > 0)
+
+        if (firstValidClose) {
+          spySinceInception = ((spyQuote.price - firstValidClose) / firstValidClose) * 100
+        }
+      }
+
+      benchmarkMetrics.value.sinceInception = spySinceInception
+      const spyPrevClose = spyQuote.previousClose || spyQuote.price
+      benchmarkMetrics.value.today = spyPrevClose > 0 ? ((spyQuote.price - spyPrevClose) / spyPrevClose) * 100 : 0
+      benchmarkMetrics.value.annualized = spySinceInception !== null && benchmarkStartDate
+        ? computeAnnualizedReturn(spySinceInception, benchmarkStartDate)
+        : null
+    } else {
+      benchmarkMetrics.value.sinceInception = null
+      benchmarkMetrics.value.today = null
+      benchmarkMetrics.value.annualized = null
+    }
+
+    // Build chart datasets (non-blocking)
+    buildChartDatasets(enriched, portfolioByGroup, tradesMap)
+
+    // Phase 2: background — period metrics + risk-adjusted
+    computePeriodMetrics(enriched)
+    computeRiskMetrics(enriched)
+
+    // Auto-refresh prices every 5 minutes (300,000ms)
+    // Only if market is open and tab is focused to save API calls
+    refreshInterval = setInterval(async () => {
+      if (document.hidden) return
+      if (!isMarketOpen()) return
+
+      const allT = [...new Set(groups.value.flatMap(g => (g.holdings || []).map(h => h.ticker)).concat(['SPY']))]
+      if (allT.length) await market.fetchBatchQuotes(allT)
+    }, 300000)
+  } catch (error) {
+    console.error('[Leaderboard] load failed:', error)
+    errorMsg.value = error.message || 'Failed to load leaderboard'
+  } finally {
     loading.value = false
-    return
   }
+}
 
-  // Get all groups in this class with member names
-  const { data: groupData } = await supabase
-    .from('groups')
-    .select('*, memberships:class_memberships(user_id, profiles:profiles(full_name))')
-    .eq('class_id', membership.class_id)
+onMounted(loadLeaderboard)
 
-  if (!groupData?.length) {
-    loading.value = false
-    return
-  }
+watch(() => auth.masqueradeUser?.id, (next, prev) => {
+  if (next !== prev) loadLeaderboard()
+})
 
-  const groupIds = groupData.map(g => g.id)
-
-  // Bulk fetch portfolios, holdings, trades
-  const { portfolios, holdingsMap, tradesMap } = await portfolioStore.getLeaderboardData(groupIds)
-
-  // Build portfolio lookup by owner_id
-  const portfolioByGroup = {}
-  for (const p of portfolios) {
-    portfolioByGroup[p.owner_id] = p
-  }
-
-  // Collect all unique tickers for batch quote fetch
-  const allTickers = new Set()
-  for (const holdings of Object.values(holdingsMap)) {
-    for (const h of holdings) allTickers.add(h.ticker)
-  }
-  allTickers.add('SPY')
-
-  // Fetch all quotes and profiles in one batch
-  await Promise.all([
-    market.fetchBatchQuotes([...allTickers]),
-    market.fetchBatchProfiles([...allTickers])
-  ])
-
-  // Phase 1: compute instant metrics
-  const enriched = []
-  for (const group of groupData) {
-    const p = portfolioByGroup[group.id]
-    const pHoldings = p ? (holdingsMap[p.id] || []) : []
-    const startingCash = p ? Number(p.starting_cash) : 100000
-    const cashBalance = p ? Number(p.cash_balance) : 100000
-
-    // Current value
-    const holdingsValue = pHoldings.reduce((sum, h) => {
-      const price = market.getCachedPrice(h.ticker) || Number(h.avg_cost)
-      return sum + (Number(h.shares) * price)
-    }, 0)
-    const totalValue = holdingsValue + cashBalance
-    const sinceInception = startingCash > 0 ? ((totalValue - startingCash) / startingCash) * 100 : 0
-
-    // Today's return
-    const quotesMap = {}
-    for (const h of pHoldings) {
-      quotesMap[h.ticker] = market.getCachedQuote(h.ticker)
-    }
-    const today = computeTodayReturn(pHoldings, quotesMap, cashBalance)
-
-    // Performance drivers (helper/hurter)
-    let topHelper = null
-    let topHurter = null
-    let maxGain = -Infinity
-    let maxLoss = Infinity
-
-    for (const h of pHoldings) {
-      const currentPrice = market.getCachedPrice(h.ticker) || Number(h.avg_cost)
-      const gainLoss = (currentPrice - Number(h.avg_cost)) * Number(h.shares)
-      const profile = market.profilesCache[h.ticker]?.data
-      const driverObj = { 
-        ticker: h.ticker, 
-        name: profile?.companyName || profile?.name || null 
-      }
-
-      if (gainLoss > 0 && gainLoss > maxGain) {
-        maxGain = gainLoss
-        topHelper = driverObj
-      }
-      if (gainLoss < 0 && gainLoss < maxLoss) {
-        maxLoss = gainLoss
-        topHurter = driverObj
-      }
-    }
-
-    // Annualized
-    const createdAt = p?.created_at || new Date().toISOString()
-    const annualized = computeAnnualizedReturn(sinceInception, createdAt)
-
-    enriched.push({
-      ...group,
-      portfolioId: p?.id,
-      totalValue,
-      metrics: { sinceInception, today, annualized },
-      drivers: { helper: topHelper, hurter: topHurter },
-      memberNames: (group.memberships || []).map(m => m.profiles?.full_name?.split(' ')[0]).filter(Boolean),
-      holdings: pHoldings,
-      trades: p ? (tradesMap[p.id] || []) : [],
-      cashBalance,
-      startingCash,
-      createdAt
-    })
-  }
-
-  groups.value = enriched
-
-  // Benchmark Phase 1
-  const spyQuote = market.getCachedQuote('SPY')
-  if (spyQuote && spyQuote.price > 0) {
-    const benchmarkStartDate = enriched
-      .map(group => group.createdAt)
-      .filter(Boolean)
-      .sort((a, b) => new Date(a) - new Date(b))[0]
-
-    let spySinceInception = null
-    if (benchmarkStartDate) {
-      const fromStr = new Date(benchmarkStartDate).toISOString().slice(0, 10)
-      const toStr = new Date().toISOString().slice(0, 10)
-      const spyHistory = await getHistoricalDaily('SPY', fromStr, toStr)
-      const firstValidClose = spyHistory
-        ?.map(point => Number(point.close ?? point.adjClose ?? point.price))
-        .find(price => Number.isFinite(price) && price > 0)
-
-      if (firstValidClose) {
-        spySinceInception = ((spyQuote.price - firstValidClose) / firstValidClose) * 100
-      }
-    }
-
-    benchmarkMetrics.value.sinceInception = spySinceInception
-    const spyPrevClose = spyQuote.previousClose || spyQuote.price
-    benchmarkMetrics.value.today = spyPrevClose > 0 ? ((spyQuote.price - spyPrevClose) / spyPrevClose) * 100 : 0
-    benchmarkMetrics.value.annualized = spySinceInception !== null && benchmarkStartDate
-      ? computeAnnualizedReturn(spySinceInception, benchmarkStartDate)
-      : null
-  } else {
-    benchmarkMetrics.value.sinceInception = null
-    benchmarkMetrics.value.today = null
-    benchmarkMetrics.value.annualized = null
-  }
-
-  loading.value = false
-
-  // Build chart datasets (non-blocking)
-  buildChartDatasets(enriched, portfolioByGroup, tradesMap)
-
-  // Phase 2: background — period metrics + risk-adjusted
-  computePeriodMetrics(enriched)
-  computeRiskMetrics(enriched)
-
-// Auto-refresh prices every 5 minutes (300,000ms)
-// Only if market is open and tab is focused to save API calls
-refreshInterval = setInterval(async () => {
-  if (document.hidden) return
-  if (!isMarketOpen()) return
-
-  const allT = [...new Set(groups.value.flatMap(g => (g.holdings || []).map(h => h.ticker)).concat(['SPY']))]
-  if (allT.length) await market.fetchBatchQuotes(allT)
-}, 300000)
-
+watch(() => auth.activeClassId, (next, prev) => {
+  if (next !== prev) loadLeaderboard()
 })
 
 // Simple seeded random for synthetic data
