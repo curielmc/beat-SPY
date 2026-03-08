@@ -1,5 +1,44 @@
--- Extend hard trade execution to competition portfolios, move benchmark writes
--- into the RPC path, and align visibility with public-read behavior.
+-- Restore teacher class scoping, extend hard trade execution to competition
+-- portfolios, move benchmark writes into the RPC path, and align visibility
+-- with public-read behavior.
+
+-- Re-assert teacher scoping in case 006_any_teacher_access was replayed out of
+-- order on a remote environment.
+CREATE OR REPLACE FUNCTION is_teacher_of_class(class_uuid uuid)
+RETURNS boolean AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM classes
+    WHERE id = class_uuid
+      AND teacher_id = auth.uid()
+  );
+$$ LANGUAGE sql SECURITY DEFINER;
+
+DROP POLICY IF EXISTS "Teachers can manage all classes" ON classes;
+DROP POLICY IF EXISTS "Teachers can manage own classes" ON classes;
+CREATE POLICY "Teachers can manage own classes" ON classes
+  FOR ALL
+  USING (
+    teacher_id = auth.uid() OR is_admin()
+  )
+  WITH CHECK (
+    teacher_id = auth.uid() OR is_admin()
+  );
+
+DROP POLICY IF EXISTS "Teachers can read students in their classes" ON profiles;
+CREATE POLICY "Teachers can read students in their classes" ON profiles
+  FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM class_memberships cm
+      JOIN classes c ON c.id = cm.class_id
+      WHERE cm.user_id = profiles.id
+        AND c.teacher_id = auth.uid()
+    )
+    OR id = auth.uid()
+    OR is_admin()
+  );
 
 CREATE OR REPLACE FUNCTION execute_trade(
   p_portfolio_id uuid,
@@ -30,8 +69,8 @@ DECLARE
   v_shares numeric;
   v_new_shares numeric;
   v_ticker text;
-  v_comp_entry competition_entries%ROWTYPE;
-  v_competition competitions%ROWTYPE;
+  v_competition_id uuid;
+  v_comp_status text;
   v_comp_rules jsonb;
   v_holdings_count integer;
   v_current_position_value numeric;
@@ -145,30 +184,39 @@ BEGIN
       RAISE EXCEPTION 'Not authorized for this competition portfolio';
     END IF;
 
-    SELECT *
-    INTO v_comp_entry
-    FROM competition_entries
-    WHERE portfolio_id = p_portfolio_id
-      AND user_id = v_uid;
+    IF to_regclass('public.competition_entries') IS NULL OR to_regclass('public.competitions') IS NULL THEN
+      RAISE EXCEPTION 'Competition tables are not available in this environment';
+    END IF;
 
-    IF NOT FOUND THEN
+    EXECUTE
+      'SELECT competition_id
+       FROM public.competition_entries
+       WHERE portfolio_id = $1 AND user_id = $2
+       LIMIT 1'
+    INTO v_competition_id
+    USING p_portfolio_id, v_uid;
+
+    IF v_competition_id IS NULL THEN
       RAISE EXCEPTION 'Competition entry not found';
     END IF;
 
-    SELECT *
-    INTO v_competition
-    FROM competitions
-    WHERE id = v_comp_entry.competition_id;
+    EXECUTE
+      'SELECT status, rules
+       FROM public.competitions
+       WHERE id = $1
+       LIMIT 1'
+    INTO v_comp_status, v_comp_rules
+    USING v_competition_id;
 
-    IF NOT FOUND THEN
+    IF v_comp_status IS NULL THEN
       RAISE EXCEPTION 'Competition not found';
     END IF;
 
-    IF v_competition.status <> 'active' THEN
+    IF v_comp_status <> 'active' THEN
       RAISE EXCEPTION 'Competition is not active';
     END IF;
 
-    v_comp_rules := COALESCE(v_competition.rules, '{}'::jsonb);
+    v_comp_rules := COALESCE(v_comp_rules, '{}'::jsonb);
   ELSE
     RAISE EXCEPTION 'Unsupported portfolio owner type';
   END IF;
