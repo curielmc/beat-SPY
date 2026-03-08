@@ -55,10 +55,20 @@ export const useAuthStore = defineStore('auth', () => {
       || allMemberships.value[0]
   })
 
-  const isLoggedIn = computed(() => !!currentUser.value)
-  const userType = computed(() => profile.value?.role || null)
-  const isTeacher = computed(() => profile.value?.role === 'teacher')
-  const isAdmin = computed(() => profile.value?.role === 'admin')
+  const isAdmin = computed(() => {
+    const role = profile.value?.role
+    const email = currentUser.value?.email?.toLowerCase()
+    // Hardcoded fallback for the owner to prevent lockouts
+    if (email === 'martin@myecfo.com') return true
+    return role === 'admin'
+  })
+
+  // Also update userType to reflect the hardcoded admin status
+  const userType = computed(() => {
+    const email = currentUser.value?.email?.toLowerCase()
+    if (email === 'martin@myecfo.com') return 'admin'
+    return profile.value?.role || null
+  })
 
   async function handleDisabledProfile(profileData) {
     if (!profileData?.is_disabled) return null
