@@ -37,6 +37,9 @@
       <button class="btn btn-primary btn-sm" :disabled="!bulkRole || bulkUpdating" @click="applyBulkRole">
         {{ bulkUpdating ? 'Applying...' : 'Apply' }}
       </button>
+      <button class="btn btn-warning btn-sm" :disabled="selectedIds.size !== 2" @click="openMergeModal">
+        Merge Selected
+      </button>
       <button class="btn btn-ghost btn-sm" @click="clearSelection">Clear</button>
     </div>
 
@@ -78,10 +81,13 @@
                     </span>
                     {{ user.full_name }}
                   </span>
+                  <div v-if="user.is_disabled" class="text-xs text-warning mt-1">
+                    Merged / disabled{{ user.merge_note ? `: ${user.merge_note}` : '' }}
+                  </div>
                 </td>
                 <td class="text-sm">{{ user.email }}</td>
                 <td>
-                  <select :value="user.role" class="select select-bordered select-xs" @change="changeRole(user.id, $event.target.value)">
+                  <select :value="user.role" class="select select-bordered select-xs" :disabled="user.is_disabled" @change="changeRole(user.id, $event.target.value)">
                     <option value="student">Student</option>
                     <option value="teacher">Teacher</option>
                     <option value="admin">Admin</option>
@@ -89,11 +95,11 @@
                 </td>
                 <td class="text-sm text-base-content/60">{{ new Date(user.created_at).toLocaleDateString() }}</td>
                 <td class="flex gap-1">
-                  <button v-if="user.role === 'student' || user.role === 'teacher'" class="btn btn-ghost btn-xs text-primary gap-1" @click="masqueradeAs(user)">
+                  <button v-if="!user.is_disabled && (user.role === 'student' || user.role === 'teacher')" class="btn btn-ghost btn-xs text-primary gap-1" @click="masqueradeAs(user)">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
                     View as {{ user.full_name?.split(' ')[0] }}
                   </button>
-                  <button class="btn btn-ghost btn-xs text-error" @click="confirmDelete(user)">Delete</button>
+                  <button class="btn btn-ghost btn-xs text-error" :disabled="user.is_disabled" @click="confirmDelete(user)">Delete</button>
                 </td>
               </tr>
               <tr v-if="filteredUsers.length === 0">
@@ -118,6 +124,49 @@
       <form method="dialog" class="modal-backdrop" @click="showDeleteModal = false"><button>close</button></form>
     </dialog>
 
+    <dialog class="modal" :class="{ 'modal-open': showMergeModal }">
+      <div class="modal-box">
+        <h3 class="font-bold text-lg">Merge User Accounts</h3>
+        <p class="py-2 text-sm text-base-content/70">
+          Move the source account's memberships, portfolios, trades, progress, and most user-linked records into the target account, then disable the source account.
+        </p>
+        <div class="space-y-4">
+          <label class="form-control">
+            <span class="label-text font-medium mb-1">Source account to merge from</span>
+            <select v-model="mergeSourceId" class="select select-bordered">
+              <option disabled value="">Select source account</option>
+              <option v-for="user in mergeCandidates" :key="user.id" :value="user.id">
+                {{ user.full_name }} · {{ user.email }}
+              </option>
+            </select>
+          </label>
+          <label class="form-control">
+            <span class="label-text font-medium mb-1">Target account to keep</span>
+            <select v-model="mergeTargetId" class="select select-bordered">
+              <option disabled value="">Select target account</option>
+              <option v-for="user in mergeCandidates" :key="user.id" :value="user.id">
+                {{ user.full_name }} · {{ user.email }}
+              </option>
+            </select>
+          </label>
+          <label class="form-control">
+            <span class="label-text font-medium mb-1">Admin note</span>
+            <textarea v-model="mergeNote" class="textarea textarea-bordered" rows="3" placeholder="Optional note about why these accounts were merged"></textarea>
+          </label>
+          <div class="text-xs text-base-content/60">
+            The source account will be disabled after merge. The auth login itself is not deleted automatically.
+          </div>
+        </div>
+        <div class="modal-action">
+          <button class="btn btn-ghost" @click="closeMergeModal">Cancel</button>
+          <button class="btn btn-warning" :disabled="!canSubmitMerge || mergeLoading" @click="mergeUsers">
+            {{ mergeLoading ? 'Merging...' : 'Merge Accounts' }}
+          </button>
+        </div>
+      </div>
+      <form method="dialog" class="modal-backdrop" @click="closeMergeModal"><button>close</button></form>
+    </dialog>
+
     <div v-if="successMsg" class="alert alert-success fixed bottom-4 right-4 w-auto z-50">
       <span>{{ successMsg }}</span>
     </div>
@@ -136,11 +185,16 @@ const search = ref('')
 const roleFilter = ref('')
 const loading = ref(true)
 const showDeleteModal = ref(false)
+const showMergeModal = ref(false)
 const deleteTarget = ref(null)
 const successMsg = ref('')
 const selectedIds = ref(new Set())
 const bulkRole = ref('')
 const bulkUpdating = ref(false)
+const mergeSourceId = ref('')
+const mergeTargetId = ref('')
+const mergeNote = ref('')
+const mergeLoading = ref(false)
 
 onMounted(async () => {
   await fetchUsers()
@@ -177,6 +231,13 @@ const filteredUsers = computed(() => {
 
 const allSelected = computed(() => filteredUsers.value.length > 0 && filteredUsers.value.every(u => selectedIds.value.has(u.id)))
 const someSelected = computed(() => filteredUsers.value.some(u => selectedIds.value.has(u.id)))
+const mergeCandidates = computed(() => users.value.filter(u => selectedIds.value.has(u.id) && !u.is_disabled))
+const canSubmitMerge = computed(() =>
+  mergeCandidates.value.length === 2 &&
+  !!mergeSourceId.value &&
+  !!mergeTargetId.value &&
+  mergeSourceId.value !== mergeTargetId.value
+)
 
 function toggleAll() {
   if (allSelected.value) {
@@ -199,6 +260,20 @@ function toggleUser(id) {
 function clearSelection() {
   selectedIds.value = new Set()
   bulkRole.value = ''
+}
+
+function openMergeModal() {
+  const candidates = mergeCandidates.value
+  if (candidates.length !== 2) return
+  mergeSourceId.value = candidates[0].id
+  mergeTargetId.value = candidates[1].id
+  mergeNote.value = ''
+  showMergeModal.value = true
+}
+
+function closeMergeModal() {
+  showMergeModal.value = false
+  mergeLoading.value = false
 }
 
 async function applyBulkRole() {
@@ -234,6 +309,27 @@ async function deleteUser() {
   users.value = users.value.filter(u => u.id !== deleteTarget.value.id)
   showDeleteModal.value = false
   showSuccess('User deleted')
+}
+
+async function mergeUsers() {
+  if (!canSubmitMerge.value) return
+  mergeLoading.value = true
+  const { data, error } = await supabase.rpc('merge_user_accounts', {
+    p_source_user_id: mergeSourceId.value,
+    p_target_user_id: mergeTargetId.value,
+    p_note: mergeNote.value.trim() || null
+  })
+
+  mergeLoading.value = false
+  if (error) {
+    showSuccess(`Merge failed: ${error.message}`)
+    return
+  }
+
+  await fetchUsers()
+  clearSelection()
+  closeMergeModal()
+  showSuccess(`Merged account successfully${data?.trades_reassigned != null ? ` · ${data.trades_reassigned} trades reassigned` : ''}`)
 }
 
 function exportCSV() {

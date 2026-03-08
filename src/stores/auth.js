@@ -60,6 +60,15 @@ export const useAuthStore = defineStore('auth', () => {
   const isTeacher = computed(() => profile.value?.role === 'teacher')
   const isAdmin = computed(() => profile.value?.role === 'admin')
 
+  async function handleDisabledProfile(profileData) {
+    if (!profileData?.is_disabled) return null
+    const message = profileData.merge_note || 'This account has been merged into another account. Please use the surviving login.'
+    await supabase.auth.signOut()
+    currentUser.value = null
+    profile.value = null
+    return { error: message }
+  }
+
   // Initialize auth state from session
   async function init() {
     if (initialized.value) return
@@ -71,7 +80,8 @@ export const useAuthStore = defineStore('auth', () => {
       console.log('[AUTH] init: getSession result:', { hasSession: !!session, userId: session?.user?.id, expiresAt: session?.expires_at, error: sessionErr })
       if (session?.user) {
         currentUser.value = session.user
-        await fetchProfile(session.user.id)
+        const profileResult = await fetchProfile(session.user.id)
+        if (await handleDisabledProfile(profileResult)) return
       }
     } finally {
       loading.value = false
@@ -83,7 +93,8 @@ export const useAuthStore = defineStore('auth', () => {
       console.log('[AUTH] onAuthStateChange:', event, { hasSession: !!session, userId: session?.user?.id })
       if (event === 'SIGNED_IN' && session?.user) {
         currentUser.value = session.user
-        await fetchProfile(session.user.id)
+        const profileResult = await fetchProfile(session.user.id)
+        if (await handleDisabledProfile(profileResult)) return
 
         // Auto-join class if student has a pending invite and no memberships
         if (profile.value?.role === 'student' && session.user.email) {
@@ -151,7 +162,9 @@ export const useAuthStore = defineStore('auth', () => {
     })
     if (error) return { error: error.message }
     currentUser.value = data.user
-    await fetchProfile(data.user.id)
+    const profileResult = await fetchProfile(data.user.id)
+    const disabled = await handleDisabledProfile(profileResult)
+    if (disabled) return disabled
     return { user: data.user }
   }
 
