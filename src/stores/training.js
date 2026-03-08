@@ -169,13 +169,77 @@ export const useTrainingStore = defineStore('training', () => {
 
     if (!error) {
       classTutorials.value = classTutorials.value.filter(
-        ct => ct.training_tutorial_id !== tutorialId
+        ct => ct.training_tutorial_id !== tutorial_id
       )
     }
     return !error
-  }
+    }
 
-  return {
+    // Admin: Create or update a tutorial
+    async function saveTutorial(tutorial) {
+    const { data, error } = await supabase
+      .from('training_tutorials')
+      .upsert({
+        id: tutorial.id || undefined,
+        title: tutorial.title,
+        slug: tutorial.slug,
+        description: tutorial.description,
+        category: tutorial.category,
+        status: tutorial.status,
+        position: tutorial.position || 0
+      })
+      .select()
+      .single()
+
+    if (!error && data) {
+      await fetchTutorials()
+    }
+    return { data, error }
+    }
+
+    // Admin: Delete a tutorial
+    async function deleteTutorial(id) {
+    const { error } = await supabase
+      .from('training_tutorials')
+      .delete()
+      .eq('id', id)
+
+    if (!error) {
+      tutorials.value = tutorials.value.filter(t => t.id !== id)
+    }
+    return !error
+    }
+
+    // Admin: Save a step
+    async function saveStep(step) {
+    const { data, error } = await supabase
+      .from('training_steps')
+      .upsert({
+        id: step.id || undefined,
+        training_tutorial_id: step.training_tutorial_id,
+        title: step.title,
+        slug: step.slug,
+        content: step.content,
+        position: step.position || 0,
+        duration_minutes: step.duration_minutes || 5
+      })
+      .select()
+      .single()
+
+    return { data, error }
+    }
+
+    // Admin: Delete a step
+    async function deleteStep(id) {
+    const { error } = await supabase
+      .from('training_steps')
+      .delete()
+      .eq('id', id)
+
+    return !error
+    }
+
+    return {
     tutorials,
     currentTutorial,
     currentStep,
@@ -190,6 +254,10 @@ export const useTrainingStore = defineStore('training', () => {
     tutorialProgress,
     fetchClassTutorials,
     assignTutorialToClass,
-    removeTutorialFromClass
-  }
-})
+    removeTutorialFromClass,
+    saveTutorial,
+    deleteTutorial,
+    saveStep,
+    deleteStep
+    }
+    })

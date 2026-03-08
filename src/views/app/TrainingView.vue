@@ -58,18 +58,39 @@
 import { ref, computed, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useTrainingStore } from '../../stores/training'
+import { useAuthStore } from '../../stores/auth'
 
 const store = useTrainingStore()
+const authStore = useAuthStore()
 const categoryFilter = ref(null)
 
 const filtered = computed(() => {
-  if (!categoryFilter.value) return store.tutorials
-  return store.tutorials.filter(t => t.category === categoryFilter.value)
+  // If student is in a class, only show tutorials assigned to that class
+  // Otherwise, show nothing or all active (depending on preference)
+  // Here we filter store.tutorials by the IDs found in store.classTutorials
+  const assignedIds = new Set(store.classTutorials.map(ct => ct.training_tutorial_id))
+  
+  let base = store.tutorials
+  if (assignedIds.size > 0) {
+    base = store.tutorials.filter(t => assignedIds.has(t.id))
+  } else {
+    // If no tutorials assigned to class yet, show nothing for students
+    return []
+  }
+
+  if (!categoryFilter.value) return base
+  return base.filter(t => t.category === categoryFilter.value)
 })
 
 function formatCategory(cat) {
   return cat.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())
 }
 
-onMounted(() => store.fetchTutorials())
+onMounted(async () => {
+  await store.fetchTutorials()
+  const membership = await authStore.getCurrentMembership()
+  if (membership?.class_id) {
+    await store.fetchClassTutorials(membership.class_id)
+  }
+})
 </script>
