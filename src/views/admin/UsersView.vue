@@ -25,6 +25,10 @@
       </select>
     </div>
 
+    <div v-if="errorMsg" class="alert alert-error">
+      <span>{{ errorMsg }}</span>
+    </div>
+
     <!-- Bulk Action Bar -->
     <div v-if="selectedIds.size > 0" class="flex items-center gap-3 bg-primary/10 rounded-lg px-4 py-2">
       <span class="font-semibold text-sm">{{ selectedIds.size }} selected</span>
@@ -195,6 +199,7 @@ const mergeSourceId = ref('')
 const mergeTargetId = ref('')
 const mergeNote = ref('')
 const mergeLoading = ref(false)
+const errorMsg = ref('')
 
 onMounted(async () => {
   await fetchUsers()
@@ -210,9 +215,34 @@ function masqueradeAs(user) {
 
 async function fetchUsers() {
   loading.value = true
-  const { data } = await supabase.from('profiles').select('*').order('created_at', { ascending: false })
-  users.value = data || []
-  loading.value = false
+  errorMsg.value = ''
+
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    const accessToken = session?.access_token
+    if (!accessToken) {
+      throw new Error('Your admin session is missing. Please sign out and back in.')
+    }
+
+    const response = await fetch('/api/admin-users', {
+      headers: {
+        Authorization: `Bearer ${accessToken}`
+      }
+    })
+
+    const payload = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      throw new Error(payload.error || 'Failed to load users')
+    }
+
+    users.value = payload.users || []
+  } catch (error) {
+    console.error('[Admin Users] fetchUsers failed:', error)
+    users.value = []
+    errorMsg.value = error.message || 'Failed to load users'
+  } finally {
+    loading.value = false
+  }
 }
 
 const filteredUsers = computed(() => {
