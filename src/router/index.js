@@ -35,6 +35,9 @@ const router = createRouter({
         { path: 'portfolio-history', name: 'portfolio-history', component: () => import('../views/app/PortfolioHistoryView.vue') },
         { path: 'sp500', name: 'sp500', component: () => import('../views/app/SP500View.vue') },
         { path: 'messages', name: 'student-messages', component: () => import('../views/app/MessagesView.vue') },
+        { path: 'training', name: 'training', component: () => import('../views/app/TrainingView.vue') },
+        { path: 'training/:slug', name: 'training-detail', component: () => import('../views/app/TrainingCourseView.vue') },
+        { path: 'training/:slug/:moduleSlug', name: 'training-module', component: () => import('../views/app/TrainingModuleView.vue') },
         { path: 'settings', name: 'profile-settings', component: () => import('../views/app/ProfileSettingsView.vue') },
         { path: 'team-settings', name: 'team-settings', component: () => import('../views/app/TeamSettingsView.vue') }
       ]
