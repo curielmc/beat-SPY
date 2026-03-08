@@ -207,7 +207,10 @@
                   <td class="text-right font-mono">{{ stock.divYieldPct ? fmt(stock.divYieldPct, 2) + '%' : '-' }}</td>
                   <td class="text-right font-mono">{{ stock.volume ? fmtNum(stock.volume) : '-' }}</td>
                   <td class="text-right font-mono">{{ stock.beta ? fmt(stock.beta, 2) : '-' }}</td>
-                  <td class="text-xs">{{ stock.sector || '-' }}</td>
+                  <td class="text-xs">
+                    <SectorLabel v-if="stock.sector" :sector="stock.sector" size="xs" />
+                    <span v-else>-</span>
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -222,6 +225,7 @@
 import { ref, reactive, computed } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { useMarketDataStore } from '../../stores/marketData'
+import SectorLabel from '../../components/SectorLabel.vue'
 
 const router = useRouter()
 const market = useMarketDataStore()

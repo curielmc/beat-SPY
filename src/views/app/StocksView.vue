@@ -28,7 +28,7 @@
           <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
         </label>
         <ul tabindex="0" class="dropdown-content z-50 menu p-2 shadow bg-base-100 rounded-box w-56 max-h-60 overflow-y-auto">
-          <li v-for="s in sectorOptions" :key="s"><a @click="setFilter('sector', s)" :class="{ 'active': activeFilters.sector === s }">{{ s }}</a></li>
+          <li v-for="s in sectorOptions" :key="s"><a @click="setFilter('sector', s)" :class="{ 'active': activeFilters.sector === s }"><SectorLabel :sector="s" size="xs" /></a></li>
         </ul>
       </div>
 
@@ -86,7 +86,7 @@
     <!-- Active filter badges -->
     <div v-if="hasActiveFilters" class="flex flex-wrap gap-2">
       <span v-if="activeFilters.sector" class="badge badge-primary gap-1">
-        {{ activeFilters.sector }}
+        <SectorLabel :sector="activeFilters.sector" size="xs" />
         <button class="btn btn-ghost btn-xs px-0" @click="removeFilter('sector')">&#10005;</button>
       </span>
       <span v-if="activeFilters.size" class="badge badge-primary gap-1">
@@ -159,7 +159,7 @@
               <p class="font-bold">{{ stock.symbol }}</p>
               <p class="text-xs text-base-content/60">{{ stock.companyName }}</p>
               <div class="flex gap-1 mt-1">
-                <span v-if="stock.sector" class="badge badge-ghost badge-xs">{{ stock.sector }}</span>
+                <span v-if="stock.sector" class="badge badge-ghost badge-xs"><SectorLabel :sector="stock.sector" size="xs" /></span>
                 <span v-if="stock.exchangeShortName" class="badge badge-ghost badge-xs">{{ stock.exchangeShortName }}</span>
               </div>
             </div>
@@ -461,6 +461,7 @@ import { usePortfolioStore } from '../../stores/portfolio'
 import { useAuthStore } from '../../stores/auth'
 import { useBasketsStore } from '../../stores/baskets'
 import { useCompetitionsStore } from '../../stores/competitions'
+import SectorLabel from '../../components/SectorLabel.vue'
 
 const market = useMarketDataStore()
 const portfolioStore = usePortfolioStore()

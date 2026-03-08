@@ -81,7 +81,7 @@
           <div v-for="sector in sectorDetails" :key="sector.name" class="card bg-base-100 shadow-sm border border-base-300">
             <div class="card-body p-3">
               <div class="flex justify-between items-start">
-                <h3 class="font-semibold text-sm">{{ sector.name }}</h3>
+                <h3 class="font-semibold text-sm"><SectorLabel :sector="sector.name" size="xs" /></h3>
                 <span class="badge badge-primary badge-sm">{{ sector.weight.toFixed(1) }}%</span>
               </div>
               <p class="text-xs text-base-content/50 mt-1">{{ sector.count }} companies</p>
@@ -183,7 +183,10 @@
                   </RouterLink>
                 </td>
                 <td class="max-w-[200px] truncate">{{ stock.name }}</td>
-                <td class="text-xs">{{ stock.sector || '—' }}</td>
+                <td class="text-xs">
+                  <SectorLabel v-if="stock.sector" :sector="stock.sector" size="xs" />
+                  <span v-else>—</span>
+                </td>
                 <td class="text-right font-mono">{{ stock.weightPercentage?.toFixed(2) }}%</td>
                 <td class="text-right font-mono">${{ stock.price?.toFixed(2) || '—' }}</td>
                 <td class="text-right font-mono" :class="(stock.changesPercentage || 0) >= 0 ? 'text-success' : 'text-error'">
@@ -232,6 +235,7 @@ import { RouterLink } from 'vue-router'
 import PortfolioLineChart from '../../components/charts/PortfolioLineChart.vue'
 import PortfolioPieChart from '../../components/charts/PortfolioPieChart.vue'
 import TimeRangeSelector from '../../components/charts/TimeRangeSelector.vue'
+import SectorLabel from '../../components/SectorLabel.vue'
 import { useMarketDataStore } from '../../stores/marketData'
 import {
   getQuote,

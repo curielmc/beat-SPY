@@ -36,8 +36,7 @@
                 <tbody>
                   <tr v-for="row in aggregateSectors" :key="row.sector">
                     <td class="flex items-center gap-2">
-                      <span class="inline-block w-3 h-3 rounded-full flex-shrink-0" :style="{ backgroundColor: row.color }"></span>
-                      {{ row.sector }}
+                      <SectorLabel :sector="row.sector" :color="row.color" />
                     </td>
                     <td class="text-right">${{ row.dollars.toLocaleString() }}</td>
                     <td class="text-right font-semibold">{{ row.pct.toFixed(1) }}%</td>
@@ -89,10 +88,7 @@
             <div class="space-y-2">
               <div v-for="row in activeGroupData.sectors" :key="row.sector" class="space-y-1">
                 <div class="flex justify-between text-sm">
-                  <span class="flex items-center gap-2">
-                    <span class="inline-block w-2.5 h-2.5 rounded-full" :style="{ backgroundColor: row.color }"></span>
-                    {{ row.sector }}
-                  </span>
+                    <SectorLabel :sector="row.sector" :color="row.color" />
                   <span class="text-base-content/60">${{ row.dollars.toLocaleString() }} · {{ row.pct.toFixed(1) }}%</span>
                 </div>
                 <div class="w-full bg-base-200 rounded-full h-2">
@@ -126,7 +122,7 @@
               <tbody>
                 <tr v-for="s in overlappingStocks" :key="s.ticker">
                   <td class="font-bold">{{ s.ticker }}</td>
-                  <td class="text-base-content/60 text-xs">{{ s.sector }}</td>
+                  <td class="text-base-content/60 text-xs"><SectorLabel :sector="s.sector" size="xs" /></td>
                   <td>
                     <div class="flex flex-wrap gap-1">
                       <span v-for="g in s.groups" :key="g" class="badge badge-sm badge-primary badge-outline">{{ g }}</span>
@@ -237,6 +233,7 @@ import { ref, computed, onMounted } from 'vue'
 import { supabase } from '../../lib/supabase'
 import { getBatchProfiles } from '../../services/fmpApi'
 import PortfolioPieChart from '../../components/charts/PortfolioPieChart.vue'
+import SectorLabel from '../../components/SectorLabel.vue'
 import { useTeacherStore } from '../../stores/teacher'
 
 const teacherStore = useTeacherStore()

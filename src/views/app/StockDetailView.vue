@@ -66,7 +66,7 @@
                 </span>
               </div>
               <div class="flex gap-1">
-                <span v-if="companyProfile?.sector" class="badge badge-ghost">{{ companyProfile.sector }}</span>
+                <span v-if="companyProfile?.sector" class="badge badge-ghost gap-1"><SectorLabel :sector="companyProfile.sector" size="xs" /></span>
               </div>
             </div>
             <StockChart
@@ -359,6 +359,7 @@ import { useAuthStore } from '../../stores/auth'
 import { useSocialStore } from '../../stores/social'
 import { useCompetitionsStore } from '../../stores/competitions'
 import TakeCard from '../../components/TakeCard.vue'
+import SectorLabel from '../../components/SectorLabel.vue'
 
 const route = useRoute()
 const router = useRouter()
