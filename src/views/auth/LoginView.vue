@@ -58,6 +58,7 @@ async function handleLogin() {
 
   // Route based on role
   const role = auth.profile?.role
+  console.log('[Login] Success. Role:', role, 'Profile:', auth.profile)
   if (role === 'admin') router.push('/admin')
   else if (role === 'teacher') router.push('/teacher')
   else router.push('/leaderboard')
