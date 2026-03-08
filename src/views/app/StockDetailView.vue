@@ -464,6 +464,7 @@ onMounted(async () => {
       if (entry) {
         activeComp.value = comp
         activeCompEntry.value = entry
+        await portfolioStore.loadPortfolioById(entry.portfolio_id)
         break
       }
     }

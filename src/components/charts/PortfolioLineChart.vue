@@ -46,7 +46,7 @@ const COLORS = {
 }
 
 function getCutoffDate(range) {
-  const now = new Date('2026-02-27')
+  const now = new Date()
   switch (range) {
     case '1D': return new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1)
     case '1W': return new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7)
@@ -73,9 +73,7 @@ const chartData = computed(() => ({
     const color = COLORS[colorKey] || colorKey
     let data
     if (props.showPercentage) {
-      // Use starting cash (100000) as baseline for consistent % return calculation
-      // NOT the first data point, which could be mid-trading
-      const baseline = 100000
+      const baseline = Number(ds.baseline ?? ds.data?.[0]?.value ?? 100000)
       data = ds.data.map(d => ({ x: d.date, y: ((d.value - baseline) / baseline) * 100 }))
     } else {
       data = ds.data.map(d => ({ x: d.date, y: d.value }))

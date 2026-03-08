@@ -460,11 +460,13 @@ import { useMarketDataStore } from '../../stores/marketData'
 import { usePortfolioStore } from '../../stores/portfolio'
 import { useAuthStore } from '../../stores/auth'
 import { useBasketsStore } from '../../stores/baskets'
+import { useCompetitionsStore } from '../../stores/competitions'
 
 const market = useMarketDataStore()
 const portfolioStore = usePortfolioStore()
 const auth = useAuthStore()
 const basketsStore = useBasketsStore()
+const competitionsStore = useCompetitionsStore()
 
 const searchQuery = ref('')
 const displayStocks = ref([])
@@ -533,6 +535,18 @@ onMounted(async () => {
     requiresApproval.value = true
   }
   basketRationaleRequired.value = membership?.class?.restrictions?.requireRationale !== false
+
+  if (auth.isLoggedIn) {
+    const comps = await competitionsStore.fetchCompetitions('active')
+    for (const comp of comps) {
+      const detail = await competitionsStore.fetchCompetition(comp.id)
+      const entry = detail?.entries?.find(e => e.user_id === auth.currentUser.id)
+      if (entry) {
+        await portfolioStore.loadPortfolioById(entry.portfolio_id)
+        break
+      }
+    }
+  }
 })
 
 const sectorOptions = [

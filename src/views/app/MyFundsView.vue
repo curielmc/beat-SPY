@@ -38,7 +38,7 @@
             </span>
           </div>
           <div class="flex justify-between text-sm">
-            <span class="text-base-content/60">vs SPY</span>
+            <span class="text-base-content/60">vs {{ personalData._benchmarkLabel || 'SPY' }}</span>
             <span class="font-mono" :class="personalData._vsSpy >= 0 ? 'text-success' : 'text-error'">
               {{ personalData._vsSpy >= 0 ? '+' : '' }}{{ personalData._vsSpy.toFixed(2) }}%
             </span>
@@ -76,7 +76,7 @@
                 </span>
               </div>
               <div class="flex justify-between text-sm">
-                <span class="text-base-content/60">vs SPY</span>
+                <span class="text-base-content/60">vs {{ fund._benchmarkLabel || 'SPY' }}</span>
                 <span class="font-mono" :class="fund._vsSpy >= 0 ? 'text-success' : 'text-error'">
                   {{ fund._vsSpy >= 0 ? '+' : '' }}{{ fund._vsSpy.toFixed(2) }}%
                 </span>
@@ -95,7 +95,7 @@
       <div class="card-body p-4">
         <h3 class="font-semibold mb-2 flex items-center gap-2">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" /></svg>
-          All Funds vs S&P 500
+          All Funds vs {{ comparisonBenchmarkLabel }}
         </h3>
         <PortfolioLineChart
           :datasets="comparisonDatasets"
@@ -121,7 +121,7 @@
                 <th class="text-right">Starting</th>
                 <th class="text-right">Current</th>
                 <th class="text-right">Return</th>
-                <th class="text-right">vs SPY</th>
+                <th class="text-right">vs Benchmark</th>
               </tr>
             </thead>
             <tbody>
@@ -165,6 +165,7 @@ import { useAuthStore } from '../../stores/auth'
 import { useMarketDataStore } from '../../stores/marketData'
 import PortfolioLineChart from '../../components/charts/PortfolioLineChart.vue'
 import { supabase } from '../../lib/supabase'
+import { getHistoricalDaily } from '../../services/fmpApi'
 
 const portfolioStore = usePortfolioStore()
 const auth = useAuthStore()
@@ -175,6 +176,7 @@ const personalPortfolio = ref(null)
 const personalData = ref({ _totalValue: 0, _returnPct: 0, _bmReturnPct: 0, _vsSpy: 0 })
 const groupEnriched = ref([])
 const comparisonDatasets = ref([])
+const comparisonBenchmarkLabel = ref('SPY')
 const groupName = ref('')
 
 const allFundsEnriched = computed(() => {
@@ -218,7 +220,8 @@ async function enrichFund(fund) {
     _totalValue: totalValue,
     _returnPct: returnPct,
     _bmReturnPct: bmReturnPct,
-    _vsSpy: returnPct - bmReturnPct
+    _vsSpy: returnPct - bmReturnPct,
+    _benchmarkLabel: fund.benchmark_ticker || 'SPY'
   }
 }
 
@@ -254,7 +257,7 @@ onMounted(async () => {
     }
 
     // Build comparison chart
-    buildComparisonChart()
+    await buildComparisonChart()
   } finally {
     loading.value = false
   }
@@ -262,8 +265,9 @@ onMounted(async () => {
 
 const FUND_COLORS = ['primary', 'secondary', 'accent', 'info', 'success', 'warning']
 
-function buildComparisonChart() {
+async function buildComparisonChart() {
   const datasets = []
+  const benchmarkTickers = new Set()
   let colorIdx = 0
 
   // Add personal portfolio
@@ -273,8 +277,10 @@ function buildComparisonChart() {
     datasets.push({
       label: auth.profile?.full_name || 'Personal',
       data: synth,
-      color: FUND_COLORS[colorIdx++ % FUND_COLORS.length]
+      color: FUND_COLORS[colorIdx++ % FUND_COLORS.length],
+      baseline: startCash
     })
+    benchmarkTickers.add(personalData.value._benchmarkLabel || 'SPY')
   }
 
   // Add group funds
@@ -285,20 +291,53 @@ function buildComparisonChart() {
     datasets.push({
       label,
       data: synth,
-      color: FUND_COLORS[colorIdx++ % FUND_COLORS.length]
+      color: FUND_COLORS[colorIdx++ % FUND_COLORS.length],
+      baseline: startCash
     })
+    benchmarkTickers.add(fund._benchmarkLabel || 'SPY')
   }
 
-  if (datasets.length === 0) return
+  if (datasets.length === 0) {
+    comparisonDatasets.value = []
+    comparisonBenchmarkLabel.value = 'SPY'
+    return
+  }
 
-  // Add SPY line using first fund's baseline
-  const firstItem = personalPortfolio.value || groupEnriched.value[0]
-  if (firstItem) {
-    const startCash = Number(firstItem.starting_cash || 100000)
-    const bmReturnPct = personalPortfolio.value ? personalData.value._bmReturnPct : (groupEnriched.value[0]?._bmReturnPct || 0)
-    const spyEnd = startCash * (1 + bmReturnPct / 100)
-    const synthSpy = generateSyntheticHistory(firstItem.created_at, null, startCash, spyEnd, 'spy-funds')
-    datasets.push({ label: 'SPY', data: synthSpy, color: 'sp500' })
+  const funds = [
+    ...(personalPortfolio.value ? [{ ...personalPortfolio.value, ...personalData.value }] : []),
+    ...groupEnriched.value
+  ]
+  const firstItem = funds[0]
+  const fromStr = new Date(firstItem.created_at).toISOString().slice(0, 10)
+  const toStr = new Date().toISOString().slice(0, 10)
+  const benchmarkList = [...benchmarkTickers].filter(Boolean)
+
+  comparisonBenchmarkLabel.value = benchmarkList.length === 1 ? benchmarkList[0] : 'Benchmarks'
+
+  for (const ticker of benchmarkList) {
+    const rawHistory = await getHistoricalDaily(ticker, fromStr, toStr)
+    if (!Array.isArray(rawHistory) || rawHistory.length === 0) continue
+
+    const normalized = rawHistory
+      .map(item => ({
+        date: new Date(item.date),
+        close: Number(item.close ?? item.adjClose ?? item.price)
+      }))
+      .filter(item => !Number.isNaN(item.date.getTime()) && Number.isFinite(item.close))
+      .sort((a, b) => a.date - b.date)
+      .map((item, index, arr) => ({
+        date: item.date,
+        value: 100000 * (item.close / arr[0].close)
+      }))
+
+    if (normalized.length === 0) continue
+
+    datasets.push({
+      label: ticker,
+      data: normalized,
+      color: 'sp500',
+      baseline: 100000
+    })
   }
 
   comparisonDatasets.value = datasets

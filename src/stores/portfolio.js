@@ -434,7 +434,7 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     const price = quote.price || quote.previousClose
     if (!price || price <= 0) return { success: false, error: 'Could not determine a valid price for ' + ticker }
 
-    // Fetch benchmark price
+    // Fetch benchmark price for the server-side mirror trade.
     const bmTicker = benchmarkTicker.value
     const bmQuote = await market.fetchQuote(bmTicker)
     const bmPrice = bmQuote?.price || bmQuote?.previousClose
@@ -469,39 +469,15 @@ export const usePortfolioStore = defineStore('portfolio', () => {
       p_dollars: dollars,
       p_price: price,
       p_rationale: rationale?.trim() || null,
-      p_approval_code: approvalCode ?? null
+      p_approval_code: approvalCode ?? null,
+      p_benchmark_price: bmPrice ?? null
     })
     if (tradeExecError) return { success: false, error: tradeExecError.message }
     portfolio.value.cash_balance = Number(tradeExec?.cash_balance ?? portfolio.value.cash_balance)
     const shares = Number(tradeExec?.shares || 0)
 
-    // Benchmark: buy same dollars of benchmark index
-    if (bmPrice) {
-      const bmShares = dollars / bmPrice
-      await supabase.from('benchmark_trades').insert({
-        portfolio_id: portfolioId,
-        ticker: bmTicker, side: 'buy', dollars, shares: bmShares, price: bmPrice
-      })
-
-      const existingBench = benchmarkHoldings.value.find(h => h.ticker === bmTicker)
-      if (existingBench) {
-        const totalCost = (existingBench.shares * existingBench.avg_cost) + dollars
-        const newShares = existingBench.shares + bmShares
-        await supabase.from('benchmark_holdings')
-          .update({ shares: newShares, avg_cost: totalCost / newShares })
-          .eq('id', existingBench.id)
-      } else {
-        await supabase.from('benchmark_holdings').insert({
-          portfolio_id: portfolioId,
-          ticker: bmTicker, shares: bmShares, avg_cost: bmPrice
-        })
-      }
-    }
-
-    // Lightweight refresh — update holdings + prices without full DB reload
-    const { data: freshHoldings } = await supabase.from('holdings').select('*').eq('portfolio_id', portfolioId)
-    rawHoldings.value = freshHoldings || []
-    await enrichHoldings()
+    // Lightweight refresh — update holdings, benchmark rows, and prices without full DB reload
+    await _refreshPortfolioState(portfolioId)
     version.value++
 
     return { success: true, shares, price }
@@ -596,40 +572,14 @@ export const usePortfolioStore = defineStore('portfolio', () => {
       p_dollars: dollars,
       p_price: price,
       p_rationale: rationale?.trim() || null,
-      p_approval_code: approvalCode ?? null
+      p_approval_code: approvalCode ?? null,
+      p_benchmark_price: bmPrice ?? null
     })
     if (tradeExecError) return { success: false, error: tradeExecError.message }
     portfolio.value.cash_balance = Number(tradeExec?.cash_balance ?? portfolio.value.cash_balance)
     const executedShares = Number(tradeExec?.shares || sharesToSell)
 
-    // Benchmark: sell proportional benchmark index
-    if (bmPrice) {
-      const existingBench = benchmarkHoldings.value.find(h => h.ticker === bmTicker)
-      if (existingBench && existingBench.shares > 0) {
-        const bmShares = dollars / bmPrice
-        const actualBmShares = Math.min(bmShares, existingBench.shares)
-        const actualDollars = actualBmShares * bmPrice
-
-        await supabase.from('benchmark_trades').insert({
-          portfolio_id: portfolioId,
-          ticker: bmTicker, side: 'sell', dollars: actualDollars, shares: actualBmShares, price: bmPrice
-        })
-
-        const newBenchShares = existingBench.shares - actualBmShares
-        if (newBenchShares < 0.001) {
-          await supabase.from('benchmark_holdings').delete().eq('id', existingBench.id)
-        } else {
-          await supabase.from('benchmark_holdings')
-            .update({ shares: newBenchShares })
-            .eq('id', existingBench.id)
-        }
-      }
-    }
-
-    // Lightweight refresh
-    const { data: freshHoldings2 } = await supabase.from('holdings').select('*').eq('portfolio_id', portfolioId)
-    rawHoldings.value = freshHoldings2 || []
-    await enrichHoldings()
+    await _refreshPortfolioState(portfolioId)
     version.value++
 
     return { success: true, shares: executedShares, price }
@@ -654,12 +604,16 @@ export const usePortfolioStore = defineStore('portfolio', () => {
   async function updateVisibility(portfolioId, visibility) {
     const pid = portfolioId || portfolio.value?.id
     if (!pid) return { error: 'No portfolio' }
+    const isPublic = visibility === 'public'
     const { error } = await supabase
       .from('portfolios')
-      .update({ visibility })
+      .update({ visibility, is_public: isPublic })
       .eq('id', pid)
     if (error) return { error: error.message }
-    if (portfolio.value?.id === pid) portfolio.value.visibility = visibility
+    if (portfolio.value?.id === pid) {
+      portfolio.value.visibility = visibility
+      portfolio.value.is_public = isPublic
+    }
     return { success: true }
   }
 
@@ -705,6 +659,19 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     } finally {
       loading.value = false
     }
+  }
+
+  async function _refreshPortfolioState(portfolioId) {
+    const [{ data: freshHoldings }, { data: freshBenchmarkHoldings }, { data: freshBenchmarkTrades }] = await Promise.all([
+      supabase.from('holdings').select('*').eq('portfolio_id', portfolioId),
+      supabase.from('benchmark_holdings').select('*').eq('portfolio_id', portfolioId),
+      supabase.from('benchmark_trades').select('*').eq('portfolio_id', portfolioId).order('executed_at', { ascending: false })
+    ])
+
+    rawHoldings.value = freshHoldings || []
+    benchmarkHoldings.value = freshBenchmarkHoldings || []
+    benchmarkTrades.value = freshBenchmarkTrades || []
+    await enrichHoldings()
   }
 
   // Load all group funds for a group, sorted by fund_number
