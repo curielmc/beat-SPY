@@ -392,10 +392,31 @@ onMounted(async () => {
   // Benchmark Phase 1
   const spyQuote = market.getCachedQuote('SPY')
   if (spyQuote && spyQuote.price > 0) {
-    benchmarkMetrics.value.sinceInception = portfolioStore.benchmarkReturnPct
+    const benchmarkStartDate = enriched
+      .map(group => group.createdAt)
+      .filter(Boolean)
+      .sort((a, b) => new Date(a) - new Date(b))[0]
+
+    let spySinceInception = null
+    if (benchmarkStartDate) {
+      const fromStr = new Date(benchmarkStartDate).toISOString().slice(0, 10)
+      const toStr = new Date().toISOString().slice(0, 10)
+      const spyHistory = await getHistoricalDaily('SPY', fromStr, toStr)
+      const firstValidClose = spyHistory
+        ?.map(point => Number(point.close ?? point.adjClose ?? point.price))
+        .find(price => Number.isFinite(price) && price > 0)
+
+      if (firstValidClose) {
+        spySinceInception = ((spyQuote.price - firstValidClose) / firstValidClose) * 100
+      }
+    }
+
+    benchmarkMetrics.value.sinceInception = spySinceInception
     const spyPrevClose = spyQuote.previousClose || spyQuote.price
     benchmarkMetrics.value.today = spyPrevClose > 0 ? ((spyQuote.price - spyPrevClose) / spyPrevClose) * 100 : 0
-    benchmarkMetrics.value.annualized = benchmarkMetrics.value.sinceInception // SPY is already annualized-ish
+    benchmarkMetrics.value.annualized = spySinceInception !== null && benchmarkStartDate
+      ? computeAnnualizedReturn(spySinceInception, benchmarkStartDate)
+      : null
   } else {
     benchmarkMetrics.value.sinceInception = null
     benchmarkMetrics.value.today = null
