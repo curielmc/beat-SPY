@@ -47,13 +47,15 @@
       </div>
 
       <!-- Highlight Stats -->
-      <div v-if="highlights" class="grid grid-cols-3 gap-3">
+      <div v-if="highlights" class="grid grid-cols-1 lg:grid-cols-3 gap-3">
         <!-- Top Fund -->
         <div class="card bg-base-100 shadow-sm border border-success/30">
-          <div class="card-body p-3 text-center space-y-1">
-            <p class="text-xs text-base-content/50 uppercase tracking-wide">🏆 Top Fund</p>
-            <p class="font-bold text-sm leading-tight">{{ highlights.topFund?.name || '—' }}</p>
-            <p class="text-success font-bold text-base">
+          <div class="card-body p-4 flex-row items-center justify-between gap-3">
+            <div class="min-w-0">
+              <p class="text-xs text-base-content/50 uppercase tracking-wide">🏆 Top Fund</p>
+              <p class="font-bold text-sm leading-tight truncate">{{ highlights.topFund?.name || '—' }}</p>
+            </div>
+            <p class="text-success font-bold text-lg whitespace-nowrap">
               <template v-if="highlights.topFund?.metrics?.[highlights.activeMetric] !== undefined">
                 {{ highlights.topFund.metrics[highlights.activeMetric] >= 0 ? '+' : '' }}{{ highlights.topFund.metrics[highlights.activeMetric]?.toFixed(2) }}%
               </template>
@@ -64,27 +66,32 @@
 
         <!-- Best Stock Pick -->
         <div class="card bg-base-100 shadow-sm border border-warning/30">
-          <div class="card-body p-3 text-center space-y-1">
-            <p class="text-xs text-base-content/50 uppercase tracking-wide">⭐ Best Pick</p>
-            <div class="leading-tight">
-              <p class="font-bold text-sm">{{ highlights.bestStock || '—' }}</p>
-              <p v-if="highlights.bestStockName" class="text-[10px] text-base-content/60 truncate px-1" :title="highlights.bestStockName">{{ highlights.bestStockName }}</p>
+          <div class="card-body p-4 flex-row items-center justify-between gap-3">
+            <div class="min-w-0">
+              <p class="text-xs text-base-content/50 uppercase tracking-wide">⭐ Best Pick</p>
+              <p class="font-bold text-sm leading-tight">{{ highlights.bestStock || '—' }}</p>
+              <p v-if="highlights.bestStockName" class="text-[10px] text-base-content/60 truncate" :title="highlights.bestStockName">{{ highlights.bestStockName }}</p>
+              <p class="text-xs text-base-content/40 truncate">{{ highlights.bestStockGroup }}</p>
             </div>
-            <p class="text-warning font-bold text-base">
+            <p class="text-warning font-bold text-lg whitespace-nowrap">
               {{ highlights.bestStockReturn >= 0 ? '+' : '' }}{{ highlights.bestStockReturn?.toFixed(2) }}%
             </p>
-            <p class="text-xs text-base-content/40">{{ highlights.bestStockGroup }}</p>
           </div>
         </div>
 
         <!-- Beating SPY -->
         <div class="card bg-base-100 shadow-sm border border-primary/30">
-          <div class="card-body p-3 text-center space-y-1">
-            <p class="text-xs text-base-content/50 uppercase tracking-wide">📈 Beating SPY</p>
-            <p class="font-bold text-3xl text-primary">
-              {{ highlights.beatingCount !== null ? highlights.beatingCount : '—' }}
-            </p>
-            <p class="text-xs text-base-content/40">of {{ highlights.total }} groups</p>
+          <div class="card-body p-4 flex-row items-center justify-between gap-3">
+            <div>
+              <p class="text-xs text-base-content/50 uppercase tracking-wide">📈 Beating SPY</p>
+              <p class="text-xs text-base-content/40">Groups above benchmark</p>
+            </div>
+            <div class="text-right">
+              <p class="font-bold text-2xl leading-none text-primary">
+                {{ highlights.beatingCount !== null ? highlights.beatingCount : '—' }}
+              </p>
+              <p class="text-xs text-base-content/40 mt-1">of {{ highlights.total }}</p>
+            </div>
           </div>
         </div>
       </div>
