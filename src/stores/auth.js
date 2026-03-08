@@ -16,6 +16,8 @@ export const useAuthStore = defineStore('auth', () => {
     sessionStorage.setItem('masquerade', JSON.stringify(user))
     // Clear all caches so next load fetches masquerade user's data fresh
     allMemberships.value = []
+    activeClassId.value = null
+    localStorage.removeItem('beatspy_active_class')
     _membershipCacheUid = null
     _membershipCacheTs = 0
     // Clear portfolio store cache
@@ -30,6 +32,8 @@ export const useAuthStore = defineStore('auth', () => {
     sessionStorage.removeItem('masquerade')
     // Clear caches
     allMemberships.value = []
+    activeClassId.value = null
+    localStorage.removeItem('beatspy_active_class')
     _membershipCacheUid = null
     _membershipCacheTs = 0
     if (typeof window !== 'undefined') window.__clearPortfolioCache = true
