@@ -188,7 +188,7 @@ const groupMembers = ref([])
 const leaderboardLoading = ref(true)
 const groups = ref([])
 const benchmarkMetrics = ref({})
-const activeMetric = ref('sinceInception')
+const activeMetric = ref('today')
 
 const metrics = [
   { key: 'sinceInception', label: 'Since Inception' },

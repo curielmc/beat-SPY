@@ -224,7 +224,7 @@ const PERIOD_METRICS = {
   d5: 5, d20: 20, d30: 30, d90: 90, y1: 365
 }
 
-const activeMetric = ref('sinceInception')
+const activeMetric = ref('today')
 const loading = ref(true)
 const groups = ref([])
 const myGroupId = ref(null)
