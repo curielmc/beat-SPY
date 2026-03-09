@@ -379,17 +379,10 @@
               <!-- Trade Rationale -->
               <div class="form-control">
                 <label class="label py-1">
-                  <span class="label-text text-sm font-bold">Why are you making this trade?{{ basketRationaleRequired ? '' : ' (optional)' }}</span>
+                  <span class="label-text text-sm font-bold">Trade Rationale{{ basketRationaleRequired ? '' : ' (optional)' }}</span>
                 </label>
-                <textarea
-                  v-model="basketRationale"
-                  class="textarea textarea-bordered w-full"
-                  rows="2"
-                  maxlength="300"
-                  placeholder="e.g. Strong earnings beat, oversold RSI, sector rotation..."
-                ></textarea>
 
-                <div class="mt-2">
+                <div class="mb-3">
                   <p class="text-[10px] uppercase font-bold text-base-content/40 mb-1.5 ml-0.5">Quick Select:</p>
                   <div class="flex flex-wrap gap-1.5">
                     <button 
@@ -404,6 +397,14 @@
                     </button>
                   </div>
                 </div>
+
+                <textarea
+                  v-model="basketRationale"
+                  class="textarea textarea-bordered w-full"
+                  rows="2"
+                  maxlength="300"
+                  placeholder="Why are you making this trade?"
+                ></textarea>
 
                 <label v-if="basketRationale.length > 0" class="label py-0.5">
                   <span></span>

@@ -164,13 +164,8 @@
 
                   <div class="form-control">
                     <label class="label py-1"><span class="label-text text-sm font-bold">Trade Rationale{{ rationaleRequired ? '' : ' (Optional)' }}</span></label>
-                    <textarea
-                      v-model="tradeRationale"
-                      class="textarea textarea-bordered w-full h-24 text-sm"
-                      placeholder="Why are you making this trade?"
-                    ></textarea>
                     
-                    <div class="mt-2">
+                    <div class="mb-3">
                       <p class="text-[10px] uppercase font-bold text-base-content/40 mb-1.5 ml-0.5">Quick Select:</p>
                       <div class="flex flex-wrap gap-1.5">
                         <button 
@@ -185,6 +180,12 @@
                         </button>
                       </div>
                     </div>
+
+                    <textarea
+                      v-model="tradeRationale"
+                      class="textarea textarea-bordered w-full h-24 text-sm"
+                      placeholder="Why are you making this trade?"
+                    ></textarea>
 
                     <p v-if="rationaleError" class="text-error text-[10px] mt-1 font-bold uppercase">{{ rationaleError }}</p>
                   </div>
