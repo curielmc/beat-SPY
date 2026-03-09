@@ -14,7 +14,17 @@
       </thead>
       <tbody>
         <tr v-for="h in enrichedHoldings" :key="h.id">
-          <td class="font-mono font-bold">{{ h.ticker }}</td>
+          <td>
+            <div class="flex items-center gap-2">
+              <div class="avatar">
+                <div class="w-6 h-6 rounded bg-base-200 flex items-center justify-center overflow-hidden border border-base-300">
+                  <img v-if="market.profilesCache[h.ticker]?.data?.image" :src="market.profilesCache[h.ticker].data.image" :alt="h.ticker" />
+                  <span v-else class="text-[8px] font-bold text-base-content/20">{{ h.ticker }}</span>
+                </div>
+              </div>
+              <span class="font-mono font-bold">{{ h.ticker }}</span>
+            </div>
+          </td>
           <td class="text-sm text-base-content/80">{{ h.companyName }}</td>
           <td class="text-right font-mono">{{ Number(h.shares).toFixed(2) }}</td>
           <td class="text-right font-mono">${{ Number(h.avg_cost).toFixed(2) }}</td>

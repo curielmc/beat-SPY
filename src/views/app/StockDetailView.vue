@@ -169,6 +169,19 @@
                       class="textarea textarea-bordered w-full h-24 text-sm"
                       placeholder="Why are you making this trade?"
                     ></textarea>
+                    
+                    <div class="flex flex-wrap gap-1 mt-2">
+                      <button 
+                        v-for="r in quickRationales" 
+                        :key="r" 
+                        type="button"
+                        class="btn btn-xs btn-ghost border border-base-300 font-normal"
+                        @click="tradeRationale = r"
+                      >
+                        {{ r }}
+                      </button>
+                    </div>
+
                     <p v-if="rationaleError" class="text-error text-[10px] mt-1 font-bold uppercase">{{ rationaleError }}</p>
                   </div>
                 </div>
@@ -383,6 +396,16 @@ const rationaleRequired = ref(true)
 const executing = ref(false)
 const requiresApproval = ref(false)
 const membership = ref(null)
+
+const quickRationales = [
+  'Stock has gone down a lot recently (buying the dip)',
+  'Stock has gone up a lot recently (momentum trade)',
+  'Strong earnings report and fundamentals',
+  'Technical breakout on the chart',
+  'Sector rotation or positive macro trend',
+  'Oversold according to technical indicators',
+  'Long-term value play with solid growth'
+]
 
 // Takes state
 const takes = ref([])

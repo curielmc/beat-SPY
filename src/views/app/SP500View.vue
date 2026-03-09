@@ -451,17 +451,17 @@ async function loadQuotes() {
   for (let i = 0; i < symbols.length; i += batchSize) {
     const batch = symbols.slice(i, i + batchSize)
     try {
-      const quotes = await getBatchQuotes(batch)
-      const profiles = await getBatchProfiles(batch)
+      const [quotes] = await Promise.all([
+        market.fetchBatchQuotes(batch),
+        market.fetchBatchProfiles(batch)
+      ])
 
       const quoteMap = {}
       for (const q of (quotes || [])) quoteMap[q.symbol] = q
-      const profileMap = {}
-      for (const p of (profiles || [])) profileMap[p.symbol] = p
 
       for (const c of constituents.value) {
         const q = quoteMap[c.symbol]
-        const p = profileMap[c.symbol]
+        const p = market.profilesCache[c.symbol]?.data
         if (q) {
           c.price = q.price
           c.changesPercentage = q.changesPercentage

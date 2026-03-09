@@ -2,7 +2,7 @@
   <div class="space-y-4">
     <div class="flex items-center justify-between">
       <div>
-        <h1 class="text-xl font-bold">Advanced Screener</h1>
+        <h1 class="text-xl font-bold">Advanced Investment Screener</h1>
         <p class="text-sm text-base-content/60">Filter securities using professional-grade criteria</p>
       </div>
       <RouterLink to="/stocks" class="btn btn-ghost btn-sm gap-1">
@@ -182,6 +182,7 @@
             <table class="table table-sm table-zebra">
               <thead>
                 <tr>
+                  <th></th>
                   <th class="cursor-pointer select-none" @click="toggleSort('symbol')">Ticker {{ sortIcon('symbol') }}</th>
                   <th class="cursor-pointer select-none" @click="toggleSort('companyName')">Name {{ sortIcon('companyName') }}</th>
                   <th class="text-right cursor-pointer select-none" @click="toggleSort('price')">Price {{ sortIcon('price') }}</th>
@@ -196,6 +197,14 @@
               </thead>
               <tbody>
                 <tr v-for="stock in displayResults" :key="stock.symbol" class="hover cursor-pointer" @click="router.push(`/stocks/${stock.symbol}`)">
+                  <td>
+                    <div class="avatar">
+                      <div class="w-6 h-6 rounded bg-base-200 flex items-center justify-center overflow-hidden border border-base-300">
+                        <img v-if="market.profilesCache[stock.symbol]?.data?.image" :src="market.profilesCache[stock.symbol].data.image" :alt="stock.symbol" />
+                        <span v-else class="text-[8px] font-bold text-base-content/20">{{ stock.symbol }}</span>
+                      </div>
+                    </div>
+                  </td>
                   <td class="font-mono font-bold text-primary">{{ stock.symbol }}</td>
                   <td class="max-w-[200px] truncate">{{ stock.companyName }}</td>
                   <td class="text-right font-mono">${{ fmt(stock.price, 2) }}</td>
@@ -355,7 +364,10 @@ async function runScreen() {
       const allQuotes = []
       for (let i = 0; i < tickers.length; i += 50) {
         const chunk = tickers.slice(i, i + 50)
-        const quotes = await market.fetchBatchQuotes(chunk)
+        const [quotes] = await Promise.all([
+          market.fetchBatchQuotes(chunk),
+          market.fetchBatchProfiles(chunk)
+        ])
         allQuotes.push(...(quotes || []))
       }
 

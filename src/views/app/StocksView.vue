@@ -2,7 +2,7 @@
   <div class="space-y-4">
     <h1 class="text-xl font-bold flex items-center gap-2">
       <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
-      Stocks & Securities
+      Investment Screener
     </h1>
 
     <!-- Search -->
@@ -79,7 +79,7 @@
       <button v-if="hasActiveFilters" class="btn btn-sm btn-ghost text-error" @click="clearFilters">Clear all</button>
       <RouterLink to="/screener" class="btn btn-sm btn-outline gap-1 ml-auto">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
-        Advanced Screener
+        Advanced Investment Screener
       </RouterLink>
     </div>
 
@@ -207,9 +207,17 @@
             />
             <ul v-if="tickerResults.length > 0" class="menu bg-base-200 rounded-box mt-1 max-h-40 overflow-y-auto">
               <li v-for="r in tickerResults" :key="r.symbol">
-                <a @click="addTickerToNew(r.symbol)">
-                  <span class="font-bold">{{ r.symbol }}</span>
-                  <span class="text-xs text-base-content/60">{{ r.name }}</span>
+                <a @click="addTickerToNew(r.symbol)" class="flex items-center gap-3">
+                  <div class="avatar">
+                    <div class="w-6 h-6 rounded bg-base-100 flex items-center justify-center overflow-hidden border border-base-300">
+                      <img v-if="market.profilesCache[r.symbol]?.data?.image" :src="market.profilesCache[r.symbol].data.image" :alt="r.symbol" />
+                      <span v-else class="text-[8px] font-bold text-base-content/20">{{ r.symbol }}</span>
+                    </div>
+                  </div>
+                  <div class="flex flex-col">
+                    <span class="font-bold">{{ r.symbol }}</span>
+                    <span class="text-xs text-base-content/60">{{ r.name }}</span>
+                  </div>
                 </a>
               </li>
             </ul>
@@ -258,9 +266,17 @@
             />
             <ul v-if="tickerResults.length > 0" class="menu bg-base-200 rounded-box mt-1 max-h-40 overflow-y-auto">
               <li v-for="r in tickerResults" :key="r.symbol">
-                <a @click="addTickerToEdit(r.symbol)">
-                  <span class="font-bold">{{ r.symbol }}</span>
-                  <span class="text-xs text-base-content/60">{{ r.name }}</span>
+                <a @click="addTickerToEdit(r.symbol)" class="flex items-center gap-3">
+                  <div class="avatar">
+                    <div class="w-6 h-6 rounded bg-base-100 flex items-center justify-center overflow-hidden border border-base-300">
+                      <img v-if="market.profilesCache[r.symbol]?.data?.image" :src="market.profilesCache[r.symbol].data.image" :alt="r.symbol" />
+                      <span v-else class="text-[8px] font-bold text-base-content/20">{{ r.symbol }}</span>
+                    </div>
+                  </div>
+                  <div class="flex flex-col">
+                    <span class="font-bold">{{ r.symbol }}</span>
+                    <span class="text-xs text-base-content/60">{{ r.name }}</span>
+                  </div>
                 </a>
               </li>
             </ul>
@@ -296,9 +312,17 @@
           <div class="space-y-2">
             <RouterLink v-for="stock in basketStocks" :key="stock.symbol" :to="`/stocks/${stock.symbol}`" class="card bg-base-100 shadow hover:shadow-md transition-shadow cursor-pointer block">
               <div class="card-body p-4 flex-row justify-between items-center">
-                <div>
-                  <p class="font-bold">{{ stock.symbol }}</p>
-                  <p class="text-xs text-base-content/60">{{ stock.name }}</p>
+                <div class="flex items-center gap-3">
+                  <div class="avatar">
+                    <div class="w-10 h-10 rounded bg-base-200 flex items-center justify-center overflow-hidden border border-base-300">
+                      <img v-if="market.profilesCache[stock.symbol]?.data?.image" :src="market.profilesCache[stock.symbol].data.image" :alt="stock.symbol" />
+                      <span v-else class="text-xs font-bold text-base-content/20">{{ stock.symbol }}</span>
+                    </div>
+                  </div>
+                  <div>
+                    <p class="font-bold">{{ stock.symbol }}</p>
+                    <p class="text-xs text-base-content/60">{{ stock.name }}</p>
+                  </div>
                 </div>
                 <div class="text-right" v-if="stock.price">
                   <p class="font-semibold">${{ Number(stock.price).toFixed(2) }}</p>
@@ -355,7 +379,7 @@
               <!-- Trade Rationale -->
               <div class="form-control">
                 <label class="label py-1">
-                  <span class="label-text text-sm">Why are you making this trade?{{ basketRationaleRequired ? '' : ' (optional)' }}</span>
+                  <span class="label-text text-sm font-bold">Why are you making this trade?{{ basketRationaleRequired ? '' : ' (optional)' }}</span>
                 </label>
                 <textarea
                   v-model="basketRationale"
@@ -364,6 +388,19 @@
                   maxlength="300"
                   placeholder="e.g. Strong earnings beat, oversold RSI, sector rotation..."
                 ></textarea>
+
+                <div class="flex flex-wrap gap-1 mt-2">
+                  <button 
+                    v-for="r in quickRationales" 
+                    :key="r" 
+                    type="button"
+                    class="btn btn-xs btn-ghost border border-base-300 font-normal"
+                    @click="basketRationale = r"
+                  >
+                    {{ r }}
+                  </button>
+                </div>
+
                 <label v-if="basketRationale.length > 0" class="label py-0.5">
                   <span></span>
                   <span class="label-text-alt">{{ basketRationale.length }}/300</span>
@@ -504,6 +541,16 @@ const basketRationaleRequired = ref(true)
 const basketBuyProgress = ref(null)
 const basketBuyResult = ref(null)
 const requiresApproval = ref(false)
+
+const quickRationales = [
+  'Stocks have gone down a lot recently (buying the dip)',
+  'Stocks have gone up a lot recently (momentum trade)',
+  'Strong earnings report and fundamentals',
+  'Technical breakout on the chart',
+  'Sector rotation or positive macro trend',
+  'Oversold according to technical indicators',
+  'Long-term value play with solid growth'
+]
 
 // Filter state
 const activeFilters = reactive({ sector: null, size: null, style: null, assetType: null, region: null, riskExposure: null })
@@ -662,6 +709,11 @@ async function runScreener() {
     if (regionObj) params.country = regionObj.countries[0]
     filteredStocks.value = await market.screenStocks(params)
   }
+
+  if (filteredStocks.value.length > 0) {
+    const tickers = filteredStocks.value.slice(0, 50).map(s => s.symbol)
+    await market.fetchBatchProfiles(tickers)
+  }
   loading.value = false
 }
 
@@ -683,7 +735,10 @@ function handleSearch() {
     const results = await market.searchStocks(searchQuery.value)
     if (results.length > 0) {
       const tickers = results.slice(0, 10).map(r => r.symbol)
-      const quotes = await market.fetchBatchQuotes(tickers)
+      const [quotes] = await Promise.all([
+        market.fetchBatchQuotes(tickers),
+        market.fetchBatchProfiles(tickers)
+      ])
       displayStocks.value = results.slice(0, 20).map(r => {
         const quote = quotes.find(q => q.symbol === r.symbol)
         return { ...r, price: quote?.price, changesPercentage: quote?.changesPercentage }
@@ -705,6 +760,10 @@ function handleTickerSearch() {
   tickerSearchTimeout = setTimeout(async () => {
     const results = await market.searchStocks(tickerSearch.value)
     tickerResults.value = results.slice(0, 6)
+    if (tickerResults.value.length > 0) {
+      const tickers = tickerResults.value.map(r => r.symbol)
+      await market.fetchBatchProfiles(tickers)
+    }
   }, 300)
 }
 
@@ -796,7 +855,10 @@ async function expandCustomBasket(basket) {
   basketBuyResult.value = null
 
   try {
-    const quotes = await market.fetchBatchQuotes(basket.tickers)
+    const [quotes] = await Promise.all([
+      market.fetchBatchQuotes(basket.tickers),
+      market.fetchBatchProfiles(basket.tickers)
+    ])
     basketStocks.value = basket.tickers.map(ticker => {
       const quote = quotes.find(q => q.symbol === ticker)
       return { symbol: ticker, name: quote?.name || '', price: quote?.price, changesPercentage: quote?.changesPercentage }
@@ -828,7 +890,10 @@ async function expandBasket(basket) {
         changesPercentage: s.changesPercentage
       }))
     } else {
-      const quotes = await market.fetchBatchQuotes(basket.tickers)
+      const [quotes] = await Promise.all([
+        market.fetchBatchQuotes(basket.tickers),
+        market.fetchBatchProfiles(basket.tickers)
+      ])
       basketStocks.value = basket.tickers.map(ticker => {
         const quote = quotes.find(q => q.symbol === ticker)
         return { symbol: ticker, name: quote?.name || '', price: quote?.price, changesPercentage: quote?.changesPercentage }
