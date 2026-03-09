@@ -170,16 +170,20 @@
                       placeholder="Why are you making this trade?"
                     ></textarea>
                     
-                    <div class="flex flex-wrap gap-1 mt-2">
-                      <button 
-                        v-for="r in quickRationales" 
-                        :key="r" 
-                        type="button"
-                        class="btn btn-xs btn-ghost border border-base-300 font-normal"
-                        @click="tradeRationale = r"
-                      >
-                        {{ r }}
-                      </button>
+                    <div class="mt-2">
+                      <p class="text-[10px] uppercase font-bold text-base-content/40 mb-1.5 ml-0.5">Quick Select:</p>
+                      <div class="flex flex-wrap gap-1.5">
+                        <button 
+                          v-for="r in quickRationales" 
+                          :key="r" 
+                          type="button"
+                          class="btn btn-xs rounded-full border-base-300 bg-base-100 hover:bg-primary hover:text-primary-content hover:border-primary transition-all font-normal gap-1 h-auto py-1 px-2.5"
+                          @click="tradeRationale = r"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M12 4v16m8-8H4" /></svg>
+                          {{ r }}
+                        </button>
+                      </div>
                     </div>
 
                     <p v-if="rationaleError" class="text-error text-[10px] mt-1 font-bold uppercase">{{ rationaleError }}</p>
