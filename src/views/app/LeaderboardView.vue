@@ -42,7 +42,7 @@
               <span class="text-sm text-base-content/40">N/A</span>
             </template>
             <template v-else>
-              <span class="text-lg font-bold text-primary">
+              <span class="text-lg font-bold text-base-content/70">
                 {{ activeBenchmarkValue >= 0 ? '+' : '' }}{{ activeBenchmarkValue.toFixed(2) }}%
               </span>
             </template>

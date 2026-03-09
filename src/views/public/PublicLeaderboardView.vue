@@ -2,9 +2,14 @@
   <div class="min-h-screen bg-base-200">
     <div class="max-w-4xl mx-auto p-4 space-y-6">
       <!-- Header -->
-      <div class="text-center space-y-2 pt-8">
-        <h1 class="text-4xl font-bold text-primary">Beat the S&P 500</h1>
-        <p class="text-base-content/70">Public Leaderboard &mdash; See who's outperforming the market</p>
+      <div class="text-center space-y-4 pt-8">
+        <div class="flex justify-center">
+          <LogoIcon size="lg" />
+        </div>
+        <div class="space-y-2">
+          <h1 class="text-4xl font-bold text-primary">Beat the S&P 500</h1>
+          <p class="text-base-content/70">Public Leaderboard &mdash; See who's outperforming the market</p>
+        </div>
         <div class="flex justify-center gap-2 mt-4">
           <RouterLink to="/login" class="btn btn-ghost btn-sm">Log In</RouterLink>
           <RouterLink to="/signup" class="btn btn-primary btn-sm">Sign Up</RouterLink>
@@ -59,10 +64,11 @@
                 <span class="text-sm text-base-content/40">N/A</span>
               </template>
               <template v-else>
-                <span class="text-lg font-bold text-primary">
+                <span class="text-lg font-bold text-base-content/70">
                   {{ activeBenchmarkValue >= 0 ? '+' : '' }}{{ activeBenchmarkValue.toFixed(2) }}%
                 </span>
               </template>
+
             </div>
           </div>
         </div>
@@ -94,6 +100,7 @@ import { supabase } from '../../lib/supabase'
 import { useMarketDataStore } from '../../stores/marketData'
 import { usePortfolioStore } from '../../stores/portfolio'
 import LeaderboardEntry from '../../components/LeaderboardEntry.vue'
+import LogoIcon from '../../components/LogoIcon.vue'
 import {
   reconstructHoldingsAsOf,
   reconstructCashAsOf,

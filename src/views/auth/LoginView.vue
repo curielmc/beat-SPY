@@ -1,5 +1,11 @@
 <template>
-  <div class="card bg-base-100 shadow-xl">
+  <div class="space-y-6">
+    <div class="flex flex-col items-center gap-4">
+      <LogoIcon size="lg" />
+      <h1 class="text-2xl font-bold text-primary">Beat the S&P 500</h1>
+    </div>
+
+    <div class="card bg-base-100 shadow-xl">
     <div class="card-body">
       <h2 class="card-title justify-center text-2xl mb-4">Log In</h2>
 
@@ -37,6 +43,7 @@
 import { ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
+import LogoIcon from '../../components/LogoIcon.vue'
 
 const router = useRouter()
 const auth = useAuthStore()

@@ -4,16 +4,20 @@
     <div v-if="sidebarOpen" class="fixed inset-0 bg-black/40 z-30 lg:hidden" @click="sidebarOpen = false"></div>
 
     <!-- Sidebar -->
-    <aside class="fixed lg:sticky top-0 left-0 z-40 h-screen w-60 bg-base-100 border-r border-base-300 flex flex-col transition-transform lg:translate-x-0" :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'">
+    <aside class="fixed lg:sticky top-0 left-0 z-40 h-screen w-56 bg-base-100 border-r border-base-300 flex flex-col transition-transform lg:translate-x-0" :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'">
       <div class="p-4 border-b border-base-300 flex items-start justify-between">
-        <div>
-          <h1 class="text-lg font-bold text-primary">Beat the S&P 500</h1>
-          <span class="badge badge-error badge-sm">Admin</span>
+        <div class="flex flex-col gap-3">
+          <LogoIcon size="sm" />
+          <div>
+            <h1 class="text-sm font-bold text-primary">Beat the S&P 500</h1>
+            <p class="text-[10px] uppercase tracking-wider text-error font-semibold">Admin Panel</p>
+          </div>
         </div>
         <button class="btn btn-ghost btn-xs btn-square hidden lg:flex" @click="handleLogout" title="Log out">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
         </button>
       </div>
+
       <nav class="flex-1 p-3 space-y-1">
         <RouterLink to="/admin" class="btn btn-ghost btn-sm justify-start w-full gap-2" :class="{ 'btn-active': route.path === '/admin' }" @click="sidebarOpen = false">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
@@ -85,6 +89,7 @@
 import { ref } from 'vue'
 import { RouterView, RouterLink, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import LogoIcon from '../components/LogoIcon.vue'
 
 const route = useRoute()
 const router = useRouter()

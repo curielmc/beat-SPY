@@ -7,10 +7,11 @@
     </div>
 
     <div class="navbar bg-base-100 shadow-sm">
-      <div class="max-w-6xl mx-auto w-full flex items-center">
-        <div class="flex-none">
-          <span class="text-lg font-bold text-primary">Beat the S&P 500</span>
-          <span class="badge badge-ghost ml-2">Teacher</span>
+      <div class="max-w-6xl mx-auto w-full flex items-center gap-4">
+        <div class="flex-none flex items-center gap-3">
+          <LogoIcon size="sm" />
+          <span class="text-sm font-bold text-primary">Beat the S&P 500</span>
+          <span class="badge badge-secondary badge-outline text-[10px] h-4 uppercase">Teacher</span>
         </div>
         <div class="flex-1 flex justify-center gap-1">
           <RouterLink to="/teacher" class="btn btn-ghost btn-sm" :class="{ 'btn-active': route.path === '/teacher' }">Dashboard</RouterLink>
@@ -36,6 +37,7 @@
 <script setup>
 import { RouterView, RouterLink, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import LogoIcon from '../components/LogoIcon.vue'
 
 const route = useRoute()
 const router = useRouter()

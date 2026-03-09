@@ -2,9 +2,14 @@
   <div class="text-center space-y-6">
 
     <!-- Hero -->
-    <div class="space-y-2">
-      <h1 class="text-4xl font-bold text-primary">Beat the S&P 500</h1>
-      <p class="text-base-content/60 text-sm">Learn investing by doing. Build a portfolio and see if you can beat the market's toughest benchmark.</p>
+    <div class="space-y-4">
+      <div class="flex justify-center">
+        <LogoIcon size="xl" />
+      </div>
+      <div class="space-y-2">
+        <h1 class="text-4xl font-bold text-primary">Beat the S&P 500</h1>
+        <p class="text-base-content/60 text-sm max-w-xs mx-auto">Learn investing by doing. Build a portfolio and see if you can beat the market's toughest benchmark.</p>
+      </div>
     </div>
 
     <!-- Primary card: sign-up actions -->
@@ -70,6 +75,7 @@
 import { ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
+import LogoIcon from '../../components/LogoIcon.vue'
 
 const router = useRouter()
 const auth = useAuthStore()
