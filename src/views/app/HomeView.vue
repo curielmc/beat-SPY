@@ -258,7 +258,7 @@
       </div>
       <div class="stat py-2">
         <div class="stat-title text-xs">S&P 500 (via {{ portfolioStore.benchmarkTicker }})</div>
-        <div class="stat-value text-lg text-base-content/70">
+        <div class="stat-value text-lg" :class="portfolioStore.benchmarkReturnPct >= 0 ? 'text-success' : 'text-error'">
           {{ portfolioStore.benchmarkReturnPct >= 0 ? '+' : '' }}{{ portfolioStore.benchmarkReturnPct.toFixed(2) }}%
         </div>
       </div>

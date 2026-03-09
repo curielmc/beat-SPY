@@ -50,28 +50,31 @@
         <input v-model="search" type="text" placeholder="Search by name or username..." class="input input-bordered w-full" />
 
         <!-- Benchmark -->
-        <div class="card bg-primary/10 border border-primary/30">
-          <div class="card-body p-4 flex-row justify-between items-center">
-            <div>
-              <p class="font-semibold text-primary">S&P 500 (SPY) Benchmark</p>
-              <p class="text-xs text-base-content/60">The index to beat</p>
+        <div class="card bg-base-100 shadow-sm border border-base-300 overflow-hidden">
+          <div class="card-body p-0 flex-row items-stretch">
+            <div class="bg-primary/10 px-4 py-3 flex flex-col justify-center border-r border-base-300">
+              <p class="font-bold text-primary text-sm uppercase tracking-wider">Benchmark</p>
+              <p class="text-[10px] text-base-content/50 font-medium">S&P 500 (SPY)</p>
             </div>
-            <div class="text-right">
-              <template v-if="benchmarkMetricLoading">
-                <span class="loading loading-dots loading-xs"></span>
-              </template>
-              <template v-else-if="activeBenchmarkValue === null">
-                <span class="text-sm text-base-content/40">N/A</span>
-              </template>
-              <template v-else>
-                <span class="text-lg font-bold text-base-content/70">
-                  {{ activeBenchmarkValue >= 0 ? '+' : '' }}{{ activeBenchmarkValue.toFixed(2) }}%
-                </span>
-              </template>
-
+            <div class="flex-1 px-6 py-3 flex items-center justify-between">
+              <span class="text-xs text-base-content/60 italic">"The index to beat"</span>
+              <div class="text-right">
+                <template v-if="benchmarkMetricLoading">
+                  <span class="loading loading-dots loading-xs"></span>
+                </template>
+                <template v-else-if="activeBenchmarkValue === null">
+                  <span class="text-sm text-base-content/40">N/A</span>
+                </template>
+                <template v-else>
+                  <span class="text-2xl font-black" :class="activeBenchmarkValue >= 0 ? 'text-success' : 'text-error'">
+                    {{ activeBenchmarkValue >= 0 ? '+' : '' }}{{ activeBenchmarkValue.toFixed(2) }}%
+                  </span>
+                </template>
+              </div>
             </div>
           </div>
         </div>
+
 
         <!-- Leaderboard -->
         <div class="space-y-2">
