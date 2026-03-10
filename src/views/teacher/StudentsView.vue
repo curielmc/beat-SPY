@@ -177,6 +177,10 @@
       <div v-if="awardSuccess" class="alert alert-success">
         <span>{{ awardSuccess }}</span>
       </div>
+      <div v-if="lessonSuccess" class="alert alert-info">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+        <span>{{ lessonSuccess }}</span>
+      </div>
 
       <!-- Per-group sections -->
       <div v-for="group in rankedGroups" :key="group.id" class="bg-base-100 shadow rounded-xl overflow-hidden">
@@ -227,6 +231,15 @@
             <div class="flex flex-wrap gap-2 mt-1">
               <div v-for="s in group.members" :key="s.id" class="flex items-center gap-1 bg-base-200 rounded-lg px-2 py-1">
                 <span class="text-sm font-medium">{{ s.name }}</span>
+                <button
+                  class="btn btn-ghost btn-xs text-info px-1"
+                  :disabled="sendingLessonId === (s.user_id || s.id)"
+                  @click="sendLesson(s.user_id || s.id, 'user')"
+                  title="Send lesson to this student"
+                >
+                  <span v-if="sendingLessonId === (s.user_id || s.id)" class="loading loading-spinner loading-xs"></span>
+                  <span v-else>📖</span>
+                </button>
                 <select
                   class="select select-ghost select-xs w-auto min-w-0 pl-1"
                   @change="handleTransfer(s, group.id, $event.target.value); $event.target.value = ''"
@@ -257,6 +270,15 @@
 
           <div class="flex gap-2 mb-4">
             <button class="btn btn-sm btn-success btn-outline" @click="openAwardModal(group)">$ Adjust Cash</button>
+            <button
+              class="btn btn-sm btn-info btn-outline gap-1"
+              :disabled="sendingLessonId === group.id"
+              @click="sendLesson(group.id, 'group')"
+            >
+              <span v-if="sendingLessonId === group.id" class="loading loading-spinner loading-xs"></span>
+              <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+              Send Lesson
+            </button>
             <button class="btn btn-sm btn-error btn-outline" @click="openDeleteGroupModal(group)">Delete Group</button>
           </div>
 
@@ -404,6 +426,36 @@ async function handleCreateGroup() {
   showCreateGroupModal.value = false
   createGroupName.value = ''
   rankedGroups.value = await teacher.getRankedGroups()
+}
+
+// Send Lesson
+const sendingLessonId = ref(null)
+const lessonSuccess = ref('')
+
+async function sendLesson(ownerId, ownerType) {
+  sendingLessonId.value = ownerId
+  lessonSuccess.value = ''
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) return
+    const res = await fetch('/api/send-lesson', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`
+      },
+      body: JSON.stringify({ owner_id: ownerId, owner_type: ownerType })
+    })
+    const result = await res.json()
+    if (res.ok) {
+      lessonSuccess.value = `Lesson sent: "${result.lesson_title}" (${result.difficulty})`
+    } else {
+      lessonSuccess.value = `Error: ${result.error || 'Failed to send lesson'}`
+    }
+    setTimeout(() => { lessonSuccess.value = '' }, 5000)
+  } finally {
+    sendingLessonId.value = null
+  }
 }
 
 // Delete Group
