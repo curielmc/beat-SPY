@@ -61,6 +61,59 @@ export default async function handler(req) {
   const subject = msg.sender_id 
     ? `[Msg: ${msg.id}] New message from your teacher`
     : `[Beat the S&P] Quick Insight`
+  // Split content into AI analysis and Quick Insight if present
+  function buildEmailHtml(content, label) {
+    const insightMarker = '💡 **Quick Insight:'
+    const hasInsight = content.includes(insightMarker)
+
+    let analysisHtml = ''
+    let insightHtml = ''
+
+    if (hasInsight) {
+      const parts = content.split(insightMarker)
+      const analysis = parts[0].trim()
+      const insightRaw = insightMarker + parts[1]
+      // Parse title and body: 💡 **Quick Insight: Title**\nBody
+      const titleMatch = insightRaw.match(/Quick Insight:\s*(.+?)\*\*/)
+      const insightTitle = titleMatch ? titleMatch[1].trim() : 'Quick Insight'
+      const insightBody = insightRaw.replace(/.*\*\*\s*/, '').trim()
+
+      analysisHtml = `
+        <div style="background: white; border-left: 4px solid #6366f1; padding: 16px; border-radius: 6px; margin-bottom: 20px;">
+          <p style="margin: 0; font-size: 15px; color: #111827;">${escapeHtml(analysis)}</p>
+        </div>
+        <div style="background: #fefce8; border-left: 4px solid #eab308; padding: 16px; border-radius: 6px; margin-bottom: 24px;">
+          <p style="margin: 0 0 6px; font-size: 14px; font-weight: bold; color: #854d0e;">💡 Quick Insight: ${escapeHtml(insightTitle)}</p>
+          <p style="margin: 0; font-size: 14px; color: #713f12;">${escapeHtml(insightBody)}</p>
+        </div>`
+    } else {
+      analysisHtml = `
+        <div style="background: white; border-left: 4px solid #6366f1; padding: 16px; border-radius: 6px; margin-bottom: 24px;">
+          <p style="margin: 0; font-size: 15px; color: #111827;">${escapeHtml(content)}</p>
+        </div>`
+    }
+
+    return `
+      <div style="font-family: sans-serif; max-width: 560px; margin: 0 auto;">
+        <div style="background: #6366f1; padding: 24px; border-radius: 12px 12px 0 0;">
+          <h2 style="color: white; margin: 0;">Beat the S&P 500 🏆</h2>
+        </div>
+        <div style="background: #f9fafb; padding: 24px; border-radius: 0 0 12px 12px; border: 1px solid #e5e7eb;">
+          <p style="margin: 0 0 8px; color: #6b7280; font-size: 13px;">Message to ${escapeHtml(label)}</p>
+          ${analysisHtml}
+          <p style="margin: 0 0 24px; color: #4b5563; font-size: 14px;">
+            Reply to this email to message back!
+          </p>
+          <a href="https://beat-snp.com/messages" style="background: #6366f1; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold; display: inline-block;">
+            Open App →
+          </a>
+          <p style="margin: 24px 0 0; font-size: 12px; color: #9ca3af;">
+            You're receiving this because you're enrolled in a Beat the S&P 500 class.
+          </p>
+        </div>
+      </div>`
+  }
+
   const results = await Promise.all(emails.map(({ email, name }) =>
     fetch(`https://api.agentmail.to/v0/inboxes/${INBOX_ID}/messages/send`, {
       method: 'POST',
@@ -68,28 +121,7 @@ export default async function handler(req) {
       body: JSON.stringify({
         to: [email],
         subject,
-        html: `
-          <div style="font-family: sans-serif; max-width: 560px; margin: 0 auto;">
-            <div style="background: #6366f1; padding: 24px; border-radius: 12px 12px 0 0;">
-              <h2 style="color: white; margin: 0;">Beat the S&P 500 🏆</h2>
-            </div>
-            <div style="background: #f9fafb; padding: 24px; border-radius: 0 0 12px 12px; border: 1px solid #e5e7eb;">
-              <p style="margin: 0 0 8px; color: #6b7280; font-size: 13px;">Message to ${escapeHtml(recipientLabel)}</p>
-              <div style="background: white; border-left: 4px solid #6366f1; padding: 16px; border-radius: 6px; margin-bottom: 24px;">
-                <p style="margin: 0; font-size: 15px; color: #111827;">${escapeHtml(msg.content)}</p>
-              </div>
-              <p style="margin: 0 0 24px; color: #4b5563; font-size: 14px;">
-                Reply to this email to message back!
-              </p>
-              <a href="https://beat-snp.com/messages" style="background: #6366f1; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold; display: inline-block;">
-                Open App →
-              </a>
-              <p style="margin: 24px 0 0; font-size: 12px; color: #9ca3af;">
-                You're receiving this because you're enrolled in a Beat the S&P 500 class.
-              </p>
-            </div>
-          </div>
-        `
+        html: buildEmailHtml(msg.content, recipientLabel)
       })
     }).then(r => r.json())
   ))
