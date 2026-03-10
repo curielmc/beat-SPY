@@ -1,5 +1,11 @@
 {
   "buildCommand": "npm install && npm run build",
+  "redirects": [
+    { "source": "/:path*", "has": [{ "type": "host", "value": "beat-spy.vercel.app" }], "destination": "https://beat-snp.com/:path*", "permanent": true },
+    { "source": "/:path*", "has": [{ "type": "host", "value": "beat-snp.vercel.app" }], "destination": "https://beat-snp.com/:path*", "permanent": true },
+    { "source": "/:path*", "has": [{ "type": "host", "value": "beat-snp-martin-curiels-projects.vercel.app" }], "destination": "https://beat-snp.com/:path*", "permanent": true },
+    { "source": "/:path*", "has": [{ "type": "host", "value": "www.beat-snp.com" }], "destination": "https://beat-snp.com/:path*", "permanent": true }
+  ],
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ],
