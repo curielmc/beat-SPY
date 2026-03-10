@@ -54,7 +54,6 @@ export const useAuthStore = defineStore('auth', () => {
 
       // Use verifyOtp to establish a real session as the target user
       const { data, error } = await supabase.auth.verifyOtp({
-        email,
         token_hash,
         type: 'magiclink'
       })
