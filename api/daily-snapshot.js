@@ -3,6 +3,28 @@ export const config = { runtime: 'edge' }
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY
 const FMP_KEY = process.env.VITE_FMP_API_KEY
+const AGENTMAIL_KEY = process.env.AGENTMAIL_API_KEY
+const INBOX_ID = 'beat-snp@agentmail.to'
+const ADMIN_EMAIL = 'martin@myecfo.com'
+
+async function notifyAdmin(subject, body) {
+  if (!AGENTMAIL_KEY) return
+  try {
+    await fetch(`https://api.agentmail.to/v0/inboxes/${INBOX_ID}/messages/send`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${AGENTMAIL_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to: [ADMIN_EMAIL],
+        subject,
+        html: `<div style="font-family:sans-serif;padding:20px;">
+          <h2 style="color:#dc2626;">${subject}</h2>
+          <pre style="background:#f3f4f6;padding:16px;border-radius:8px;overflow:auto;">${body}</pre>
+          <p style="color:#9ca3af;font-size:12px;margin-top:16px;">Automated alert from Beat the S&amp;P 500 daily snapshot cron.</p>
+        </div>`
+      })
+    })
+  } catch (e) { /* best effort */ }
+}
 
 async function sbFetch(path) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1${path}`, {
@@ -21,6 +43,7 @@ export default async function handler(req) {
   // Get all active portfolios with their holdings
   const portfolios = await sbFetch('/portfolios?status=eq.active&select=id,cash_balance,starting_cash,holdings(ticker,shares)')
   if (!portfolios?.length) {
+    await notifyAdmin('⚠️ Daily Snapshot: No active portfolios found', 'The cron ran but found zero active portfolios. This is unexpected.')
     return new Response(JSON.stringify({ message: 'No active portfolios' }), { headers: { 'Content-Type': 'application/json' } })
   }
 
@@ -101,10 +124,20 @@ export default async function handler(req) {
     }
   }
 
-  return new Response(JSON.stringify({
+  const result = {
     snapshotted,
     total: portfolios.length,
     prices_fetched: Object.keys(priceMap).length,
     errors: errors.length > 0 ? errors : undefined
-  }), { headers: { 'Content-Type': 'application/json' } })
+  }
+
+  // Alert admin if there were failures
+  if (errors.length > 0 || snapshotted === 0) {
+    await notifyAdmin(
+      `⚠️ Daily Snapshot: ${errors.length} error(s), ${snapshotted}/${portfolios.length} succeeded`,
+      JSON.stringify(result, null, 2)
+    )
+  }
+
+  return new Response(JSON.stringify(result), { headers: { 'Content-Type': 'application/json' } })
 }
