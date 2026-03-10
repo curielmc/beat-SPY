@@ -62,7 +62,7 @@ export default async function handler(req) {
     ? `[Msg: ${msg.id}] New message from your teacher`
     : `[Insight] Weekly Portfolio Analysis & Lesson`
   const results = await Promise.all(emails.map(({ email, name }) =>
-    fetch(`https://api.agentmail.to/v0/inboxes/${INBOX_ID}/messages`, {
+    fetch(`https://api.agentmail.to/v0/inboxes/${INBOX_ID}/messages/send`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${AGENTMAIL_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
