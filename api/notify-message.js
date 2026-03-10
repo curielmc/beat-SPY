@@ -1,5 +1,12 @@
 export const config = { runtime: 'edge' }
 
+async function hashToken(userId) {
+  const secret = process.env.CRON_SECRET || 'beat-snp-lesson-pref'
+  const data = new TextEncoder().encode(userId + secret)
+  const hash = await crypto.subtle.digest('SHA-256', data)
+  return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 16)
+}
+
 function escapeHtml(input) {
   return String(input || '')
     .replace(/&/g, '&amp;')
@@ -41,17 +48,17 @@ export default async function handler(req) {
   let recipientLabel = ''
 
   if (msg.recipient_type === 'class') {
-    const members = await sbFetch(`/class_memberships?class_id=eq.${msg.class_id}&select=profiles:profiles(email,full_name)`)
-    emails = (members || []).map(m => ({ email: m.profiles?.email, name: m.profiles?.full_name })).filter(e => e.email)
+    const members = await sbFetch(`/class_memberships?class_id=eq.${msg.class_id}&select=user_id,profiles:profiles(email,full_name)`)
+    emails = (members || []).map(m => ({ email: m.profiles?.email, name: m.profiles?.full_name, user_id: m.user_id })).filter(e => e.email)
     recipientLabel = 'your class'
   } else if (msg.recipient_type === 'group') {
-    const members = await sbFetch(`/class_memberships?group_id=eq.${msg.recipient_id}&select=profiles:profiles(email,full_name)`)
+    const members = await sbFetch(`/class_memberships?group_id=eq.${msg.recipient_id}&select=user_id,profiles:profiles(email,full_name)`)
     const group = await sbFetch(`/groups?id=eq.${msg.recipient_id}&select=name`)
-    emails = (members || []).map(m => ({ email: m.profiles?.email, name: m.profiles?.full_name })).filter(e => e.email)
+    emails = (members || []).map(m => ({ email: m.profiles?.email, name: m.profiles?.full_name, user_id: m.user_id })).filter(e => e.email)
     recipientLabel = group?.[0]?.name || 'your group'
   } else if (msg.recipient_type === 'user') {
     const profile = await sbFetch(`/profiles?id=eq.${msg.recipient_id}&select=email,full_name`)
-    if (profile?.[0]?.email) emails = [{ email: profile[0].email, name: profile[0].full_name }]
+    if (profile?.[0]?.email) emails = [{ email: profile[0].email, name: profile[0].full_name, user_id: msg.recipient_id }]
     recipientLabel = 'you'
   }
 
@@ -62,12 +69,11 @@ export default async function handler(req) {
     ? `[Msg: ${msg.id}] New message from your teacher`
     : `[Beat the S&P] Quick Insight`
   // Split content into AI analysis and Quick Insight if present
-  function buildEmailHtml(content, label) {
+  async function buildEmailHtml(content, label, userId) {
     const insightMarker = '💡 **Quick Insight:'
     const hasInsight = content.includes(insightMarker)
 
     let analysisHtml = ''
-    let insightHtml = ''
 
     if (hasInsight) {
       const parts = content.split(insightMarker)
@@ -78,6 +84,21 @@ export default async function handler(req) {
       const insightTitle = titleMatch ? titleMatch[1].trim() : 'Quick Insight'
       const insightBody = insightRaw.replace(/.*\*\*\s*/, '').trim()
 
+      let difficultyButtons = ''
+      if (userId) {
+        const basicToken = await hashToken(userId)
+        const advancedToken = await hashToken(userId)
+        const baseUrl = 'https://beat-snp.com/api/lesson-preference'
+        const basicUrl = `${baseUrl}?user=${userId}&level=basic&token=${basicToken}`
+        const advancedUrl = `${baseUrl}?user=${userId}&level=advanced&token=${advancedToken}`
+        difficultyButtons = `
+          <div style="margin-top: 12px; padding-top: 10px; border-top: 1px solid #eab30833;">
+            <p style="margin: 0 0 8px; font-size: 12px; color: #854d0e;">Adjust lesson difficulty:</p>
+            <a href="${basicUrl}" style="display: inline-block; padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: bold; text-decoration: none; background: #fef3c7; color: #92400e; border: 1px solid #f59e0b; margin-right: 8px;">📖 Switch to Basic</a>
+            <a href="${advancedUrl}" style="display: inline-block; padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: bold; text-decoration: none; background: #dbeafe; color: #1e40af; border: 1px solid #3b82f6;">🚀 Switch to Advanced</a>
+          </div>`
+      }
+
       analysisHtml = `
         <div style="background: white; border-left: 4px solid #6366f1; padding: 16px; border-radius: 6px; margin-bottom: 20px;">
           <p style="margin: 0; font-size: 15px; color: #111827;">${escapeHtml(analysis)}</p>
@@ -85,6 +106,7 @@ export default async function handler(req) {
         <div style="background: #fefce8; border-left: 4px solid #eab308; padding: 16px; border-radius: 6px; margin-bottom: 24px;">
           <p style="margin: 0 0 6px; font-size: 14px; font-weight: bold; color: #854d0e;">💡 Quick Insight: ${escapeHtml(insightTitle)}</p>
           <p style="margin: 0; font-size: 14px; color: #713f12;">${escapeHtml(insightBody)}</p>
+          ${difficultyButtons}
         </div>`
     } else {
       analysisHtml = `
@@ -114,17 +136,14 @@ export default async function handler(req) {
       </div>`
   }
 
-  const results = await Promise.all(emails.map(({ email, name }) =>
-    fetch(`https://api.agentmail.to/v0/inboxes/${INBOX_ID}/messages/send`, {
+  const results = await Promise.all(emails.map(async ({ email, user_id }) => {
+    const html = await buildEmailHtml(msg.content, recipientLabel, user_id)
+    return fetch(`https://api.agentmail.to/v0/inboxes/${INBOX_ID}/messages/send`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${AGENTMAIL_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        to: [email],
-        subject,
-        html: buildEmailHtml(msg.content, recipientLabel)
-      })
+      body: JSON.stringify({ to: [email], subject, html })
     }).then(r => r.json())
-  ))
+  }))
 
   return new Response(JSON.stringify({ sent: emails.length, results }), {
     status: 200,

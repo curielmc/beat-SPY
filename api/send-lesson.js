@@ -162,23 +162,43 @@ export default async function handler(req) {
         : lessons[Math.floor(Math.random() * lessons.length)]
   }
 
-  // Build AI analysis from portfolio context
+  // Build AI analysis from portfolio context with live market data
   const tickers = (portfolio.holdings || []).map(h => h.ticker)
-  let newsSnippet = ''
+  let newsContext = ''
+  let priceContext = ''
+
   if (FMP_KEY && tickers.length > 0) {
-    const news = await fetch(`https://financialmodelingprep.com/api/v3/stock_news?tickers=${tickers.slice(0, 3).join(',')}&limit=3&apikey=${FMP_KEY}`).then(r => r.json()).catch(() => [])
+    // Fetch recent news with summaries
+    const [news, quotes] = await Promise.all([
+      fetch(`https://financialmodelingprep.com/api/v3/stock_news?tickers=${tickers.join(',')}&limit=5&apikey=${FMP_KEY}`).then(r => r.json()).catch(() => []),
+      fetch(`https://financialmodelingprep.com/api/v3/quote/${tickers.join(',')}?apikey=${FMP_KEY}`).then(r => r.json()).catch(() => [])
+    ])
+
     if (news?.length > 0) {
-      newsSnippet = 'Recent news in their stocks: ' + news.map(n => n.title).join('; ')
+      newsContext = 'Recent headlines:\n' + news.slice(0, 5).map(n =>
+        `- ${n.symbol}: "${n.title}"${n.text ? ' — ' + n.text.slice(0, 120) : ''}`
+      ).join('\n')
+    }
+
+    if (quotes?.length > 0) {
+      priceContext = 'Current performance:\n' + quotes.map(q =>
+        `- ${q.symbol}: $${q.price} (${q.changesPercentage >= 0 ? '+' : ''}${q.changesPercentage?.toFixed(2)}% today, ${q.yearHigh ? 'Year high: $' + q.yearHigh : ''})`
+      ).join('\n')
     }
   }
 
   let analysis = 'Great job managing your portfolio!'
   if (tickers.length > 0) {
-    const portfolioContext = `Portfolio: ${portfolio.holdings.map(h => `${h.ticker} (${h.shares} shares)`).join(', ')}. ${newsSnippet}`
-    const prompt = `You are "Market Spy AI", a helpful financial coach for high school students.
-      Analyze this portfolio and provide a ONE-SENTENCE encouraging but educational insight.
-      Context: ${portfolioContext}
-      Use a tone appropriate for a teenager. Be brief.`
+    const holdingsStr = portfolio.holdings.map(h => `${h.ticker} (${h.shares} shares)`).join(', ')
+    const prompt = `You are "Market Spy AI", a financial coach for high school students.
+
+Portfolio holdings: ${holdingsStr}
+
+${priceContext}
+
+${newsContext}
+
+Based on the above, write ONE sentence that references a specific recent news event or price movement for one of their stocks. Make it educational and encouraging. Speak directly to the student like a mentor. Be specific — mention the stock ticker and what happened. Keep it under 40 words.`
     analysis = await generateAIAnalysis(prompt) || analysis
   }
 
