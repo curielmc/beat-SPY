@@ -8,29 +8,11 @@ export const useAuthStore = defineStore('auth', () => {
   const loading = ref(true)
   const initialized = ref(false)
 
-  // Admin masquerade
+  // Admin masquerade — real session swap
   const masqueradeUser = ref(JSON.parse(sessionStorage.getItem('masquerade') || 'null'))
+  const _originalSession = ref(JSON.parse(sessionStorage.getItem('masquerade_original') || 'null'))
 
-  function startMasquerade(user) {
-    masqueradeUser.value = user
-    sessionStorage.setItem('masquerade', JSON.stringify(user))
-    // Clear all caches so next load fetches masquerade user's data fresh
-    allMemberships.value = []
-    activeClassId.value = null
-    localStorage.removeItem('beatspy_active_class')
-    _membershipCacheUid = null
-    _membershipCacheTs = 0
-    // Clear portfolio store cache
-    try { const { usePortfolioStore } = require('../stores/portfolio'); usePortfolioStore().$reset?.() } catch(e) {}
-    if (typeof window !== 'undefined') {
-      // Force portfolio store cache clear via global flag
-      window.__clearPortfolioCache = true
-    }
-  }
-  function stopMasquerade() {
-    masqueradeUser.value = null
-    sessionStorage.removeItem('masquerade')
-    // Clear caches
+  function _clearCaches() {
     allMemberships.value = []
     activeClassId.value = null
     localStorage.removeItem('beatspy_active_class')
@@ -38,6 +20,93 @@ export const useAuthStore = defineStore('auth', () => {
     _membershipCacheTs = 0
     if (typeof window !== 'undefined') window.__clearPortfolioCache = true
   }
+
+  async function startMasquerade(user) {
+    // Save the admin's current session so we can restore it later
+    const { data: { session: adminSession } } = await supabase.auth.getSession()
+    if (!adminSession) return { error: 'No active session' }
+
+    _originalSession.value = {
+      access_token: adminSession.access_token,
+      refresh_token: adminSession.refresh_token
+    }
+    sessionStorage.setItem('masquerade_original', JSON.stringify(_originalSession.value))
+
+    // Call the masquerade API to get a magic link token for the target user
+    try {
+      const res = await fetch('/api/masquerade', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminSession.access_token}`
+        },
+        body: JSON.stringify({ target_user_id: user.id || user.userId })
+      })
+
+      if (!res.ok) {
+        const err = await res.json()
+        _originalSession.value = null
+        sessionStorage.removeItem('masquerade_original')
+        return { error: err.error || 'Masquerade failed' }
+      }
+
+      const { email, token_hash } = await res.json()
+
+      // Use verifyOtp to establish a real session as the target user
+      const { data, error } = await supabase.auth.verifyOtp({
+        email,
+        token_hash,
+        type: 'magiclink'
+      })
+
+      if (error) {
+        // Restore admin session on failure
+        await supabase.auth.setSession(_originalSession.value)
+        _originalSession.value = null
+        sessionStorage.removeItem('masquerade_original')
+        return { error: 'Session switch failed: ' + error.message }
+      }
+
+      // Successfully switched to target user's session
+      masqueradeUser.value = { id: data.user.id, email: data.user.email }
+      sessionStorage.setItem('masquerade', JSON.stringify(masqueradeUser.value))
+
+      currentUser.value = data.user
+      await fetchProfile(data.user.id)
+      _clearCaches()
+
+      return { success: true }
+    } catch (err) {
+      // Restore admin session on error
+      if (_originalSession.value) {
+        await supabase.auth.setSession(_originalSession.value)
+      }
+      _originalSession.value = null
+      sessionStorage.removeItem('masquerade_original')
+      return { error: err.message }
+    }
+  }
+
+  async function stopMasquerade() {
+    if (_originalSession.value) {
+      // Restore the admin's original session
+      await supabase.auth.setSession(_originalSession.value)
+
+      // Reload admin's profile
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.user) {
+        currentUser.value = session.user
+        await fetchProfile(session.user.id)
+      }
+    }
+
+    masqueradeUser.value = null
+    _originalSession.value = null
+    sessionStorage.removeItem('masquerade')
+    sessionStorage.removeItem('masquerade_original')
+    _clearCaches()
+  }
+
   const isMasquerading = computed(() => !!masqueradeUser.value)
   const effectiveUserId = computed(() => masqueradeUser.value?.id || currentUser.value?.id || null)
 
@@ -62,6 +131,8 @@ export const useAuthStore = defineStore('auth', () => {
   const isLoggedIn = computed(() => !!currentUser.value)
   const isTeacher = computed(() => userType.value === 'teacher')
   const isAdmin = computed(() => {
+    // During masquerade, admin is still an admin (for route guards and nav)
+    if (isMasquerading.value) return true
     const role = profile.value?.role
     const email = currentUser.value?.email?.toLowerCase()
     // Hardcoded fallback for the owner to prevent lockouts
@@ -71,6 +142,8 @@ export const useAuthStore = defineStore('auth', () => {
 
   // Also update userType to reflect the hardcoded admin status
   const userType = computed(() => {
+    // During masquerade, show the student's role for the student view
+    if (isMasquerading.value) return profile.value?.role || 'student'
     const email = currentUser.value?.email?.toLowerCase()
     if (email === 'martin@myecfo.com') return 'admin'
     return profile.value?.role || null
@@ -128,6 +201,9 @@ export const useAuthStore = defineStore('auth', () => {
     // Listen for auth state changes
     supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('[AUTH] onAuthStateChange:', event, { hasSession: !!session, userId: session?.user?.id })
+      // Skip side effects during masquerade session switches
+      if (isMasquerading.value || _originalSession.value) return
+
       if (event === 'SIGNED_IN' && session?.user) {
         currentUser.value = session.user
         const profileResult = await fetchProfile(session.user.id)

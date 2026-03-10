@@ -1,0 +1,92 @@
+export const config = { runtime: 'edge' }
+
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY
+
+export default async function handler(req) {
+  if (req.method !== 'POST') {
+    return new Response('Method not allowed', { status: 405 })
+  }
+
+  // Verify caller is admin
+  const authHeader = req.headers.get('authorization')
+  if (!authHeader) return new Response('Unauthorized', { status: 401 })
+
+  const token = authHeader.replace('Bearer ', '')
+  const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+    headers: { Authorization: `Bearer ${token}`, apikey: SUPABASE_KEY }
+  })
+  if (!userRes.ok) return new Response('Unauthorized', { status: 401 })
+
+  const caller = await userRes.json()
+
+  // Check admin role
+  const profileRes = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${caller.id}&select=role,email`, {
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
+  })
+  const profiles = await profileRes.json()
+  const callerRole = profiles?.[0]?.role
+  const callerEmail = profiles?.[0]?.email?.toLowerCase()
+
+  if (callerRole !== 'admin' && callerEmail !== 'martin@myecfo.com') {
+    return new Response('Forbidden', { status: 403 })
+  }
+
+  const { target_user_id } = await req.json()
+  if (!target_user_id) {
+    return new Response(JSON.stringify({ error: 'target_user_id required' }), {
+      status: 400, headers: { 'Content-Type': 'application/json' }
+    })
+  }
+
+  // Get target user's email
+  const targetRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${target_user_id}`, {
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
+  })
+  if (!targetRes.ok) {
+    return new Response(JSON.stringify({ error: 'User not found' }), {
+      status: 404, headers: { 'Content-Type': 'application/json' }
+    })
+  }
+  const targetUser = await targetRes.json()
+  const targetEmail = targetUser.email
+
+  if (!targetEmail) {
+    return new Response(JSON.stringify({ error: 'User has no email' }), {
+      status: 400, headers: { 'Content-Type': 'application/json' }
+    })
+  }
+
+  // Generate a magic link for the target user using Supabase admin API
+  const linkRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/generate_link`, {
+    method: 'POST',
+    headers: {
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${SUPABASE_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      type: 'magiclink',
+      email: targetEmail
+    })
+  })
+
+  if (!linkRes.ok) {
+    const err = await linkRes.text()
+    return new Response(JSON.stringify({ error: 'Failed to generate link: ' + err }), {
+      status: 500, headers: { 'Content-Type': 'application/json' }
+    })
+  }
+
+  const linkData = await linkRes.json()
+
+  // The response contains hashed_token and action_link
+  // Extract the token_hash and type from the action_link or use properties directly
+  return new Response(JSON.stringify({
+    email: targetEmail,
+    token_hash: linkData.hashed_token,
+    action_link: linkData.action_link
+  }), {
+    headers: { 'Content-Type': 'application/json' }
+  })
+}

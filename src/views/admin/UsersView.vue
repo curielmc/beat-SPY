@@ -99,7 +99,7 @@
                 </td>
                 <td class="text-sm text-base-content/60">{{ new Date(user.created_at).toLocaleDateString() }}</td>
                 <td class="flex gap-1">
-                  <button v-if="!user.is_disabled && (user.role === 'student' || user.role === 'teacher')" class="btn btn-ghost btn-xs text-primary gap-1" @click="masqueradeAs(user)">
+                  <button v-if="!user.is_disabled && (user.role === 'student' || user.role === 'teacher')" class="btn btn-ghost btn-xs text-primary gap-1" :disabled="masquerading" @click="masqueradeAs(user)">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
                     View as {{ user.full_name?.split(' ')[0] }}
                   </button>
@@ -381,8 +381,15 @@ onMounted(async () => {
 const router = useRouter()
 const auth = useAuthStore()
 
-function masqueradeAs(user) {
-  auth.startMasquerade(user)
+const masquerading = ref(false)
+async function masqueradeAs(user) {
+  masquerading.value = true
+  const result = await auth.startMasquerade(user)
+  masquerading.value = false
+  if (result?.error) {
+    alert('Masquerade failed: ' + result.error)
+    return
+  }
   router.push('/leaderboard')
 }
 
