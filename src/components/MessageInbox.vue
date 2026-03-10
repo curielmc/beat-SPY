@@ -82,6 +82,28 @@
                   {{ msg.sender_id === currentUserId ? 'You' : (msg.sender_id ? (senderNames[msg.sender_id] || 'Teacher') : 'Market Spy AI') }}
                 </p>
                 <p>{{ msg.content }}</p>
+                <!-- Difficulty toggle for AI lesson messages -->
+                <div v-if="!msg.sender_id && msg.content.includes('Weekly Lesson:')" class="flex gap-2 mt-2 pt-2 border-t border-base-content/10">
+                  <button
+                    class="btn btn-xs gap-1"
+                    :class="lessonDifficulty === 'basic' ? 'btn-disabled opacity-50' : 'btn-outline btn-warning'"
+                    :disabled="lessonDifficulty === 'basic' || updatingDifficulty"
+                    @click.stop="setDifficulty('basic')"
+                  >
+                    <span v-if="updatingDifficulty === 'basic'" class="loading loading-spinner loading-xs"></span>
+                    <span v-else>&#x1F4D6;</span> Too Advanced
+                  </button>
+                  <button
+                    class="btn btn-xs gap-1"
+                    :class="lessonDifficulty === 'advanced' ? 'btn-disabled opacity-50' : 'btn-outline btn-info'"
+                    :disabled="lessonDifficulty === 'advanced' || updatingDifficulty"
+                    @click.stop="setDifficulty('advanced')"
+                  >
+                    <span v-if="updatingDifficulty === 'advanced'" class="loading loading-spinner loading-xs"></span>
+                    <span v-else>&#x1F680;</span> Too Basic
+                  </button>
+                  <span v-if="difficultyUpdated" class="text-xs text-success self-center ml-1">Updated!</span>
+                </div>
               </div>
               <div class="flex items-center gap-1 mt-1 px-1"
                 :class="msg.sender_id === currentUserId ? 'justify-end' : 'justify-start'">
@@ -140,6 +162,9 @@ const draft = ref('')
 const sending = ref(false)
 const loadingMessages = ref(false)
 const threadEl = ref(null)
+const lessonDifficulty = ref('basic')
+const updatingDifficulty = ref(null)
+const difficultyUpdated = ref(false)
 let realtimeSub = null
 
 const unreadCount = computed(() =>
@@ -253,6 +278,35 @@ function scrollToBottom() {
   nextTick(() => { if (threadEl.value) threadEl.value.scrollTop = threadEl.value.scrollHeight })
 }
 
+async function loadLessonPreference() {
+  const { data } = await supabase.from('user_lesson_preferences')
+    .select('difficulty').eq('user_id', currentUserId.value).single()
+  if (data) lessonDifficulty.value = data.difficulty
+}
+
+async function setDifficulty(level) {
+  updatingDifficulty.value = level
+  difficultyUpdated.value = false
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) { updatingDifficulty.value = null; return }
+
+  const res = await fetch('/api/lesson-difficulty', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${session.access_token}`
+    },
+    body: JSON.stringify({ difficulty: level })
+  })
+
+  if (res.ok) {
+    lessonDifficulty.value = level
+    difficultyUpdated.value = true
+    setTimeout(() => { difficultyUpdated.value = false }, 3000)
+  }
+  updatingDifficulty.value = null
+}
+
 async function loadMeta() {
   const membership = await auth.getCurrentMembership()
   if (membership?.class_id) {
@@ -271,6 +325,7 @@ async function loadMeta() {
     await loadThread()
     subscribeRealtime()
   }
+  await loadLessonPreference()
 }
 
 onMounted(loadMeta)

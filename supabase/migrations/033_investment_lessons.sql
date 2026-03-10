@@ -3,7 +3,8 @@ CREATE TABLE IF NOT EXISTS investment_lessons (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   title text NOT NULL,
   content text NOT NULL,
-  lesson_type text NOT NULL, -- 'diversification', 'risk', 'sector', 'long-term', etc.
+  lesson_type text NOT NULL, -- 'diversification', 'risk', 'sector', 'long-term', 'personal_finance', etc.
+  difficulty text NOT NULL DEFAULT 'basic' CHECK (difficulty IN ('basic', 'advanced')),
   created_at timestamptz DEFAULT now()
 );
 
@@ -42,6 +43,21 @@ CREATE POLICY "Users can read own sent lessons" ON sent_lessons
       WHERE cm.group_id = sent_lessons.recipient_id AND cm.user_id = auth.uid()
     ))
   );
+
+-- Track each user's preferred difficulty level
+CREATE TABLE IF NOT EXISTS user_lesson_preferences (
+  user_id uuid PRIMARY KEY REFERENCES profiles(id) ON DELETE CASCADE,
+  difficulty text NOT NULL DEFAULT 'basic' CHECK (difficulty IN ('basic', 'advanced')),
+  updated_at timestamptz DEFAULT now()
+);
+
+ALTER TABLE user_lesson_preferences ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can read own lesson preference" ON user_lesson_preferences
+  FOR SELECT USING (user_id = auth.uid());
+
+CREATE POLICY "Users can upsert own lesson preference" ON user_lesson_preferences
+  FOR ALL USING (user_id = auth.uid());
 
 -- Seed some initial lessons
 INSERT INTO investment_lessons (title, content, lesson_type) VALUES

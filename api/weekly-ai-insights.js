@@ -125,12 +125,19 @@ export default async function handler(req) {
         }
       }
 
+      // Get student's preferred difficulty level
+      const prefs = await sbFetch(`/user_lesson_preferences?user_id=eq.${portfolio.owner_id}&select=difficulty`)
+      const difficulty = prefs?.[0]?.difficulty || 'basic'
+
       const sentLessons = await sbFetch(`/sent_lessons?recipient_id=eq.${portfolio.owner_id}&select=lesson_id`)
       const seenIds = (sentLessons || []).map(s => s.lesson_id)
-      const availableLessons = lessons.filter(l => !seenIds.includes(l.id))
-      const lesson = availableLessons.length > 0 
+      const availableLessons = lessons.filter(l => l.difficulty === difficulty && !seenIds.includes(l.id))
+      const fallbackLessons = lessons.filter(l => l.difficulty === difficulty)
+      const lesson = availableLessons.length > 0
         ? availableLessons[Math.floor(Math.random() * availableLessons.length)]
-        : lessons[Math.floor(Math.random() * lessons.length)]
+        : fallbackLessons.length > 0
+          ? fallbackLessons[Math.floor(Math.random() * fallbackLessons.length)]
+          : lessons[Math.floor(Math.random() * lessons.length)]
 
       const portfolioContext = `Portfolio: ${portfolio.holdings.map(h => `${h.ticker} (${h.shares} shares)`).join(', ')}. ${newsSnippet}`
       
