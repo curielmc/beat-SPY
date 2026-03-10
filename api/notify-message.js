@@ -60,7 +60,7 @@ export default async function handler(req) {
   // Send via AgentMail
   const subject = msg.sender_id 
     ? `[Msg: ${msg.id}] New message from your teacher`
-    : `[Beat the S&P] Something to Think About`
+    : `[Beat the S&P] Quick Insight`
   const results = await Promise.all(emails.map(({ email, name }) =>
     fetch(`https://api.agentmail.to/v0/inboxes/${INBOX_ID}/messages/send`, {
       method: 'POST',
