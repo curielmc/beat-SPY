@@ -164,8 +164,6 @@ import TimeRangeSelector from '../../components/charts/TimeRangeSelector.vue'
 import { getHistoricalDaily } from '../../services/fmpApi'
 import { isMarketOpen } from '../../utils/marketHours'
 import {
-  reconstructHoldingsAsOf,
-  reconstructCashAsOf,
   computePeriodReturn,
   computeTodayReturn,
   computeAnnualizedReturn,
@@ -735,67 +733,92 @@ async function computePeriodMetrics(entries) {
       periodDates[key] = new Date(now.getTime() - days * 86400000).toISOString().split('T')[0]
     }
 
-    // Collect all unique tickers across all entries
-    const allTickers = new Set()
-    for (const entry of entries) {
-      for (const h of entry.holdings) allTickers.add(h.ticker)
+    // Get all portfolio IDs
+    const portfolioIds = entries.map(e => e.portfolioId).filter(Boolean)
+
+    // Find the earliest period date we need
+    const allDateStrs = Object.values(periodDates)
+    const earliestDate = allDateStrs.sort()[0]
+
+    // Fetch all daily snapshots for these portfolios from the earliest date
+    let allSnapshots = []
+    if (portfolioIds.length > 0) {
+      const { data } = await supabase
+        .from('portfolio_snapshots')
+        .select('portfolio_id, total_value, snapshot_date')
+        .eq('snapshot_type', 'daily')
+        .in('portfolio_id', portfolioIds)
+        .gte('snapshot_date', earliestDate)
+        .order('snapshot_date', { ascending: true })
+      allSnapshots = data || []
     }
-    allTickers.add('SPY')
-    const tickerList = [...allTickers]
 
-    // Fetch historical prices for each period date
-    const historicalByDate = {}
-    await Promise.all(
-      Object.entries(periodDates).map(async ([key, dateStr]) => {
-        historicalByDate[key] = await market.fetchHistoricalCloseForTickers(tickerList, dateStr)
-      })
-    )
+    // Index snapshots by portfolio_id
+    const snapshotsByPortfolio = {}
+    for (const s of allSnapshots) {
+      if (!snapshotsByPortfolio[s.portfolio_id]) snapshotsByPortfolio[s.portfolio_id] = []
+      snapshotsByPortfolio[s.portfolio_id].push(s)
+    }
 
-    // Compute period returns for each entry
+    // For each entry and period, find the closest snapshot
     for (const entry of entries) {
-      for (const [key, dateStr] of Object.entries(periodDates)) {
-        const asOfDate = new Date(dateStr)
-        const created = new Date(entry.createdAt)
+      const snapshots = snapshotsByPortfolio[entry.portfolioId] || []
 
-        // If portfolio was created AFTER the start of this period, 
-        // the return for this period is effectively the return "Since Inception"
+      for (const [key, dateStr] of Object.entries(periodDates)) {
+        const created = new Date(entry.createdAt)
+        const asOfDate = new Date(dateStr)
+
         if (created > asOfDate) {
           entry.metrics[key] = entry.metrics.sinceInception
           continue
         }
 
-        const pastHoldings = reconstructHoldingsAsOf(entry.holdings, entry.trades, asOfDate)
-        const pastCash = reconstructCashAsOf(entry.cashBalance, entry.trades, asOfDate)
-        const historicalPrices = historicalByDate[key]
-
-        const pastValue = pastHoldings.reduce((sum, h) => {
-          const price = historicalPrices[h.ticker] || market.getCachedPrice(h.ticker) || 0
-          return sum + (h.shares * price)
-        }, 0) + pastCash
-
-        // Skip if past value is unreasonably small (missing price data)
-        if (pastValue < 1) {
-          entry.metrics[key] = entry.metrics.sinceInception
-          continue
+        // Find the closest snapshot to the target date
+        const targetTs = new Date(dateStr).getTime()
+        let closest = null
+        let closestDiff = Infinity
+        for (const s of snapshots) {
+          const sDate = new Date(s.snapshot_date).getTime()
+          const diff = Math.abs(sDate - targetTs)
+          if (diff < closestDiff) {
+            closestDiff = diff
+            closest = s
+          }
         }
 
-        entry.metrics[key] = computePeriodReturn(pastValue, entry.totalValue)
+        if (closest && closestDiff < 5 * 86400000) {
+          // Use snapshot if within 5 days of target
+          const pastValue = Number(closest.total_value)
+          if (pastValue > 1) {
+            entry.metrics[key] = computePeriodReturn(pastValue, entry.totalValue)
+          } else {
+            entry.metrics[key] = entry.metrics.sinceInception
+          }
+        } else {
+          // No snapshot available — fall back to since inception
+          entry.metrics[key] = entry.metrics.sinceInception
+        }
       }
     }
 
-    // SPY benchmark period returns
-    for (const [key, dateStr] of Object.entries(periodDates)) {
-      const spyPrice = market.getCachedPrice('SPY')
-      const spyHistorical = historicalByDate[key]?.SPY
-      
-      // If SPY has historical data for this period
-      if (spyPrice && spyHistorical && spyHistorical > 0) {
-        benchmarkMetrics.value[key] = computePeriodReturn(spyHistorical, spyPrice)
-      } else if (spyPrice && key === 'sinceInception') {
-        // For sinceInception, use the total SPY return if we have a current price
-        benchmarkMetrics.value[key] = portfolioStore.benchmarkReturnPct
-      } else {
-        benchmarkMetrics.value[key] = null
+    // SPY benchmark period returns (still use FMP historical)
+    const spyPrice = market.getCachedPrice('SPY')
+    if (spyPrice) {
+      const spyDates = Object.entries(periodDates)
+      const spyHistorical = {}
+      await Promise.all(
+        spyDates.map(async ([key, dateStr]) => {
+          const prices = await market.fetchHistoricalCloseForTickers(['SPY'], dateStr)
+          spyHistorical[key] = prices?.SPY
+        })
+      )
+
+      for (const [key] of spyDates) {
+        if (spyHistorical[key] && spyHistorical[key] > 0) {
+          benchmarkMetrics.value[key] = computePeriodReturn(spyHistorical[key], spyPrice)
+        } else {
+          benchmarkMetrics.value[key] = null
+        }
       }
     }
 

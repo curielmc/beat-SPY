@@ -13,6 +13,10 @@
     {
       "path": "/api/weekly-ai-insights",
       "schedule": "0 0 * * 0"
+    },
+    {
+      "path": "/api/daily-snapshot",
+      "schedule": "0 21 * * 1-5"
     }
   ]
 }
