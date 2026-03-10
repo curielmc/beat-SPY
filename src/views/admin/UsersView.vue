@@ -103,6 +103,16 @@
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
                     View as {{ user.full_name?.split(' ')[0] }}
                   </button>
+                  <button
+                    v-if="!user.is_disabled && user.role === 'student'"
+                    class="btn btn-ghost btn-xs text-info gap-1"
+                    :disabled="sendingLessonId === user.id"
+                    @click="sendLesson(user)"
+                  >
+                    <span v-if="sendingLessonId === user.id" class="loading loading-spinner loading-xs"></span>
+                    <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+                    Send Lesson
+                  </button>
                   <button class="btn btn-ghost btn-xs text-error" :disabled="user.is_disabled" @click="confirmDelete(user)">Delete</button>
                 </td>
               </tr>
@@ -200,6 +210,55 @@ const mergeTargetId = ref('')
 const mergeNote = ref('')
 const mergeLoading = ref(false)
 const errorMsg = ref('')
+const sendingLessonId = ref(null)
+
+async function sendLesson(user) {
+  sendingLessonId.value = user.id
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) return
+
+    // Try sending as individual user first, then check if they're in a group
+    let res = await fetch('/api/send-lesson', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`
+      },
+      body: JSON.stringify({ owner_id: user.id, owner_type: 'user' })
+    })
+
+    // If no personal portfolio, try their group portfolio
+    if (!res.ok) {
+      const { data: membership } = await supabase
+        .from('class_memberships')
+        .select('group_id')
+        .eq('user_id', user.id)
+        .not('group_id', 'is', null)
+        .maybeSingle()
+
+      if (membership?.group_id) {
+        res = await fetch('/api/send-lesson', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`
+          },
+          body: JSON.stringify({ owner_id: membership.group_id, owner_type: 'group' })
+        })
+      }
+    }
+
+    const result = await res.json()
+    if (res.ok) {
+      showSuccess(`Lesson sent to ${user.full_name}: "${result.lesson_title}" (${result.difficulty})`)
+    } else {
+      showSuccess(`Error: ${result.error || 'Failed to send lesson'}`)
+    }
+  } finally {
+    sendingLessonId.value = null
+  }
+}
 
 onMounted(async () => {
   await fetchUsers()
