@@ -158,7 +158,7 @@ export default async function handler(req) {
       }
 
       if (classId) {
-        const content = `${analysis}\n\n🎓 **Weekly Lesson: ${lesson.title}**\n${lesson.content}`
+        const content = `${analysis}\n\n💡 **Something to Think About: ${lesson.title}**\n${lesson.content}`
         
         const msgRes = await fetch(`${SUPABASE_URL}/rest/v1/messages`, {
           method: 'POST',

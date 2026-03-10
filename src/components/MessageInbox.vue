@@ -83,7 +83,7 @@
                 </p>
                 <p>{{ msg.content }}</p>
                 <!-- Difficulty toggle for AI lesson messages -->
-                <div v-if="!msg.sender_id && msg.content.includes('Weekly Lesson:')" class="flex gap-2 mt-2 pt-2 border-t border-base-content/10">
+                <div v-if="!msg.sender_id && msg.content.includes('Something to Think About:')" class="flex gap-2 mt-2 pt-2 border-t border-base-content/10">
                   <button
                     class="btn btn-xs gap-1"
                     :class="lessonDifficulty === 'basic' ? 'btn-disabled opacity-50' : 'btn-outline btn-warning'"
