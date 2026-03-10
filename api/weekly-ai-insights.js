@@ -160,7 +160,10 @@ ${priceContext}
 
 ${newsContext}
 
-Based on the above, write ONE sentence that references a specific recent news event or price movement for one of their stocks. Make it educational and encouraging. Speak directly to the student like a mentor. Be specific — mention the stock ticker and what happened. Keep it under 40 words.`
+Based on the above, explain specifically WHAT happened with their stocks this week. 
+Identify 1-2 key stocks that moved and explain WHY they moved (e.g., "VRTX surged over 8% today because of positive data for their new kidney disease drug"). 
+If there is no specific news for their stocks, explain a broader market or sector trend that affected their portfolio value. 
+Use a professional but accessible tone for a teenager. Keep it to 2-3 concise, timely sentences.`
 
       const analysis = await generateAIAnalysis(prompt) || "Great job managing your portfolio this week!"
 
