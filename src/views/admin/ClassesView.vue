@@ -99,8 +99,10 @@
             <div v-if="cls.groups?.length" class="card bg-base-200 p-4">
               <div class="flex items-center justify-between mb-3">
                 <h3 class="font-semibold">Group Leaderboard</h3>
-                <button v-if="!leaderboards[cls.id]" class="btn btn-xs btn-outline btn-primary" :disabled="leaderboardLoading[cls.id]" @click="loadLeaderboard(cls)">
-                  {{ leaderboardLoading[cls.id] ? 'Loading...' : 'Load Leaderboard' }}
+                <button class="btn btn-xs btn-ghost gap-1" :disabled="leaderboardLoading[cls.id]" @click="loadLeaderboard(cls)">
+                  <svg v-if="leaderboardLoading[cls.id]" class="animate-spin h-3 w-3" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                  <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                  {{ leaderboardLoading[cls.id] ? 'Updating...' : 'Refresh' }}
                 </button>
               </div>
               <div class="overflow-x-auto">
@@ -122,7 +124,7 @@
                         <span v-else class="text-base-content/30">-</span>
                       </td>
                       <td class="font-medium">
-                        <span v-if="leaderboards[cls.id] && group.funds?.length" class="mr-1 text-xs">{{ expandedGroups[cls.id + ':' + group.id] ? '&#9660;' : '&#9654;' }}</span>
+                        <span v-if="leaderboards[cls.id] && group.funds?.length" class="mr-1 text-xs">{{ expandedGroups[cls.id + ':' + group.id] ? '▼' : '▶' }}</span>
                         {{ group.name }}
                       </td>
                       <td>
@@ -134,14 +136,18 @@
                       </td>
                       <td class="text-right">
                         <span v-if="leaderboards[cls.id]" class="badge badge-sm badge-ghost">{{ group.funds?.length || 0 }}</span>
+                        <span v-else-if="leaderboardLoading[cls.id]" class="loading loading-spinner loading-xs"></span>
+                        <span v-else class="text-base-content/20">-</span>
                       </td>
                       <td class="text-right font-mono" :class="group.returnPct > 0 ? 'text-success' : group.returnPct < 0 ? 'text-error' : ''">
                         <template v-if="leaderboards[cls.id]">{{ group.returnPct >= 0 ? '+' : '' }}{{ group.returnPct.toFixed(2) }}%</template>
-                        <span v-else class="text-base-content/30">-</span>
+                        <span v-else-if="leaderboardLoading[cls.id]" class="loading loading-spinner loading-xs"></span>
+                        <span v-else class="text-base-content/20">-</span>
                       </td>
                       <td class="text-right font-mono">
                         <template v-if="leaderboards[cls.id]">${{ group.totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</template>
-                        <span v-else class="text-base-content/30">-</span>
+                        <span v-else-if="leaderboardLoading[cls.id]" class="loading loading-spinner loading-xs"></span>
+                        <span v-else class="text-base-content/20">-</span>
                       </td>
                     </tr>
                     <!-- Expanded fund details -->
@@ -319,6 +325,11 @@ async function fetchClasses() {
     }
   }
   loading.value = false
+
+  // Automatically load leaderboards for all classes in background
+  classes.value.forEach(cls => {
+    loadLeaderboard(cls)
+  })
 }
 
 function getGroupMembers(cls, groupId) {
