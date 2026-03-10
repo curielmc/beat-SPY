@@ -769,9 +769,15 @@ async function computePeriodMetrics(entries) {
         const historicalPrices = historicalByDate[key]
 
         const pastValue = pastHoldings.reduce((sum, h) => {
-          const price = historicalPrices[h.ticker] || 0
+          const price = historicalPrices[h.ticker] || market.getCachedPrice(h.ticker) || 0
           return sum + (h.shares * price)
         }, 0) + pastCash
+
+        // Skip if past value is unreasonably small (missing price data)
+        if (pastValue < 1) {
+          entry.metrics[key] = entry.metrics.sinceInception
+          continue
+        }
 
         entry.metrics[key] = computePeriodReturn(pastValue, entry.totalValue)
       }
