@@ -1,11 +1,17 @@
 <template>
   <div class="space-y-6">
-    <div>
-      <h1 class="text-2xl font-bold flex items-center gap-2">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
-        Admin Dashboard
-      </h1>
-      <p class="text-base-content/70">Platform overview and statistics</p>
+    <div class="flex items-start justify-between">
+      <div>
+        <h1 class="text-2xl font-bold flex items-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+          Admin Dashboard
+        </h1>
+        <p class="text-base-content/70">Platform overview and statistics</p>
+      </div>
+      <button class="btn btn-primary btn-sm gap-2" @click="showNotesModal = true" :disabled="loading">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+        Generate Class Notes
+      </button>
     </div>
 
     <div v-if="loading" class="flex justify-center py-12">
@@ -147,11 +153,76 @@
         </div>
       </div>
     </template>
+
+    <!-- Class Notes Modal -->
+    <dialog :class="['modal', showNotesModal && 'modal-open']">
+      <div class="modal-box max-w-3xl max-h-[85vh]">
+        <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" @click="showNotesModal = false">X</button>
+        <h3 class="font-bold text-lg flex items-center gap-2 mb-4">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+          Generate Class Notes
+        </h3>
+
+        <div v-if="!classNotes" class="space-y-4">
+          <div class="form-control">
+            <label class="label"><span class="label-text font-medium">Class</span></label>
+            <select v-model="notesClassId" class="select select-bordered select-sm" @change="loadGroupsForClass">
+              <option value="">Select a class</option>
+              <option v-for="c in allClasses" :key="c.id" :value="c.id">{{ c.class_name }} ({{ c.school }})</option>
+            </select>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div class="form-control">
+              <label class="label"><span class="label-text font-medium">Start Date</span></label>
+              <input type="date" v-model="notesDateStart" class="input input-bordered input-sm" />
+            </div>
+            <div class="form-control">
+              <label class="label"><span class="label-text font-medium">End Date</span></label>
+              <input type="date" v-model="notesDateEnd" class="input input-bordered input-sm" />
+            </div>
+          </div>
+
+          <div class="form-control">
+            <label class="label"><span class="label-text font-medium">Focus on Group</span></label>
+            <select v-model="notesGroupId" class="select select-bordered select-sm">
+              <option value="">All Groups</option>
+              <option v-for="g in notesGroups" :key="g.id" :value="g.id">{{ g.name }}</option>
+            </select>
+          </div>
+
+          <div class="flex gap-2 mt-2">
+            <button class="btn btn-sm btn-ghost" @click="setNotesDateRange(7)">Last 7 days</button>
+            <button class="btn btn-sm btn-ghost" @click="setNotesDateRange(14)">Last 14 days</button>
+            <button class="btn btn-sm btn-ghost" @click="setNotesDateRange(30)">Last 30 days</button>
+          </div>
+
+          <button class="btn btn-primary w-full" :disabled="generatingNotes || !notesClassId" @click="generateNotes">
+            <span v-if="generatingNotes" class="loading loading-spinner loading-sm"></span>
+            <span v-else>Generate Notes</span>
+          </button>
+
+          <p v-if="notesError" class="text-error text-sm">{{ notesError }}</p>
+        </div>
+
+        <div v-else class="space-y-4">
+          <div class="flex items-center justify-between">
+            <p class="text-sm text-base-content/60">{{ notesMeta }}</p>
+            <div class="flex gap-2">
+              <button class="btn btn-sm btn-outline" @click="copyNotes">{{ notesCopied ? 'Copied!' : 'Copy' }}</button>
+              <button class="btn btn-sm btn-ghost" @click="classNotes = null">Regenerate</button>
+            </div>
+          </div>
+          <div class="prose prose-sm max-w-none overflow-y-auto max-h-[55vh] bg-base-200/50 rounded-lg p-4" v-html="renderedNotes"></div>
+        </div>
+      </div>
+      <form method="dialog" class="modal-backdrop" @click="showNotesModal = false"><button>close</button></form>
+    </dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { Bar } from 'vue-chartjs'
 import {
   Chart as ChartJS,
@@ -173,6 +244,96 @@ const activeUsers = ref({ last7: 0, last30: 0 })
 const signupChartData = ref(null)
 const tradeVolumeChartData = ref(null)
 const topTickers = ref([])
+
+// Class Notes state
+const showNotesModal = ref(false)
+const generatingNotes = ref(false)
+const classNotes = ref(null)
+const notesMeta = ref('')
+const notesError = ref('')
+const notesCopied = ref(false)
+const allClasses = ref([])
+const notesGroups = ref([])
+const notesClassId = ref('')
+const notesGroupId = ref('')
+const todayStr = new Date().toISOString().split('T')[0]
+const sevenAgoStr = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+const notesDateStart = ref(sevenAgoStr)
+const notesDateEnd = ref(todayStr)
+
+function setNotesDateRange(days) {
+  notesDateStart.value = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+  notesDateEnd.value = new Date().toISOString().split('T')[0]
+}
+
+async function loadGroupsForClass() {
+  notesGroupId.value = ''
+  if (!notesClassId.value) { notesGroups.value = []; return }
+  const { data } = await supabase.from('groups').select('id, name').eq('class_id', notesClassId.value)
+  notesGroups.value = data || []
+}
+
+async function generateNotes() {
+  if (!notesClassId.value) return
+  generatingNotes.value = true
+  notesError.value = ''
+  classNotes.value = null
+
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) { notesError.value = 'Not logged in'; generatingNotes.value = false; return }
+
+  try {
+    const body = {
+      class_id: notesClassId.value,
+      date_start: new Date(notesDateStart.value).toISOString(),
+      date_end: new Date(notesDateEnd.value + 'T23:59:59').toISOString()
+    }
+    if (notesGroupId.value) body.group_id = notesGroupId.value
+
+    const res = await fetch('/api/generate-class-notes', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`
+      },
+      body: JSON.stringify(body)
+    })
+
+    const data = await res.json()
+    if (!res.ok) {
+      notesError.value = data.error || 'Failed to generate notes'
+    } else {
+      classNotes.value = data.notes
+      notesMeta.value = `${data.period} | ${data.groups_analyzed} groups | ${data.tickers_tracked} stocks tracked`
+    }
+  } catch (err) {
+    notesError.value = err.message
+  }
+  generatingNotes.value = false
+}
+
+function copyNotes() {
+  if (classNotes.value) {
+    navigator.clipboard.writeText(classNotes.value)
+    notesCopied.value = true
+    setTimeout(() => { notesCopied.value = false }, 2000)
+  }
+}
+
+const renderedNotes = computed(() => {
+  if (!classNotes.value) return ''
+  return classNotes.value
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+    .replace(/^- (.+)$/gm, '<li>$1</li>')
+    .replace(/^(\d+)\. (.+)$/gm, '<li>$2</li>')
+    .replace(/\n\n/g, '<br><br>')
+    .replace(/\n/g, '<br>')
+})
 
 const barOptions = {
   responsive: true,
@@ -221,6 +382,10 @@ function bucketByWeek(items, dateField, weeks) {
 
 onMounted(async () => {
   try {
+    // Load classes for class notes feature
+    const { data: classData } = await supabase.from('classes').select('id, class_name, school')
+    allClasses.value = classData || []
+
     const now = new Date()
     const ago7 = new Date(now); ago7.setDate(now.getDate() - 7)
     const ago30 = new Date(now); ago30.setDate(now.getDate() - 30)
