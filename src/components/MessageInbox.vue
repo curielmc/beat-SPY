@@ -79,7 +79,7 @@
                   : 'bg-base-200 text-base-content rounded-tl-sm'"
               >
                 <p class="text-xs font-semibold mb-1 opacity-70">
-                  {{ msg.sender_id === currentUserId ? 'You' : (senderNames[msg.sender_id] || 'Teacher') }}
+                  {{ msg.sender_id === currentUserId ? 'You' : (msg.sender_id ? (senderNames[msg.sender_id] || 'Teacher') : 'Market Spy AI') }}
                 </p>
                 <p>{{ msg.content }}</p>
               </div>
