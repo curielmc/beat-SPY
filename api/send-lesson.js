@@ -115,7 +115,7 @@ export default async function handler(req) {
     return new Response('Forbidden', { status: 403 })
   }
 
-  const { owner_id, owner_type } = await req.json()
+  const { owner_id, owner_type, lesson_id } = await req.json()
   if (!owner_id || !['user', 'group'].includes(owner_type)) {
     return new Response(JSON.stringify({ error: 'owner_id and owner_type (user|group) required' }), {
       status: 400, headers: { 'Content-Type': 'application/json' }
@@ -139,20 +139,28 @@ export default async function handler(req) {
     })
   }
 
-  // Get preferred difficulty
-  const prefs = await sbFetch(`/user_lesson_preferences?user_id=eq.${owner_id}&select=difficulty`)
-  const difficulty = prefs?.[0]?.difficulty || 'basic'
-
-  // Pick an unseen lesson
-  const sentLessons = await sbFetch(`/sent_lessons?recipient_id=eq.${owner_id}&select=lesson_id`)
-  const seenIds = (sentLessons || []).map(s => s.lesson_id)
-  const availableLessons = lessons.filter(l => l.difficulty === difficulty && !seenIds.includes(l.id))
-  const fallbackLessons = lessons.filter(l => l.difficulty === difficulty)
-  const lesson = availableLessons.length > 0
-    ? availableLessons[Math.floor(Math.random() * availableLessons.length)]
-    : fallbackLessons.length > 0
-      ? fallbackLessons[Math.floor(Math.random() * fallbackLessons.length)]
-      : lessons[Math.floor(Math.random() * lessons.length)]
+  // Pick a lesson — use specific lesson_id if provided, otherwise random by difficulty
+  let lesson
+  if (lesson_id) {
+    lesson = lessons.find(l => l.id === lesson_id)
+    if (!lesson) {
+      return new Response(JSON.stringify({ error: 'Lesson not found' }), {
+        status: 404, headers: { 'Content-Type': 'application/json' }
+      })
+    }
+  } else {
+    const prefs = await sbFetch(`/user_lesson_preferences?user_id=eq.${owner_id}&select=difficulty`)
+    const difficulty = prefs?.[0]?.difficulty || 'basic'
+    const sentLessons = await sbFetch(`/sent_lessons?recipient_id=eq.${owner_id}&select=lesson_id`)
+    const seenIds = (sentLessons || []).map(s => s.lesson_id)
+    const availableLessons = lessons.filter(l => l.difficulty === difficulty && !seenIds.includes(l.id))
+    const fallbackLessons = lessons.filter(l => l.difficulty === difficulty)
+    lesson = availableLessons.length > 0
+      ? availableLessons[Math.floor(Math.random() * availableLessons.length)]
+      : fallbackLessons.length > 0
+        ? fallbackLessons[Math.floor(Math.random() * fallbackLessons.length)]
+        : lessons[Math.floor(Math.random() * lessons.length)]
+  }
 
   // Build AI analysis from portfolio context
   const tickers = (portfolio.holdings || []).map(h => h.ticker)

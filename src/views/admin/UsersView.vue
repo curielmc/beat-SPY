@@ -106,11 +106,9 @@
                   <button
                     v-if="!user.is_disabled && user.role === 'student'"
                     class="btn btn-ghost btn-xs text-info gap-1"
-                    :disabled="sendingLessonId === user.id"
-                    @click="sendLesson(user)"
+                    @click="openLessonModal(user)"
                   >
-                    <span v-if="sendingLessonId === user.id" class="loading loading-spinner loading-xs"></span>
-                    <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
                     Send Lesson
                   </button>
                   <button class="btn btn-ghost btn-xs text-error" :disabled="user.is_disabled" @click="confirmDelete(user)">Delete</button>
@@ -181,6 +179,75 @@
       <form method="dialog" class="modal-backdrop" @click="closeMergeModal"><button>close</button></form>
     </dialog>
 
+    <!-- Send Lesson Modal -->
+    <dialog class="modal" :class="{ 'modal-open': showLessonModal }">
+      <div class="modal-box max-w-2xl">
+        <h3 class="font-bold text-lg mb-1">Send Investment Lesson</h3>
+        <p class="text-sm text-base-content/60 mb-4">
+          Sending to: <strong>{{ lessonTargetName }}</strong>
+        </p>
+
+        <div class="flex gap-2 mb-3">
+          <input
+            v-model="lessonSearch"
+            type="text"
+            placeholder="Search lessons..."
+            class="input input-bordered input-sm flex-1"
+          />
+          <select v-model="lessonTypeFilter" class="select select-bordered select-sm">
+            <option value="">All Categories</option>
+            <option v-for="t in lessonTypes" :key="t" :value="t">{{ formatLessonType(t) }}</option>
+          </select>
+          <select v-model="lessonDifficultyFilter" class="select select-bordered select-sm">
+            <option value="">All Levels</option>
+            <option value="basic">Basic</option>
+            <option value="advanced">Advanced</option>
+          </select>
+        </div>
+
+        <div class="max-h-72 overflow-y-auto border border-base-300 rounded-lg mb-4">
+          <div
+            v-for="lesson in filteredLessons"
+            :key="lesson.id"
+            class="px-3 py-2 border-b border-base-200 cursor-pointer hover:bg-base-200 transition-colors"
+            :class="{ 'bg-info/10 border-info/30': selectedLessonId === lesson.id }"
+            @click="selectedLessonId = selectedLessonId === lesson.id ? null : lesson.id"
+          >
+            <div class="flex items-center gap-2">
+              <span class="font-medium text-sm flex-1">{{ lesson.title }}</span>
+              <span class="badge badge-xs" :class="lesson.difficulty === 'advanced' ? 'badge-warning' : 'badge-success'">{{ lesson.difficulty }}</span>
+              <span class="badge badge-xs badge-ghost">{{ formatLessonType(lesson.lesson_type) }}</span>
+            </div>
+            <p class="text-xs text-base-content/50 mt-1 line-clamp-2">{{ lesson.content }}</p>
+          </div>
+          <div v-if="filteredLessons.length === 0" class="p-4 text-center text-base-content/50 text-sm">
+            No lessons match your search.
+          </div>
+        </div>
+
+        <div class="modal-action">
+          <button class="btn btn-ghost" @click="showLessonModal = false">Cancel</button>
+          <button
+            class="btn btn-outline btn-info"
+            :disabled="sendingLessonId"
+            @click="confirmSendLesson(null)"
+          >
+            <span v-if="sendingLessonId && !selectedLessonId" class="loading loading-spinner loading-xs"></span>
+            Send Random Lesson
+          </button>
+          <button
+            class="btn btn-info"
+            :disabled="!selectedLessonId || sendingLessonId"
+            @click="confirmSendLesson(selectedLessonId)"
+          >
+            <span v-if="sendingLessonId && selectedLessonId" class="loading loading-spinner loading-xs"></span>
+            Send Selected Lesson
+          </button>
+        </div>
+      </div>
+      <form method="dialog" class="modal-backdrop" @click="showLessonModal = false"><button>close</button></form>
+    </dialog>
+
     <div v-if="successMsg" class="alert alert-success fixed bottom-4 right-4 w-auto z-50">
       <span>{{ successMsg }}</span>
     </div>
@@ -189,6 +256,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
 import { supabase } from '../../lib/supabase'
@@ -211,21 +279,67 @@ const mergeNote = ref('')
 const mergeLoading = ref(false)
 const errorMsg = ref('')
 const sendingLessonId = ref(null)
+const showLessonModal = ref(false)
+const allLessons = ref([])
+const lessonSearch = ref('')
+const lessonTypeFilter = ref('')
+const lessonDifficultyFilter = ref('')
+const selectedLessonId = ref(null)
+const lessonTargetUser = ref(null)
+const lessonTargetName = ref('')
 
-async function sendLesson(user) {
+const lessonTypes = computed(() => {
+  const types = new Set(allLessons.value.map(l => l.lesson_type))
+  return [...types].sort()
+})
+
+const filteredLessons = computed(() => {
+  let result = allLessons.value
+  if (lessonTypeFilter.value) result = result.filter(l => l.lesson_type === lessonTypeFilter.value)
+  if (lessonDifficultyFilter.value) result = result.filter(l => l.difficulty === lessonDifficultyFilter.value)
+  if (lessonSearch.value) {
+    const q = lessonSearch.value.toLowerCase()
+    result = result.filter(l => l.title.toLowerCase().includes(q) || l.content.toLowerCase().includes(q))
+  }
+  return result
+})
+
+function formatLessonType(type) {
+  return type.replace(/_/g, ' ').replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+}
+
+async function loadLessons() {
+  if (allLessons.value.length > 0) return
+  const { data } = await supabase.from('investment_lessons').select('*').order('lesson_type').order('title')
+  allLessons.value = data || []
+}
+
+function openLessonModal(user) {
+  lessonTargetUser.value = user
+  lessonTargetName.value = user.full_name
+  selectedLessonId.value = null
+  lessonSearch.value = ''
+  lessonTypeFilter.value = ''
+  lessonDifficultyFilter.value = ''
+  loadLessons()
+  showLessonModal.value = true
+}
+
+async function confirmSendLesson(lessonId) {
+  const user = lessonTargetUser.value
+  if (!user) return
   sendingLessonId.value = user.id
   try {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) return
 
-    // Try sending as individual user first, then check if they're in a group
+    const body = { owner_id: user.id, owner_type: 'user' }
+    if (lessonId) body.lesson_id = lessonId
+
     let res = await fetch('/api/send-lesson', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${session.access_token}`
-      },
-      body: JSON.stringify({ owner_id: user.id, owner_type: 'user' })
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify(body)
     })
 
     // If no personal portfolio, try their group portfolio
@@ -238,19 +352,19 @@ async function sendLesson(user) {
         .maybeSingle()
 
       if (membership?.group_id) {
+        const groupBody = { owner_id: membership.group_id, owner_type: 'group' }
+        if (lessonId) groupBody.lesson_id = lessonId
         res = await fetch('/api/send-lesson', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${session.access_token}`
-          },
-          body: JSON.stringify({ owner_id: membership.group_id, owner_type: 'group' })
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+          body: JSON.stringify(groupBody)
         })
       }
     }
 
     const result = await res.json()
     if (res.ok) {
+      showLessonModal.value = false
       showSuccess(`Lesson sent to ${user.full_name}: "${result.lesson_title}" (${result.difficulty})`)
     } else {
       showSuccess(`Error: ${result.error || 'Failed to send lesson'}`)
