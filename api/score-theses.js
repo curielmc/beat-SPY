@@ -1,4 +1,4 @@
-export const config = { runtime: 'edge' }
+export const config = { maxDuration: 60 }
 
 const RATE_LIMIT_WINDOW_MS = 60 * 1000
 const RATE_LIMIT_MAX = 10
@@ -76,7 +76,7 @@ export default async function handler(req) {
           'X-Title': 'Beat the S&P 500'
         },
         body: JSON.stringify({
-          model: process.env.OPENROUTER_MODEL || 'deepseek/deepseek-chat',
+          model: process.env.OPENROUTER_MODEL || 'deepseek/deepseek-chat,anthropic/claude-3-haiku',
           messages: [{ role: 'user', content: prompt }],
           max_tokens: 2048
         })
