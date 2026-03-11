@@ -5,6 +5,24 @@ import { useAuthStore } from './auth'
 import { getSP500Constituents } from '../services/fmpApi'
 import { useMarketDataStore } from './marketData'
 
+async function serverPlaceTrade({ portfolio_id, ticker, side, dollars, rationale, approval_code, benchmark_ticker }) {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.access_token) throw new Error('Not authenticated')
+
+  const res = await fetch('/api/place-trade', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${session.access_token}`
+    },
+    body: JSON.stringify({ portfolio_id, ticker, side, dollars, rationale, approval_code, benchmark_ticker })
+  })
+
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error || 'Trade failed')
+  return data
+}
+
 export const usePortfolioStore = defineStore('portfolio', () => {
   const auth = useAuthStore()
   const STARTING_CASH = 100000
@@ -437,32 +455,18 @@ export const usePortfolioStore = defineStore('portfolio', () => {
       }
     }
 
-    // Fetch price (uses last close on weekends/after-hours)
-    const quote = await market.fetchQuote(ticker)
-    if (!quote) return { success: false, error: 'Could not fetch stock price' }
-    const price = quote.price || quote.previousClose
-    if (!price || price <= 0) return { success: false, error: 'Could not determine a valid price for ' + ticker }
-
-    // Fetch benchmark price for the server-side mirror trade.
-    const bmTicker = benchmarkTicker.value
-    const bmQuote = await market.fetchQuote(bmTicker)
-    const bmPrice = bmQuote?.price || bmQuote?.previousClose
-
     const portfolioId = portfolio.value.id
 
-    // Check approval code and restrictions
+    // Check approval code and restrictions (client-side pre-check for fast feedback)
     if (approvalCode !== undefined) {
-      // Validate against class
       const membership = await auth.getCurrentMembership()
       if (membership?.class) {
         const cls = membership.class
         if (cls.approval_code && cls.approval_code !== approvalCode) {
           return { success: false, error: 'Invalid approval code' }
         }
-        // Check trade frequency restriction
         const freqError = await checkTradeFrequency(ticker, portfolioId, cls.restrictions)
         if (freqError) return { success: false, error: freqError }
-        // Check rationale requirement (default: required)
         const requireRationale = cls.restrictions?.requireRationale !== false
         if (requireRationale && (!rationale || !rationale.trim())) {
           return { success: false, error: 'Please explain your reasoning before trading' }
@@ -470,19 +474,24 @@ export const usePortfolioStore = defineStore('portfolio', () => {
       }
     }
 
-    // Server-side execution with hard constraints (approval/rationale/frequency) and atomic updates.
-    const { data: tradeExec, error: tradeExecError } = await supabase.rpc('place_trade_order', {
-      p_portfolio_id: portfolioId,
-      p_ticker: ticker,
-      p_side: 'buy',
-      p_dollars: dollars,
-      p_price: price,
-      p_rationale: rationale?.trim() || null,
-      p_approval_code: approvalCode ?? null,
-      p_benchmark_price: bmPrice ?? null
-    })
-    if (tradeExecError) return { success: false, error: tradeExecError.message }
+    // Server-side execution — price is fetched server-side to prevent manipulation.
+    let tradeExec
+    try {
+      tradeExec = await serverPlaceTrade({
+        portfolio_id: portfolioId,
+        ticker,
+        side: 'buy',
+        dollars,
+        rationale: rationale?.trim() || null,
+        approval_code: approvalCode ?? null,
+        benchmark_ticker: benchmarkTicker.value
+      })
+    } catch (e) {
+      return { success: false, error: e.message }
+    }
+
     const status = tradeExec?.status || 'executed'
+    const price = tradeExec?.price || 0
 
     if (status === 'queued') {
       await loadPendingOrders(portfolioId)
@@ -512,7 +521,7 @@ export const usePortfolioStore = defineStore('portfolio', () => {
 
     const market = useMarketDataStore()
 
-    // Fetch price (uses last close on weekends/after-hours)
+    // Get a client-side price estimate for validation checks (server will use its own live price)
     const quote = await market.fetchQuote(ticker)
     if (!quote) return { success: false, error: 'Could not fetch stock price' }
     const price = quote.price || quote.previousClose
@@ -553,17 +562,13 @@ export const usePortfolioStore = defineStore('portfolio', () => {
       }
     }
 
-    const bmTicker = benchmarkTicker.value
-    const bmQuote = await market.fetchQuote(bmTicker)
-    const bmPrice = bmQuote?.price || bmQuote?.previousClose
-
     const existing = rawHoldings.value.find(h => h.ticker === ticker)
     if (!existing) return { success: false, error: "You don't own this stock" }
 
     const sharesToSell = dollars / price
     if (sharesToSell > existing.shares + 0.0001) return { success: false, error: 'Not enough shares' }
 
-    // Check approval code and restrictions
+    // Check approval code and restrictions (client-side pre-check for fast feedback)
     if (approvalCode !== undefined) {
       const membership = await auth.getCurrentMembership()
       if (membership?.class) {
@@ -571,12 +576,10 @@ export const usePortfolioStore = defineStore('portfolio', () => {
         if (cls.approval_code && cls.approval_code !== approvalCode) {
           return { success: false, error: 'Invalid approval code' }
         }
-        // Check trade frequency restriction
         const sellFundNum = String(portfolio.value?.fund_number || '1')
         const sellRestrictions = cls.restrictions?.byFund?.[sellFundNum] || cls.restrictions || {}
         const freqError = await checkTradeFrequency(ticker, portfolio.value.id, sellRestrictions)
         if (freqError) return { success: false, error: freqError }
-        // Check rationale requirement (default: required)
         const requireRationale = sellRestrictions?.requireRationale !== false
         if (requireRationale && (!rationale || !rationale.trim())) {
           return { success: false, error: 'Please explain your reasoning before trading' }
@@ -586,19 +589,24 @@ export const usePortfolioStore = defineStore('portfolio', () => {
 
     const portfolioId = portfolio.value.id
 
-    // Server-side execution with hard constraints (approval/rationale/frequency) and atomic updates.
-    const { data: tradeExec, error: tradeExecError } = await supabase.rpc('place_trade_order', {
-      p_portfolio_id: portfolioId,
-      p_ticker: ticker,
-      p_side: 'sell',
-      p_dollars: dollars,
-      p_price: price,
-      p_rationale: rationale?.trim() || null,
-      p_approval_code: approvalCode ?? null,
-      p_benchmark_price: bmPrice ?? null
-    })
-    if (tradeExecError) return { success: false, error: tradeExecError.message }
+    // Server-side execution — price is fetched server-side to prevent manipulation.
+    let tradeExec
+    try {
+      tradeExec = await serverPlaceTrade({
+        portfolio_id: portfolioId,
+        ticker,
+        side: 'sell',
+        dollars,
+        rationale: rationale?.trim() || null,
+        approval_code: approvalCode ?? null,
+        benchmark_ticker: benchmarkTicker.value
+      })
+    } catch (e) {
+      return { success: false, error: e.message }
+    }
+
     const status = tradeExec?.status || 'executed'
+    const serverPrice = tradeExec?.price || price
 
     if (status === 'queued') {
       await loadPendingOrders(portfolioId)
@@ -608,7 +616,7 @@ export const usePortfolioStore = defineStore('portfolio', () => {
         status,
         executeAfter: tradeExec?.execute_after || null,
         orderId: tradeExec?.order_id || null,
-        price
+        price: serverPrice
       }
     }
 
@@ -618,7 +626,7 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     await _refreshPortfolioState(portfolioId)
     version.value++
 
-    return { success: true, shares: executedShares, price, status }
+    return { success: true, shares: executedShares, price: serverPrice, status }
   }
 
   // Benchmark ticker for this portfolio (default SPY)

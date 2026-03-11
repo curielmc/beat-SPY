@@ -4,11 +4,35 @@ const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY
 const FMP_KEY = process.env.VITE_FMP_API_KEY
 
+function easterDate(year) {
+  const a = year % 19, b = Math.floor(year / 100), c = year % 100
+  const d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25)
+  const g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30
+  const i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7
+  const m = Math.floor((a + 11 * h + 22 * l) / 451), em = h + l - 7 * m + 114
+  return new Date(year, Math.floor(em / 31) - 1, (em % 31) + 1)
+}
+
+function isUSMarketHoliday(date) {
+  const y = date.getFullYear()
+  const same = (a, b) => a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+  const observed = (m, d) => { const dt = new Date(y, m - 1, d); const dow = dt.getDay(); if (dow === 0) dt.setDate(dt.getDate() + 1); if (dow === 6) dt.setDate(dt.getDate() - 1); return dt }
+  const nthDay = (m, wd, n) => { const f = new Date(y, m - 1, 1); return new Date(y, m - 1, 1 + ((wd - f.getDay() + 7) % 7) + (n - 1) * 7) }
+  const lastMon = () => { const last = new Date(y, 5, 0); return new Date(y, 4, last.getDate() - ((last.getDay() - 1 + 7) % 7)) }
+  const holidays = [
+    observed(1, 1), nthDay(1, 1, 3), nthDay(2, 1, 3),
+    new Date(easterDate(y).getTime() - 2 * 86400000),
+    lastMon(), observed(6, 19), observed(7, 4),
+    nthDay(9, 1, 1), nthDay(11, 4, 4), observed(12, 25)
+  ]
+  return holidays.some(h => same(h, date))
+}
+
 function isMarketOpen(now = new Date()) {
   const easternTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }))
   const day = easternTime.getDay()
   const timeInMinutes = easternTime.getHours() * 60 + easternTime.getMinutes()
-  return day >= 1 && day <= 5 && timeInMinutes >= 570 && timeInMinutes < 960
+  return day >= 1 && day <= 5 && timeInMinutes >= 570 && timeInMinutes < 960 && !isUSMarketHoliday(easternTime)
 }
 
 async function sbFetch(path, options = {}) {
