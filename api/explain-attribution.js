@@ -49,8 +49,10 @@ export default async function handler(req) {
     return new Response(JSON.stringify({ error: 'Invalid tickers payload' }), { status: 400 })
   }
   const FMP_KEY = process.env.VITE_FMP_API_KEY
+  const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY
   const ANTHROPIC_KEY = process.env.ANTHROPIC_KEY
-  if (!FMP_KEY || !ANTHROPIC_KEY) {
+  
+  if (!FMP_KEY || (!OPENROUTER_KEY && !ANTHROPIC_KEY)) {
     return new Response(JSON.stringify({ error: 'Server not configured' }), { status: 500 })
   }
 
@@ -93,26 +95,53 @@ Recent news for their holdings:${newsContext}
 
 Write 3-4 engaging sentences explaining what drove today's portfolio performance. Use plain language a high school student would understand. Mention specific stocks and news. Be concrete about what went up and what went down. End with one investing lesson.`
 
-  // Call Anthropic API directly via fetch (Edge-compatible)
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'x-api-key': ANTHROPIC_KEY,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json'
-    },
-    body: JSON.stringify({
-      model: 'claude-opus-4-5',
-      max_tokens: 400,
-      messages: [{ role: 'user', content: prompt }]
+  // AI Call Logic
+  let explanation = 'Could not generate explanation.'
+  
+  if (OPENROUTER_KEY) {
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${OPENROUTER_KEY}`,
+        'HTTP-Referer': 'https://beat-snp.com',
+        'X-Title': 'Beat the S&P 500'
+      },
+      body: JSON.stringify({
+        model: process.env.OPENROUTER_MODEL || 'deepseek/deepseek-chat',
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 400
+      })
     })
-  })
 
-  if (!response.ok) {
-    return new Response(JSON.stringify({ error: 'AI provider error' }), { status: 502 })
+    if (response.ok) {
+      const data = await response.json()
+      explanation = data.choices?.[0]?.message?.content || explanation
+    } else {
+      console.error('OpenRouter Error:', await response.text())
+    }
+  } else if (ANTHROPIC_KEY) {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': ANTHROPIC_KEY,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'claude-3-5-sonnet-20240620',
+        max_tokens: 400,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    })
+
+    if (response.ok) {
+      const data = await response.json()
+      explanation = data.content?.[0]?.text || explanation
+    } else {
+      console.error('Anthropic Error:', await response.text())
+    }
   }
-  const data = await response.json()
-  const explanation = data.content?.[0]?.text || 'Could not generate explanation.'
 
   return new Response(JSON.stringify({ explanation }), {
     headers: { 'Content-Type': 'application/json' }
