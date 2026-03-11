@@ -27,11 +27,15 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
  * Use this instead of supabase.auth.getSession() in components.
  */
 export async function getAccessToken() {
-  const { data: { session } } = await supabase.auth.getSession()
-  if (session?.access_token) return session.access_token
-  // Session expired in memory — try refreshing
-  const { data: refreshed } = await supabase.auth.refreshSession()
-  return refreshed?.session?.access_token || null
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session?.access_token) return session.access_token
+    // Session expired in memory — try refreshing
+    const { data: refreshed } = await supabase.auth.refreshSession()
+    return refreshed?.session?.access_token || null
+  } catch {
+    return null
+  }
 }
 
 export async function uploadAvatar(userId, file) {
