@@ -14,6 +14,7 @@ export const usePortfolioStore = defineStore('portfolio', () => {
   const rawHoldings = ref([])         // raw holdings from DB
   const benchmarkHoldings = ref([])   // benchmark SPY holdings
   const trades = ref([])              // trade history
+  const pendingOrders = ref([])       // queued/processing/failed orders awaiting execution
   const benchmarkTrades = ref([])     // benchmark trade history
   const snapshots = ref([])           // portfolio snapshots (reset/close history)
   const allFunds = ref([])            // all funds for current user
@@ -54,11 +55,10 @@ export const usePortfolioStore = defineStore('portfolio', () => {
       // Normal path: use benchmark_holdings rows
       holdingsValue = benchmarkHoldings.value.reduce((sum, h) => sum + (h.shares * bmPrice), 0)
     } else {
-      // Fallback: compute from benchmark_trades (personal portfolios may lack benchmark_holdings rows)
-      const totalShares = benchmarkTrades.value
-        .filter(t => t.side === 'buy')
-        .reduce((sum, t) => sum + Number(t.shares), 0)
-      holdingsValue = totalShares * bmPrice
+      // Fallback: compute net shares from benchmark_trades (buys minus sells)
+      const netShares = benchmarkTrades.value
+        .reduce((sum, t) => sum + (t.side === 'buy' ? Number(t.shares) : -Number(t.shares)), 0)
+      holdingsValue = Math.max(0, netShares) * bmPrice
     }
     return holdingsValue + benchmarkCash.value
   })
@@ -172,6 +172,14 @@ export const usePortfolioStore = defineStore('portfolio', () => {
       .order('executed_at', { ascending: false })
     trades.value = tData || []
 
+    const { data: poData } = await supabase
+      .from('pending_trade_orders')
+      .select('*')
+      .eq('portfolio_id', pData.id)
+      .in('status', ['queued', 'processing', 'failed'])
+      .order('requested_at', { ascending: false })
+    pendingOrders.value = poData || []
+
     const { data: btData } = await supabase
       .from('benchmark_trades')
       .select('*')
@@ -186,6 +194,7 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     rawHoldings.value = []
     benchmarkHoldings.value = []
     trades.value = []
+    pendingOrders.value = []
     benchmarkTrades.value = []
     holdings.value = []
   }
@@ -241,7 +250,7 @@ export const usePortfolioStore = defineStore('portfolio', () => {
       const dollars = h.shares * h.currentPrice
       const res = await sellStock(h.ticker, dollars, approvalCode, rationale)
       if (res.success) {
-        results.push({ ticker: h.ticker, shares: h.shares })
+        results.push({ ticker: h.ticker, shares: h.shares, queued: !!res.queued })
       } else {
         errors.push({ ticker: h.ticker, error: res.error })
       }
@@ -462,7 +471,7 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     }
 
     // Server-side execution with hard constraints (approval/rationale/frequency) and atomic updates.
-    const { data: tradeExec, error: tradeExecError } = await supabase.rpc('execute_trade', {
+    const { data: tradeExec, error: tradeExecError } = await supabase.rpc('place_trade_order', {
       p_portfolio_id: portfolioId,
       p_ticker: ticker,
       p_side: 'buy',
@@ -473,14 +482,27 @@ export const usePortfolioStore = defineStore('portfolio', () => {
       p_benchmark_price: bmPrice ?? null
     })
     if (tradeExecError) return { success: false, error: tradeExecError.message }
+    const status = tradeExec?.status || 'executed'
+
+    if (status === 'queued') {
+      await loadPendingOrders(portfolioId)
+      return {
+        success: true,
+        queued: true,
+        status,
+        executeAfter: tradeExec?.execute_after || null,
+        orderId: tradeExec?.order_id || null,
+        price
+      }
+    }
+
     portfolio.value.cash_balance = Number(tradeExec?.cash_balance ?? portfolio.value.cash_balance)
     const shares = Number(tradeExec?.shares || 0)
 
-    // Lightweight refresh — update holdings, benchmark rows, and prices without full DB reload
     await _refreshPortfolioState(portfolioId)
     version.value++
 
-    return { success: true, shares, price }
+    return { success: true, shares, price, status }
   }
 
   async function sellStock(ticker, dollars, approvalCode, rationale) {
@@ -565,7 +587,7 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     const portfolioId = portfolio.value.id
 
     // Server-side execution with hard constraints (approval/rationale/frequency) and atomic updates.
-    const { data: tradeExec, error: tradeExecError } = await supabase.rpc('execute_trade', {
+    const { data: tradeExec, error: tradeExecError } = await supabase.rpc('place_trade_order', {
       p_portfolio_id: portfolioId,
       p_ticker: ticker,
       p_side: 'sell',
@@ -576,13 +598,27 @@ export const usePortfolioStore = defineStore('portfolio', () => {
       p_benchmark_price: bmPrice ?? null
     })
     if (tradeExecError) return { success: false, error: tradeExecError.message }
+    const status = tradeExec?.status || 'executed'
+
+    if (status === 'queued') {
+      await loadPendingOrders(portfolioId)
+      return {
+        success: true,
+        queued: true,
+        status,
+        executeAfter: tradeExec?.execute_after || null,
+        orderId: tradeExec?.order_id || null,
+        price
+      }
+    }
+
     portfolio.value.cash_balance = Number(tradeExec?.cash_balance ?? portfolio.value.cash_balance)
     const executedShares = Number(tradeExec?.shares || sharesToSell)
 
     await _refreshPortfolioState(portfolioId)
     version.value++
 
-    return { success: true, shares: executedShares, price }
+    return { success: true, shares: executedShares, price, status }
   }
 
   // Benchmark ticker for this portfolio (default SPY)
@@ -661,16 +697,35 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     }
   }
 
+  async function loadPendingOrders(portfolioId) {
+    const pid = portfolioId || portfolio.value?.id
+    if (!pid) return []
+
+    const { data } = await supabase
+      .from('pending_trade_orders')
+      .select('*')
+      .eq('portfolio_id', pid)
+      .in('status', ['queued', 'processing', 'failed'])
+      .order('requested_at', { ascending: false })
+
+    pendingOrders.value = data || []
+    return pendingOrders.value
+  }
+
   async function _refreshPortfolioState(portfolioId) {
-    const [{ data: freshHoldings }, { data: freshBenchmarkHoldings }, { data: freshBenchmarkTrades }] = await Promise.all([
+    const [{ data: freshHoldings }, { data: freshTrades }, { data: freshBenchmarkHoldings }, { data: freshBenchmarkTrades }, { data: freshPendingOrders }] = await Promise.all([
       supabase.from('holdings').select('*').eq('portfolio_id', portfolioId),
+      supabase.from('trades').select('*').eq('portfolio_id', portfolioId).order('executed_at', { ascending: false }),
       supabase.from('benchmark_holdings').select('*').eq('portfolio_id', portfolioId),
-      supabase.from('benchmark_trades').select('*').eq('portfolio_id', portfolioId).order('executed_at', { ascending: false })
+      supabase.from('benchmark_trades').select('*').eq('portfolio_id', portfolioId).order('executed_at', { ascending: false }),
+      supabase.from('pending_trade_orders').select('*').eq('portfolio_id', portfolioId).in('status', ['queued', 'processing', 'failed']).order('requested_at', { ascending: false })
     ])
 
     rawHoldings.value = freshHoldings || []
+    trades.value = freshTrades || []
     benchmarkHoldings.value = freshBenchmarkHoldings || []
     benchmarkTrades.value = freshBenchmarkTrades || []
+    pendingOrders.value = freshPendingOrders || []
     await enrichHoldings()
   }
 
@@ -1019,7 +1074,7 @@ export const usePortfolioStore = defineStore('portfolio', () => {
 
   return {
     portfolio, holdings, rawHoldings, benchmarkHoldings,
-    trades, benchmarkTrades, loading, version,
+    trades, pendingOrders, benchmarkTrades, loading, version,
     cashBalance, startingCash, totalMarketValue,
     totalReturnDollar, totalReturnPct,
     benchmarkMarketValue, benchmarkReturnPct, isBeatingSP500,
@@ -1030,6 +1085,6 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     resetPortfolio, closePortfolio, loadSnapshots, snapshots, createPersonalPortfolio,
     getLeaderboardData, getPublicLeaderboardData,
     createFund, loadAllFunds, loadFundsForOwner,
-    loadPersonalPortfolio, loadGroupFunds
+    loadPersonalPortfolio, loadGroupFunds, loadPendingOrders, sellAll
   }
 })

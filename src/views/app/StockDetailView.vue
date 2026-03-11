@@ -103,6 +103,10 @@
                 <span class="font-bold">Active Challenge:</span> {{ activeComp.name }} (Subject to Rules)
               </div>
 
+              <div v-if="marketClosedMessage" class="alert alert-warning py-2 rounded-lg text-xs">
+                <span class="font-bold">Market Closed:</span> {{ marketClosedMessage }}
+              </div>
+
               <!-- Portfolio Switcher -->
               <div v-if="canSwitchPortfolio" class="flex justify-end">
                 <button class="btn btn-ghost btn-xs underline text-primary" :disabled="switchingPortfolio" @click="switchPortfolio">
@@ -208,7 +212,7 @@
                 >
                   <span v-if="executing" class="loading loading-spinner loading-sm"></span>
                   <template v-if="auth.isTeacher || auth.isAdmin">Trading Disabled for Educators</template>
-                  <template v-else>{{ tradeMode === 'buy' ? 'Execute Buy Order' : 'Execute Sell Order' }}</template>
+                  <template v-else>{{ executeButtonLabel }}</template>
                 </button>
                 <div v-if="tradeResult" class="alert mt-3 py-2" :class="tradeResult.success ? 'alert-success' : 'alert-error'">
                   <span class="text-sm font-medium">{{ tradeResult.message }}</span>
@@ -378,6 +382,7 @@ import { useSocialStore } from '../../stores/social'
 import { useCompetitionsStore } from '../../stores/competitions'
 import TakeCard from '../../components/TakeCard.vue'
 import SectorLabel from '../../components/SectorLabel.vue'
+import { isMarketOpen, getMarketHoursMessage } from '../../utils/marketHours'
 
 const route = useRoute()
 const router = useRouter()
@@ -580,6 +585,17 @@ const canTrade = computed(() => {
   return tradeAmount.value <= maxSellDollars.value + 0.01
 })
 
+const marketClosedMessage = computed(() => (
+  isMarketOpen() ? '' : getMarketHoursMessage()
+))
+
+const executeButtonLabel = computed(() => {
+  if (isMarketOpen()) {
+    return tradeMode.value === 'buy' ? 'Execute Buy Order' : 'Execute Sell Order'
+  }
+  return tradeMode.value === 'buy' ? 'Queue Buy For Next Open' : 'Queue Sell For Next Open'
+})
+
 const rangePosition = computed(() => {
   if (!quote.value?.yearHigh || !quote.value?.yearLow) return 50
   const range = quote.value.yearHigh - quote.value.yearLow
@@ -636,14 +652,24 @@ async function executeTrade() {
   executing.value = false
 
   if (result.success) {
-    const action = tradeMode.value === 'buy' ? 'Bought' : 'Sold'
-    tradeResult.value = {
-      success: true,
-      message: `${action} ${result.shares.toFixed(4)} shares of ${ticker} at $${result.price.toFixed(2)}`
+    if (result.queued) {
+      const action = tradeMode.value === 'buy' ? 'buy' : 'sell'
+      const executeAfter = result.executeAfter
+        ? new Date(result.executeAfter).toLocaleString()
+        : 'the next market open'
+      tradeResult.value = {
+        success: true,
+        message: `Queued ${action} order for ${ticker}. It will execute when the market reopens, starting ${executeAfter}.`
+      }
+    } else {
+      const action = tradeMode.value === 'buy' ? 'Bought' : 'Sold'
+      tradeResult.value = {
+        success: true,
+        message: `${action} ${result.shares.toFixed(4)} shares of ${ticker} at $${result.price.toFixed(2)}`
+      }
     }
     tradeAmount.value = 0
     tradeRationale.value = ''
-    // Refresh quote
     quote.value = await market.fetchQuote(ticker)
     setTimeout(() => { tradeResult.value = null }, 5000)
   } else {

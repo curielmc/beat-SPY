@@ -17,6 +17,10 @@
     {
       "path": "/api/daily-snapshot",
       "schedule": "0 21 * * 1-5"
+    },
+    {
+      "path": "/api/process-pending-orders",
+      "schedule": "*/5 * * * 1-5"
     }
   ]
 }

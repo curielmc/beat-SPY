@@ -107,11 +107,14 @@
     <div v-if="!switchingTab" class="flex items-center justify-between">
       <div class="flex items-center gap-2">
         <h1 class="text-xl font-bold">
-          <template v-if="activeTab === 'personal'">{{ auth.profile?.full_name || 'My Portfolio' }}</template>
-          <template v-else>{{ activeFundName }}</template>
-          <span class="text-sm font-normal text-base-content/50">
-            {{ activeTab === 'group' ? membership?.group?.name : '' }}
-          </span>
+          <template v-if="activeTab === 'personal'">
+            My Portfolio
+            <span class="text-sm font-normal text-base-content/50">{{ auth.profile?.full_name }}</span>
+          </template>
+          <template v-else>
+            {{ activeFundName }}
+            <span class="text-sm font-normal text-base-content/50">{{ membership?.group?.name }}</span>
+          </template>
         </h1>
         <select
           v-if="activeTab === 'personal'"
@@ -478,6 +481,41 @@
       </div>
     </div>
 
+    <!-- Queued Orders -->
+    <div class="card bg-base-100 shadow" v-if="portfolioStore.pendingOrders.length > 0">
+      <div class="card-body p-4">
+        <h3 class="font-semibold mb-2">Queued Orders</h3>
+        <div class="overflow-x-auto">
+          <table class="table table-sm">
+            <thead>
+              <tr>
+                <th>Submitted</th>
+                <th>Ticker</th>
+                <th>Side</th>
+                <th>Status</th>
+                <th class="text-right">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="order in portfolioStore.pendingOrders.slice(0, 10)" :key="order.id" class="hover">
+                <td class="text-[10px] text-base-content/50">{{ new Date(order.requested_at).toLocaleString() }}</td>
+                <td class="font-mono font-bold text-xs">{{ order.ticker }}</td>
+                <td><span class="badge badge-xs font-bold" :class="order.side === 'buy' ? 'badge-success' : 'badge-error'">{{ order.side.toUpperCase() }}</span></td>
+                <td>
+                  <span class="badge badge-xs" :class="order.status === 'failed' ? 'badge-error' : order.status === 'processing' ? 'badge-info' : 'badge-warning'">
+                    {{ order.status.toUpperCase() }}
+                  </span>
+                  <span v-if="order.execute_after" class="block text-[10px] text-base-content/50 mt-1">Next try: {{ new Date(order.execute_after).toLocaleString() }}</span>
+                  <span v-if="order.error_message" class="block text-[10px] text-error mt-1">{{ order.error_message }}</span>
+                </td>
+                <td class="text-right font-mono text-xs font-semibold">${{ Number(order.dollars).toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
     <!-- Recent Trades -->
     <div class="card bg-base-100 shadow" v-if="portfolioStore.trades.length > 0">
       <div class="card-body p-4">
@@ -530,11 +568,11 @@
     </div>
 
     <!-- Charts Section -->
-    <div v-if="portfolioStore.holdings.length > 0 || portfolioStore.cashBalance > 0" class="space-y-4">
+    <div v-if="portfolioStore.holdings.length > 0 || portfolioStore.cashBalance > 0 || portfolioStore.trades.length > 0" class="space-y-4">
       <div class="flex items-center justify-between gap-2 flex-wrap">
         <div class="flex items-center gap-3">
           <h3 class="font-semibold text-sm">Charts</h3>
-          <RouterLink to="/attribution" class="btn btn-xs btn-primary gap-1">
+          <RouterLink :to="{ path: '/attribution', query: portfolioStore.portfolio?.id ? { portfolioId: portfolioStore.portfolio.id } : {} }" class="btn btn-xs btn-primary gap-1">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
             Performance Attribution
           </RouterLink>
@@ -718,10 +756,17 @@ async function handleSellAll() {
     if (res.success) {
       showSellAllModal.value = false
       sellAllRationale.value = ''
-      showFeedback(`Successfully sold all ${res.results.length} positions.`)
+      const queuedCount = (res.results || []).filter(r => r.queued).length
+      if (queuedCount === res.results.length && queuedCount > 0) {
+        showFeedback(`Queued ${queuedCount} sell orders for the next market open.`)
+      } else if (queuedCount > 0) {
+        showFeedback(`Executed ${res.results.length - queuedCount} sells and queued ${queuedCount} for the next market open.`)
+      } else {
+        showFeedback(`Successfully sold all ${res.results.length} positions.`)
+      }
       // Refresh charts and data
       resetCharts()
-      if (portfolioStore.holdings.length > 0) loadCharts()
+      if (portfolioStore.holdings.length > 0 || portfolioStore.trades.length > 0) loadCharts()
     } else {
       sellAllError.value = res.error || 'Failed to liquidate positions'
     }
@@ -795,7 +840,7 @@ onMounted(async () => {
       }
     }
     loading.value = false
-    if (portfolioStore.holdings.length > 0) loadCharts()
+    if (portfolioStore.holdings.length > 0 || portfolioStore.trades.length > 0) loadCharts()
     return
   }
 
@@ -868,7 +913,7 @@ onMounted(async () => {
   loading.value = false
 
   // Load charts after portfolio data is ready
-  if (portfolioStore.holdings.length > 0) {
+  if (portfolioStore.holdings.length > 0 || portfolioStore.trades.length > 0) {
     loadCharts()
   }
 
@@ -902,7 +947,7 @@ refreshInterval = setInterval(async () => {
 })
 
 async function loadCharts() {
-  if (portfolioStore.holdings.length === 0) return
+  if (portfolioStore.holdings.length === 0 && portfolioStore.trades.length === 0) return
   chartsLoading.value = true
   try {
     // --- Performance Line Chart ---
@@ -1248,7 +1293,7 @@ async function switchFund(fund) {
       }
     }
     resetCharts()
-    if (portfolioStore.holdings.length > 0) {
+    if (portfolioStore.holdings.length > 0 || portfolioStore.trades.length > 0) {
       loadCharts()
     }
   } finally {
@@ -1292,7 +1337,7 @@ async function switchTab(tab) {
       }
     }
     resetCharts()
-    if (portfolioStore.holdings.length > 0) {
+    if (portfolioStore.holdings.length > 0 || portfolioStore.trades.length > 0) {
       loadCharts()
     }
   } finally {
