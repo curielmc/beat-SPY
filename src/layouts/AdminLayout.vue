@@ -51,6 +51,10 @@
           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
           View as Student
         </RouterLink>
+        <button class="btn btn-outline btn-sm justify-start w-full gap-2 border-secondary/30 text-secondary" @click="openTeacherModal">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+          VUS teacher
+        </button>
         <RouterLink to="/admin/portfolio" class="btn btn-ghost btn-sm justify-start w-full gap-2" :class="{ 'btn-active': route.path === '/admin/portfolio' }" @click="sidebarOpen = false">
           <span>📈</span> My Portfolio
         </RouterLink>
@@ -82,6 +86,38 @@
         <RouterView />
       </div>
     </div>
+
+    <!-- Teacher Selection Modal -->
+    <dialog class="modal" :class="{ 'modal-open': showTeacherModal }">
+      <div class="modal-box">
+        <h3 class="font-bold text-lg">Select Class to View as Teacher</h3>
+        <p class="py-2 text-sm text-base-content/60">Choose which class you want to see through its teacher's eyes.</p>
+        
+        <div v-if="loadingClasses" class="flex justify-center py-6">
+          <span class="loading loading-spinner loading-md"></span>
+        </div>
+        <div v-else-if="allClasses.length === 0" class="py-6 text-center text-base-content/50">
+          No classes found.
+        </div>
+        <div v-else class="space-y-2 mt-4 max-h-96 overflow-y-auto">
+          <button v-for="cls in allClasses" :key="cls.id" 
+            class="btn btn-ghost w-full justify-between h-auto py-3 px-4 border border-base-300"
+            :disabled="masquerading"
+            @click="viewAsTeacher(cls)">
+            <div class="text-left">
+              <div class="font-bold">{{ cls.class_name }}</div>
+              <div class="text-xs text-base-content/60">{{ cls.code }} · {{ cls.teacher?.full_name || 'No Teacher' }}</div>
+            </div>
+            <span>&rarr;</span>
+          </button>
+        </div>
+
+        <div class="modal-action">
+          <button class="btn btn-ghost" @click="showTeacherModal = false">Cancel</button>
+        </div>
+      </div>
+      <form method="dialog" class="modal-backdrop" @click="showTeacherModal = false"><button>close</button></form>
+    </dialog>
   </div>
 </template>
 
@@ -89,12 +125,50 @@
 import { ref } from 'vue'
 import { RouterView, RouterLink, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import { supabase } from '../lib/supabase'
 import LogoIcon from '../components/LogoIcon.vue'
 
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 const sidebarOpen = ref(false)
+
+const showTeacherModal = ref(false)
+const allClasses = ref([])
+const loadingClasses = ref(false)
+const masquerading = ref(false)
+
+async function openTeacherModal() {
+  sidebarOpen.value = false
+  showTeacherModal.value = true
+  loadingClasses.value = true
+  try {
+    const { data, error } = await supabase
+      .from('classes')
+      .select('id, class_name, code, teacher_id, teacher:profiles!classes_teacher_id_fkey(id, full_name, email)')
+      .order('created_at', { ascending: false })
+    if (!error) allClasses.value = data
+  } finally {
+    loadingClasses.value = false
+  }
+}
+
+async function viewAsTeacher(cls) {
+  if (!cls.teacher) {
+    alert('No teacher found for this class.')
+    return
+  }
+  masquerading.value = true
+  const result = await auth.startMasquerade(cls.teacher)
+  masquerading.value = false
+  if (result?.error) {
+    alert('Masquerade failed: ' + result.error)
+    return
+  }
+  // Set the active class for the teacher view
+  auth.setActiveClass(cls.id)
+  router.push('/teacher')
+}
 
 async function handleLogout() {
   await auth.logout()
