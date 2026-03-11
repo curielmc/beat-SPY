@@ -84,8 +84,21 @@
           >
             <div class="card-body p-3">
               <div class="flex justify-between items-start">
-                <h3 class="font-semibold text-sm"><SectorLabel :sector="sector.name" size="xs" /></h3>
+                <div class="flex items-center gap-1">
+                  <h3 class="font-semibold text-sm"><SectorLabel :sector="sector.name" size="xs" /></h3>
+                  <button class="btn btn-ghost btn-circle btn-xs" @click.stop="toggleSectorInfo(sector.name)" :title="'What is ' + sector.name + '?'">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-base-content/40" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  </button>
+                </div>
                 <span class="badge badge-primary badge-sm">{{ sector.weight.toFixed(1) }}%</span>
+              </div>
+              <div v-if="expandedSector === sector.name && sectorDescriptions[sector.name]" class="mt-2 p-2 bg-primary/5 border border-primary/20 rounded-lg" @click.stop>
+                <ul class="space-y-1">
+                  <li v-for="(point, i) in sectorDescriptions[sector.name]" :key="i" class="text-xs text-base-content/70 flex gap-1.5">
+                    <span class="text-primary shrink-0">•</span>
+                    <span>{{ point }}</span>
+                  </li>
+                </ul>
               </div>
               <p class="text-xs text-base-content/50 mt-1">{{ sector.count }} companies</p>
               <div class="flex flex-wrap gap-1 mt-1">
@@ -329,6 +342,70 @@ const sectorSegments = computed(() => {
     .map(([name, data]) => ({ label: name, value: parseFloat(data.weight.toFixed(2)) }))
     .sort((a, b) => b.value - a.value)
 })
+
+const sectorDescriptions = {
+  'Technology': [
+    'Companies that develop software, hardware, semiconductors, and IT services',
+    'Includes cloud computing, AI, cybersecurity, and consumer electronics',
+    'Historically high-growth sector driven by innovation and digital transformation'
+  ],
+  'Financial Services': [
+    'Banks, insurance companies, asset managers, and payment processors',
+    'Revenue tied to interest rates, lending activity, and capital markets',
+    'Heavily regulated sector sensitive to economic cycles and monetary policy'
+  ],
+  'Healthcare': [
+    'Pharmaceutical companies, biotech firms, medical device makers, and health insurers',
+    'Demand is relatively stable regardless of economic conditions (defensive sector)',
+    'Growth driven by aging populations, drug pipelines, and medical innovation'
+  ],
+  'Consumer Cyclical': [
+    'Retailers, automakers, restaurants, and e-commerce companies',
+    'Spending on these products rises in good times and falls in recessions',
+    'Also called "Consumer Discretionary" — things people want but don\'t need'
+  ],
+  'Communication Services': [
+    'Social media, streaming, telecom carriers, and entertainment companies',
+    'Includes both high-growth digital platforms and stable telecom utilities',
+    'Revenue from advertising, subscriptions, and data services'
+  ],
+  'Industrials': [
+    'Aerospace, defense, railroads, machinery, and construction companies',
+    'Performance closely tracks manufacturing activity and infrastructure spending',
+    'Benefits from economic expansion, government contracts, and global trade'
+  ],
+  'Consumer Defensive': [
+    'Food, beverages, household products, and discount retailers',
+    'People buy these essentials regardless of the economy (defensive sector)',
+    'Lower growth but more stable — popular during market downturns'
+  ],
+  'Energy': [
+    'Oil & gas producers, refiners, pipeline operators, and renewable energy firms',
+    'Highly correlated with crude oil and natural gas prices',
+    'Transitioning sector balancing traditional fossil fuels with clean energy growth'
+  ],
+  'Utilities': [
+    'Electric, gas, and water companies that provide essential services',
+    'Regulated businesses with predictable revenue and high dividend yields',
+    'Considered a "bond proxy" — performs well when interest rates fall'
+  ],
+  'Real Estate': [
+    'REITs (Real Estate Investment Trusts) that own and manage properties',
+    'Includes office, residential, retail, data center, and industrial properties',
+    'Required to distribute 90% of income as dividends — high yield sector'
+  ],
+  'Basic Materials': [
+    'Mining, chemicals, forestry, and metals companies',
+    'Prices driven by global supply/demand for raw commodities',
+    'Cyclical sector that benefits from economic growth and inflation'
+  ]
+}
+
+const expandedSector = ref(null)
+
+function toggleSectorInfo(sectorName) {
+  expandedSector.value = expandedSector.value === sectorName ? null : sectorName
+}
 
 const sectorDetails = computed(() => {
   return Object.entries(sectorMap.value)

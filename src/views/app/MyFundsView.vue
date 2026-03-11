@@ -16,13 +16,13 @@
       <p class="text-sm mt-1">Start investing from the home page!</p>
     </div>
 
-    <!-- Personal Portfolio Card -->
+    <!-- My Investments Card -->
     <div v-if="personalPortfolio" class="card bg-base-100 shadow">
       <div class="card-body p-4">
         <div class="flex items-start justify-between">
           <div>
-            <span class="badge badge-sm badge-primary">Personal</span>
-            <h3 class="font-bold mt-1">{{ auth.profile?.full_name || 'My Portfolio' }}</h3>
+            <span class="badge badge-sm badge-primary">My Investments</span>
+            <h3 class="font-bold mt-1">{{ auth.profile?.full_name || 'My Investments' }}</h3>
           </div>
           <span class="badge badge-ghost badge-sm">{{ personalPortfolio.visibility || 'private' }}</span>
         </div>
@@ -45,7 +45,7 @@
           </div>
         </div>
         <div class="mt-3">
-          <RouterLink :to="{ name: 'home' }" class="btn btn-sm btn-outline btn-block">View Portfolio</RouterLink>
+          <RouterLink :to="{ name: 'home' }" class="btn btn-sm btn-outline btn-block">View Investments</RouterLink>
         </div>
       </div>
     </div>
@@ -126,8 +126,8 @@
             </thead>
             <tbody>
               <tr v-if="personalPortfolio">
-                <td class="font-semibold">{{ auth.profile?.full_name || 'My Portfolio' }}</td>
-                <td><span class="badge badge-xs badge-primary">Personal</span></td>
+                <td class="font-semibold">{{ auth.profile?.full_name || 'My Investments' }}</td>
+                <td><span class="badge badge-xs badge-primary">My Investments</span></td>
                 <td class="text-right font-mono">${{ Number(personalPortfolio.starting_cash || 100000).toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</td>
                 <td class="text-right font-mono">${{ personalData._totalValue.toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</td>
                 <td class="text-right font-mono" :class="personalData._returnPct >= 0 ? 'text-success' : 'text-error'">
@@ -154,6 +154,52 @@
         </div>
       </div>
     </div>
+
+    <!-- Multi-Period Performance Table -->
+    <div v-if="periodPerformance.length > 0" class="card bg-base-100 shadow">
+      <div class="card-body p-4">
+        <h3 class="font-semibold mb-2 flex items-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+          Performance by Period
+        </h3>
+        <div class="overflow-x-auto">
+          <table class="table table-sm table-zebra">
+            <thead>
+              <tr>
+                <th>Fund</th>
+                <th v-for="p in periods" :key="p.key" class="text-right">{{ p.label }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in periodPerformance" :key="row.fundId">
+                <td class="font-semibold">{{ row.fundName }}</td>
+                <td v-for="p in periods" :key="p.key" class="text-right">
+                  <template v-if="row[p.key] != null">
+                    <div class="font-mono text-sm" :class="row[p.key] >= 0 ? 'text-success' : 'text-error'">
+                      {{ row[p.key] >= 0 ? '+' : '' }}{{ row[p.key].toFixed(2) }}%
+                    </div>
+                    <div class="font-mono text-xs" :class="row[p.key + '_vs'] >= 0 ? 'text-success/60' : 'text-error/60'">
+                      {{ row[p.key + '_vs'] >= 0 ? '+' : '' }}{{ row[p.key + '_vs']?.toFixed(2) }}% vs SPY
+                    </div>
+                  </template>
+                  <span v-else class="text-base-content/30 text-xs">—</span>
+                </td>
+              </tr>
+              <!-- SPY row -->
+              <tr class="opacity-60">
+                <td class="font-semibold">S&P 500 (SPY)</td>
+                <td v-for="p in periods" :key="p.key" class="text-right">
+                  <div v-if="spyPeriodReturns[p.key] != null" class="font-mono text-sm" :class="spyPeriodReturns[p.key] >= 0 ? 'text-success' : 'text-error'">
+                    {{ spyPeriodReturns[p.key] >= 0 ? '+' : '' }}{{ spyPeriodReturns[p.key].toFixed(2) }}%
+                  </div>
+                  <span v-else class="text-base-content/30 text-xs">—</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -166,6 +212,7 @@ import { useMarketDataStore } from '../../stores/marketData'
 import PortfolioLineChart from '../../components/charts/PortfolioLineChart.vue'
 import { supabase } from '../../lib/supabase'
 import { getHistoricalDaily } from '../../services/fmpApi'
+import { reconstructHoldingsAsOf, reconstructCashAsOf } from '../../utils/leaderboardMetrics'
 
 const portfolioStore = usePortfolioStore()
 const auth = useAuthStore()
@@ -258,6 +305,9 @@ onMounted(async () => {
 
     // Build comparison chart
     await buildComparisonChart()
+
+    // Load period performance (non-blocking)
+    loadPeriodPerformance()
   } finally {
     loading.value = false
   }
@@ -275,7 +325,7 @@ async function buildComparisonChart() {
     const startCash = Number(personalPortfolio.value.starting_cash || 100000)
     const synth = generateSyntheticHistory(personalPortfolio.value.created_at, null, startCash, personalData.value._totalValue, personalPortfolio.value.id)
     datasets.push({
-      label: auth.profile?.full_name || 'Personal',
+      label: auth.profile?.full_name || 'My Investments',
       data: synth,
       color: FUND_COLORS[colorIdx++ % FUND_COLORS.length],
       baseline: startCash
@@ -341,6 +391,157 @@ async function buildComparisonChart() {
   }
 
   comparisonDatasets.value = datasets
+}
+
+// --- Multi-period performance ---
+const periods = [
+  { key: '1d', label: '1 Day', days: 1 },
+  { key: '1w', label: '1 Week', days: 7 },
+  { key: '1m', label: '1 Month', days: 30 },
+  { key: '3m', label: '3 Months', days: 90 },
+  { key: 'ytd', label: 'YTD', days: null },
+  { key: 'all', label: 'Since Inception', days: null },
+]
+
+const periodPerformance = ref([])
+const spyPeriodReturns = ref({})
+
+function getDateNDaysAgo(n) {
+  return new Date(Date.now() - n * 86400000)
+}
+
+function getYTDStart() {
+  const now = new Date()
+  return new Date(now.getFullYear(), 0, 1)
+}
+
+async function loadPeriodPerformance() {
+  // Collect all fund IDs and their data
+  const fundList = []
+  if (personalPortfolio.value) {
+    fundList.push({ id: personalPortfolio.value.id, name: auth.profile?.full_name || 'My Investments', createdAt: personalPortfolio.value.created_at })
+  }
+  for (const fund of groupEnriched.value) {
+    fundList.push({ id: fund.id, name: fund.fund_name || `Fund ${fund.fund_number || 1}`, createdAt: fund.created_at })
+  }
+  if (fundList.length === 0) return
+
+  // For each fund, load holdings + trades to reconstruct past values
+  const rows = []
+  const spyReturns = {}
+
+  // Fetch SPY historical prices for period calculations
+  const earliestCreated = fundList.reduce((min, f) => {
+    const d = new Date(f.createdAt)
+    return d < min ? d : min
+  }, new Date())
+  const fromStr = new Date(earliestCreated.getTime() - 400 * 86400000).toISOString().split('T')[0]
+  const toStr = new Date().toISOString().split('T')[0]
+
+  let spyHistory = []
+  try {
+    const raw = await getHistoricalDaily('SPY', fromStr, toStr)
+    spyHistory = (raw || []).map(d => ({ date: d.date, close: Number(d.close ?? d.adjClose) })).sort((a, b) => new Date(a.date) - new Date(b.date))
+  } catch (e) { /* ignore */ }
+
+  function getSpyPriceNear(targetDate) {
+    const target = targetDate.getTime()
+    let best = null
+    for (const d of spyHistory) {
+      const dt = new Date(d.date).getTime()
+      if (dt <= target) best = d.close
+    }
+    return best
+  }
+
+  const spyNow = spyHistory.length > 0 ? spyHistory[spyHistory.length - 1].close : null
+
+  // Calculate SPY returns for each period
+  for (const p of periods) {
+    if (!spyNow) continue
+    let startDate
+    if (p.key === 'ytd') startDate = getYTDStart()
+    else if (p.key === 'all') continue // no SPY "since inception" — each fund differs
+    else startDate = getDateNDaysAgo(p.days)
+
+    const spyStart = getSpyPriceNear(startDate)
+    if (spyStart && spyStart > 0) {
+      spyReturns[p.key] = ((spyNow / spyStart) - 1) * 100
+    }
+  }
+  spyPeriodReturns.value = spyReturns
+
+  // For each fund, compute returns per period
+  for (const fund of fundList) {
+    const { data: holdings } = await supabase.from('holdings').select('*').eq('portfolio_id', fund.id)
+    const { data: trades } = await supabase.from('trades').select('*').eq('portfolio_id', fund.id).order('executed_at', { ascending: false })
+    const { data: pf } = await supabase.from('portfolios').select('cash_balance, starting_cash').eq('id', fund.id).single()
+
+    const currentHoldings = holdings || []
+    const allTrades = trades || []
+    const currentCash = pf?.cash_balance != null ? Number(pf.cash_balance) : Number(pf?.starting_cash || 100000)
+    const startingCash = Number(pf?.starting_cash || 100000)
+
+    // Current portfolio value
+    const tickers = currentHoldings.map(h => h.ticker)
+    if (tickers.length > 0) await market.fetchBatchQuotes(tickers)
+    const currentValue = currentHoldings.reduce((sum, h) => sum + (Number(h.shares) * (market.getCachedPrice(h.ticker) || 0)), 0) + currentCash
+
+    const row = { fundId: fund.id, fundName: fund.name }
+
+    for (const p of periods) {
+      let asOfDate
+      if (p.key === 'ytd') asOfDate = getYTDStart()
+      else if (p.key === 'all') asOfDate = new Date(fund.createdAt)
+      else asOfDate = getDateNDaysAgo(p.days)
+
+      // Skip if fund didn't exist yet
+      if (new Date(fund.createdAt) > asOfDate && p.key !== 'all') {
+        row[p.key] = null
+        row[p.key + '_vs'] = null
+        continue
+      }
+
+      if (p.key === 'all') {
+        // Since inception = current total return
+        const ret = startingCash > 0 ? ((currentValue - startingCash) / startingCash) * 100 : 0
+        // SPY since inception
+        const spyStart = getSpyPriceNear(new Date(fund.createdAt))
+        const spyRet = spyStart && spyNow ? ((spyNow / spyStart) - 1) * 100 : 0
+        row[p.key] = ret
+        row[p.key + '_vs'] = ret - spyRet
+        continue
+      }
+
+      // Reconstruct portfolio value at period start
+      const pastHoldings = reconstructHoldingsAsOf(currentHoldings, allTrades, asOfDate)
+      const pastCash = reconstructCashAsOf(currentCash, allTrades, asOfDate)
+
+      // Get historical prices for past holdings
+      let pastValue = pastCash
+      for (const h of pastHoldings) {
+        const dateStr = asOfDate.toISOString().split('T')[0]
+        let price = 0
+        try {
+          const hist = await market.fetchHistoricalCloseForTickers([h.ticker], dateStr)
+          price = hist[h.ticker] || 0
+        } catch (e) { /* ignore */ }
+        pastValue += h.shares * price
+      }
+
+      // If past value is 0 (no holdings and no cash), use starting cash
+      if (pastValue <= 0) pastValue = startingCash
+
+      const ret = pastValue > 0 ? ((currentValue - pastValue) / pastValue) * 100 : 0
+      const spyRet = spyReturns[p.key] || 0
+      row[p.key] = ret
+      row[p.key + '_vs'] = ret - spyRet
+    }
+
+    rows.push(row)
+  }
+
+  periodPerformance.value = rows
 }
 
 function generateSyntheticHistory(startDate, endDate, startValue, endValue, seed) {

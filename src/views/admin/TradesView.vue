@@ -203,7 +203,7 @@ function buildPortfolioLabel(portfolio) {
   if (!portfolio) return 'Unknown portfolio'
   if (portfolio.owner_type === 'group') return portfolio.fund_name || `Group Fund ${portfolio.fund_number || ''}`.trim()
   if (portfolio.owner_type === 'competition') return portfolio.fund_name || portfolio.name || 'Competition Portfolio'
-  return portfolio.name || 'Personal Portfolio'
+  return portfolio.name || 'My Investments'
 }
 
 function describeAuditEntry(entry) {

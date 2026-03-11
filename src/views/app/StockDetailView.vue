@@ -88,7 +88,7 @@
               <div v-if="isGroupPortfolio" class="badge badge-secondary gap-1 font-bold">
                 Group: {{ membership?.group?.name }}
               </div>
-              <div v-else class="badge badge-primary font-bold">Personal Portfolio</div>
+              <div v-else class="badge badge-primary font-bold">My Investments</div>
             </div>
 
             <div class="card-body p-4 space-y-4">

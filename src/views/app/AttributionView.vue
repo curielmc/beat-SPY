@@ -282,7 +282,7 @@ const portfolioLabel = computed(() => {
   const p = portfolioStore.portfolio
   if (!p) return ''
   if (p.fund_name) return p.fund_name
-  if (p.owner_type === 'user') return 'My Portfolio'
+  if (p.owner_type === 'user') return 'My Investments'
   return ''
 })
 
@@ -706,7 +706,7 @@ onMounted(async () => {
       .limit(1)
       .maybeSingle()
     if (personalPortfolio) {
-      allFunds.push({ ...personalPortfolio, fund_name: personalPortfolio.fund_name || 'My Portfolio' })
+      allFunds.push({ ...personalPortfolio, fund_name: personalPortfolio.fund_name || 'My Investments' })
     }
   }
 

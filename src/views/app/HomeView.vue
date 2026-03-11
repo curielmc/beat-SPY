@@ -72,7 +72,7 @@
           : 'bg-base-200 text-base-content/60 hover:bg-base-300'"
         @click="switchTab('personal')"
       >
-        Personal
+        My Investments
       </button>
       <button
         class="flex-1 py-2 px-4 rounded-lg text-sm font-semibold transition-all"
@@ -108,7 +108,7 @@
       <div class="flex items-center gap-2">
         <h1 class="text-xl font-bold">
           <template v-if="activeTab === 'personal'">
-            My Portfolio
+            My Investments
             <span class="text-sm font-normal text-base-content/50">{{ auth.profile?.full_name }}</span>
           </template>
           <template v-else>
@@ -727,7 +727,7 @@ const activeFund = computed(() =>
   groupFunds.value.find(f => f.id === activeFundId.value) || null
 )
 const activeFundName = computed(() => {
-  if (activeTab.value === 'personal') return auth.profile?.full_name || 'My Portfolio'
+  if (activeTab.value === 'personal') return auth.profile?.full_name || 'My Investments'
   const f = activeFund.value
   if (!f) return portfolioStore.portfolio?.fund_name || 'Group Fund'
   return f.fund_name || `Fund ${f.fund_number}`
@@ -867,7 +867,7 @@ onMounted(async () => {
     // Independent user - check for personal portfolio
     await portfolioStore.loadPersonalPortfolio()
     if (portfolioStore.portfolio) {
-      membership.value = { group_id: 'personal', group: { name: 'My Portfolio' } }
+      membership.value = { group_id: 'personal', group: { name: 'My Investments' } }
       groupMembers.value = [{ id: auth.currentUser.id, full_name: auth.profile?.full_name }]
       personalVisibility.value = portfolioStore.portfolio.visibility || 'private'
     }
@@ -1005,7 +1005,7 @@ async function loadCharts() {
 
     const datasets = []
     if (portfolioHistory.length > 1) {
-      datasets.push({ label: 'My Portfolio', data: portfolioHistory, color: 'primary' })
+      datasets.push({ label: 'My Investments', data: portfolioHistory, color: 'primary' })
     }
     if (spyHistory.length > 0) {
       datasets.push({ label: 'S&P 500', data: spyHistory, color: 'sp500' })
@@ -1015,12 +1015,12 @@ async function loadCharts() {
     // --- Portfolio Value Line Chart (absolute $) ---
     const pvDatasets = []
     if (portfolioHistory.length > 1) {
-      pvDatasets.push({ label: 'My Portfolio', data: portfolioHistory, color: 'primary' })
+      pvDatasets.push({ label: 'My Investments', data: portfolioHistory, color: 'primary' })
     } else {
       // Synthetic fallback
       const createdAt = portfolioStore.portfolio?.created_at
       const synth = generateSyntheticHistory(createdAt, null, startCash, portfolioStore.totalMarketValue, portfolioStore.portfolio?.id)
-      pvDatasets.push({ label: 'My Portfolio', data: synth, color: 'primary' })
+      pvDatasets.push({ label: 'My Investments', data: synth, color: 'primary' })
     }
     if (spyHistory.length > 0) {
       pvDatasets.push({ label: portfolioStore.benchmarkTicker, data: spyHistory, color: 'sp500' })
@@ -1197,7 +1197,7 @@ async function handleStartInvesting() {
     return
   }
   await portfolioStore.loadPersonalPortfolio()
-  membership.value = { group_id: 'personal', group: { name: 'My Portfolio' } }
+  membership.value = { group_id: 'personal', group: { name: 'My Investments' } }
   groupMembers.value = [{ id: auth.currentUser.id, full_name: auth.profile?.full_name }]
   personalVisibility.value = portfolioStore.portfolio?.visibility || 'private'
   settingsForm.value = {

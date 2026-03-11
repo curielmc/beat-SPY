@@ -17,7 +17,7 @@
           <!-- Header row -->
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-2">
-              <h3 class="font-semibold">{{ p.name || 'My Portfolio' }}</h3>
+              <h3 class="font-semibold">{{ p.name || 'My Investments' }}</h3>
               <span class="badge badge-sm" :class="p.status === 'active' ? 'badge-success' : 'badge-ghost'">
                 {{ p.status || 'active' }}
               </span>
