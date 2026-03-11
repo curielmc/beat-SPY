@@ -78,7 +78,10 @@
           Sector Breakdown
         </h2>
         <div v-if="sectorDetails.length" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div v-for="sector in sectorDetails" :key="sector.name" class="card bg-base-100 shadow-sm border border-base-300">
+          <div v-for="sector in sectorDetails" :key="sector.name"
+            class="card bg-base-100 shadow-sm border border-base-300 cursor-pointer hover:border-primary/50 transition-colors"
+            @click="filterBySector(sector.name)"
+          >
             <div class="card-body p-3">
               <div class="flex justify-between items-start">
                 <h3 class="font-semibold text-sm"><SectorLabel :sector="sector.name" size="xs" /></h3>
@@ -88,6 +91,7 @@
               <div class="flex flex-wrap gap-1 mt-1">
                 <span v-for="h in sector.topHoldings" :key="h" class="badge badge-ghost badge-xs">{{ h }}</span>
               </div>
+              <div class="text-xs text-primary/60 mt-1">View all &rarr;</div>
             </div>
           </div>
         </div>
@@ -144,14 +148,45 @@
     </div>
 
     <!-- Constituents Table -->
-    <div class="card bg-base-100 shadow">
+    <div ref="constituentsSection" class="card bg-base-100 shadow">
       <div class="card-body p-4">
         <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
           <h2 class="font-bold text-lg flex items-center gap-2">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
             All Constituents
+            <span v-if="activeSectorFilter" class="badge badge-primary badge-sm gap-1">
+              {{ activeSectorFilter }}
+              <button class="btn btn-ghost btn-xs p-0 h-auto min-h-0" @click="activeSectorFilter = ''">✕</button>
+            </span>
           </h2>
           <input v-model="searchQuery" type="text" placeholder="Search ticker or company..." class="input input-sm input-bordered w-60" />
+        </div>
+
+        <!-- Filter bar -->
+        <div class="flex flex-wrap gap-2 mb-3">
+          <!-- Sector filter -->
+          <select v-model="activeSectorFilter" class="select select-bordered select-sm">
+            <option value="">All Sectors</option>
+            <option v-for="s in sectorDetails" :key="s.name" :value="s.name">{{ s.name }} ({{ s.count }})</option>
+          </select>
+
+          <!-- Market cap filter -->
+          <select v-model="marketCapFilter" class="select select-bordered select-sm">
+            <option value="">All Market Caps</option>
+            <option value="mega">Mega Cap ($200B+)</option>
+            <option value="large">Large Cap ($10B–$200B)</option>
+            <option value="mid">Mid Cap (&lt;$10B)</option>
+          </select>
+
+          <!-- Performance filter -->
+          <select v-model="performanceFilter" class="select select-bordered select-sm">
+            <option value="">All Performance</option>
+            <option value="up">Up Today</option>
+            <option value="down">Down Today</option>
+          </select>
+
+          <button v-if="activeSectorFilter || marketCapFilter || performanceFilter || searchQuery" class="btn btn-ghost btn-sm" @click="clearFilters">Clear All</button>
+          <span class="text-xs text-base-content/50 self-center ml-auto">{{ filteredConstituents.length }} results</span>
         </div>
 
         <div class="overflow-x-auto">
@@ -184,7 +219,9 @@
                 </td>
                 <td class="max-w-[200px] truncate">{{ stock.name }}</td>
                 <td class="text-xs">
-                  <SectorLabel v-if="stock.sector" :sector="stock.sector" size="xs" />
+                  <button v-if="stock.sector" class="hover:opacity-80" @click="activeSectorFilter = stock.sector">
+                    <SectorLabel :sector="stock.sector" size="xs" />
+                  </button>
                   <span v-else>—</span>
                 </td>
                 <td class="text-right font-mono">{{ stock.weightPercentage?.toFixed(2) }}%</td>
@@ -257,9 +294,13 @@ const spyHistory = ref([])
 const holdings = ref([])
 const constituents = ref([])
 const searchQuery = ref('')
+const activeSectorFilter = ref('')
+const marketCapFilter = ref('')
+const performanceFilter = ref('')
 const displayCount = ref(50)
 const sortKey = ref('weightPercentage')
 const sortAsc = ref(false)
+const constituentsSection = ref(null)
 
 // --- Computed ---
 const spyChartDatasets = computed(() => {
@@ -313,6 +354,24 @@ const filteredConstituents = computed(() => {
     const q = searchQuery.value.toLowerCase()
     list = list.filter(s => s.symbol?.toLowerCase().includes(q) || s.name?.toLowerCase().includes(q))
   }
+  if (activeSectorFilter.value) {
+    list = list.filter(s => s.sector === activeSectorFilter.value)
+  }
+  if (marketCapFilter.value) {
+    list = list.filter(s => {
+      const cap = s.marketCap || 0
+      if (marketCapFilter.value === 'mega') return cap >= 200e9
+      if (marketCapFilter.value === 'large') return cap >= 10e9 && cap < 200e9
+      if (marketCapFilter.value === 'mid') return cap < 10e9
+      return true
+    })
+  }
+  if (performanceFilter.value) {
+    list = list.filter(s => {
+      if (s.changesPercentage == null) return false
+      return performanceFilter.value === 'up' ? s.changesPercentage >= 0 : s.changesPercentage < 0
+    })
+  }
   list.sort((a, b) => {
     const aVal = a[sortKey.value] ?? 0
     const bVal = b[sortKey.value] ?? 0
@@ -340,6 +399,19 @@ function toggleSort(key) {
     sortKey.value = key
     sortAsc.value = false
   }
+}
+
+function filterBySector(sectorName) {
+  activeSectorFilter.value = sectorName
+  displayCount.value = 100
+  constituentsSection.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+function clearFilters() {
+  activeSectorFilter.value = ''
+  marketCapFilter.value = ''
+  performanceFilter.value = ''
+  searchQuery.value = ''
 }
 
 const explainerCards = [

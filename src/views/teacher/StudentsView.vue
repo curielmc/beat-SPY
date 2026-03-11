@@ -730,16 +730,19 @@ async function confirmAward() {
   const finalAmount = awardType.value === "subtract" ? -awardAmount.value : awardAmount.value
 
   if (awardTargetId.value) {
-    // Award to a specific student fund
+    // Award to a specific student fund — adjust both cash and starting_cash
     const { data: fundData } = await supabase
       .from('portfolios')
-      .select('cash_balance')
+      .select('cash_balance, starting_cash')
       .eq('id', awardTargetId.value)
       .single()
     if (fundData) {
       await supabase
         .from('portfolios')
-        .update({ cash_balance: Number(fundData.cash_balance) + finalAmount })
+        .update({
+          cash_balance: Number(fundData.cash_balance) + finalAmount,
+          starting_cash: (Number(fundData.starting_cash) || 100000) + finalAmount
+        })
         .eq('id', awardTargetId.value)
     }
     awardSuccess.value = `${awardType.value === 'add' ? 'Added' : 'Subtracted'} $${awardAmount.value.toLocaleString()} ${awardType.value === 'add' ? 'to' : 'from'} student fund!`

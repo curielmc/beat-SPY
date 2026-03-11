@@ -245,15 +245,20 @@ export const useTeacherStore = defineStore('teacher', () => {
     // Get portfolio for this group
     const { data: pData } = await supabase
       .from('portfolios')
-      .select('id, cash_balance')
+      .select('id, cash_balance, starting_cash')
       .eq('owner_type', 'group')
       .eq('owner_id', groupId)
       .maybeSingle()
 
     if (pData) {
+      // Update both cash_balance AND starting_cash so deposits/withdrawals
+      // don't inflate or deflate return calculations
       await supabase
         .from('portfolios')
-        .update({ cash_balance: pData.cash_balance + amount })
+        .update({
+          cash_balance: pData.cash_balance + amount,
+          starting_cash: (pData.starting_cash || 100000) + amount
+        })
         .eq('id', pData.id)
     } else {
       // Create portfolio if it doesn't exist
