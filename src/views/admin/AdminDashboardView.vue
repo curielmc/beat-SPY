@@ -299,12 +299,20 @@ async function generateNotes() {
       body: JSON.stringify(body)
     })
 
-    const data = await res.json()
     if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
       notesError.value = data.error || 'Failed to generate notes'
     } else {
-      classNotes.value = data.notes
-      notesMeta.value = `${data.period} | ${data.groups_analyzed} groups | ${data.tickers_tracked} stocks tracked`
+      // Stream the response
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      classNotes.value = ''
+      notesMeta.value = `${res.headers.get('X-Notes-Period') || ''} | ${res.headers.get('X-Notes-Groups') || '?'} groups | ${res.headers.get('X-Notes-Tickers') || '?'} stocks tracked`
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        classNotes.value += decoder.decode(value, { stream: true })
+      }
     }
   } catch (err) {
     notesError.value = 'Server error — the request may have timed out. Try a shorter date range or a single group.'

@@ -15,76 +15,76 @@ async function sbFetch(path) {
   return res.json()
 }
 
-async function generateAIAnalysis(prompt) {
+function getAIConfig(prompt) {
   if (process.env.OPENROUTER_API_KEY) {
-    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
+    return {
+      url: 'https://openrouter.ai/api/v1/chat/completions',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
         'HTTP-Referer': 'https://beat-snp.com',
         'X-Title': 'Beat the S&P 500'
       },
-      body: JSON.stringify({
+      body: {
         model: process.env.OPENROUTER_MODEL || 'deepseek/deepseek-chat',
         messages: [{ role: 'user', content: prompt }],
-        max_tokens: 2000
-      })
-    })
-    const data = await res.json()
-    return data.choices?.[0]?.message?.content
+        max_tokens: 2000,
+        stream: true
+      },
+      format: 'openai'
+    }
   }
 
   if (process.env.DEEPSEEK_API_KEY) {
-    const res = await fetch('https://api.deepseek.com/v1/chat/completions', {
-      method: 'POST',
+    return {
+      url: 'https://api.deepseek.com/v1/chat/completions',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${process.env.DEEPSEEK_API_KEY}`
       },
-      body: JSON.stringify({
+      body: {
         model: 'deepseek-chat',
         messages: [{ role: 'user', content: prompt }],
-        max_tokens: 2000
-      })
-    })
-    const data = await res.json()
-    return data.choices?.[0]?.message?.content
+        max_tokens: 2000,
+        stream: true
+      },
+      format: 'openai'
+    }
   }
 
   if (process.env.KIMI_API_KEY) {
-    const res = await fetch('https://api.moonshot.cn/v1/chat/completions', {
-      method: 'POST',
+    return {
+      url: 'https://api.moonshot.cn/v1/chat/completions',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${process.env.KIMI_API_KEY}`
       },
-      body: JSON.stringify({
+      body: {
         model: 'moonshot-v1-8k',
         messages: [{ role: 'user', content: prompt }],
-        max_tokens: 2000
-      })
-    })
-    const data = await res.json()
-    return data.choices?.[0]?.message?.content
+        max_tokens: 2000,
+        stream: true
+      },
+      format: 'openai'
+    }
   }
 
   if (process.env.ANTHROPIC_KEY) {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
+    return {
+      url: 'https://api.anthropic.com/v1/messages',
       headers: {
         'x-api-key': process.env.ANTHROPIC_KEY,
         'anthropic-version': '2023-06-01',
         'content-type': 'application/json'
       },
-      body: JSON.stringify({
+      body: {
         model: 'claude-3-haiku-20240307',
         max_tokens: 2000,
-        messages: [{ role: 'user', content: prompt }]
-      })
-    })
-    const data = await res.json()
-    return data.content?.[0]?.text
+        messages: [{ role: 'user', content: prompt }],
+        stream: true
+      },
+      format: 'anthropic'
+    }
   }
 
   return null
@@ -95,7 +95,6 @@ export default async function handler(req) {
     return new Response('Method not allowed', { status: 405 })
   }
 
-  // Verify teacher/admin role
   const authHeader = req.headers.get('authorization')
   if (!authHeader) return new Response('Unauthorized', { status: 401 })
 
@@ -208,18 +207,79 @@ Write structured class notes in markdown with these sections:
 
 Keep it practical, specific, and reference actual tickers, prices, and group names. Write for a teacher who wants to lead a 10-minute discussion. Use a conversational but informative tone.`
 
-  const notes = await generateAIAnalysis(prompt)
-
-  if (!notes) {
-    return new Response(JSON.stringify({ error: 'AI generation failed. Check API keys.' }), {
+  const aiConfig = getAIConfig(prompt)
+  if (!aiConfig) {
+    return new Response(JSON.stringify({ error: 'No AI provider configured.' }), {
       status: 500, headers: { 'Content-Type': 'application/json' }
     })
   }
 
-  return new Response(JSON.stringify({
-    notes,
-    period: dateLabel,
-    groups_analyzed: groupSnapshots.length,
-    tickers_tracked: [...new Set([...(allHoldings || []).map(h => h.ticker), ...(allTrades || []).map(t => t.ticker)])].length
-  }), { headers: { 'Content-Type': 'application/json' } })
+  // Stream the LLM response to avoid Vercel Edge timeout
+  const aiRes = await fetch(aiConfig.url, {
+    method: 'POST',
+    headers: aiConfig.headers,
+    body: JSON.stringify(aiConfig.body)
+  })
+
+  if (!aiRes.ok) {
+    const err = await aiRes.text()
+    return new Response(JSON.stringify({ error: 'AI request failed: ' + err }), {
+      status: 502, headers: { 'Content-Type': 'application/json' }
+    })
+  }
+
+  // Transform the upstream SSE stream into a plain text stream
+  const encoder = new TextEncoder()
+  const decoder = new TextDecoder()
+  const readable = new ReadableStream({
+    async start(controller) {
+      const reader = aiRes.body.getReader()
+      let buffer = ''
+      try {
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          buffer += decoder.decode(value, { stream: true })
+
+          const lines = buffer.split('\n')
+          buffer = lines.pop() || ''
+
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue
+            const data = line.slice(6).trim()
+            if (data === '[DONE]') continue
+
+            try {
+              const parsed = JSON.parse(data)
+              let text = ''
+              if (aiConfig.format === 'anthropic') {
+                if (parsed.type === 'content_block_delta') {
+                  text = parsed.delta?.text || ''
+                }
+              } else {
+                text = parsed.choices?.[0]?.delta?.content || ''
+              }
+              if (text) {
+                controller.enqueue(encoder.encode(text))
+              }
+            } catch {}
+          }
+        }
+      } catch (err) {
+        controller.error(err)
+      } finally {
+        controller.close()
+      }
+    }
+  })
+
+  return new Response(readable, {
+    headers: {
+      'Content-Type': 'text/plain; charset=utf-8',
+      'Transfer-Encoding': 'chunked',
+      'X-Notes-Period': dateLabel,
+      'X-Notes-Groups': String(groupSnapshots.length),
+      'X-Notes-Tickers': String([...new Set([...(allHoldings || []).map(h => h.ticker), ...(allTrades || []).map(t => t.ticker)])].length)
+    }
+  })
 }
