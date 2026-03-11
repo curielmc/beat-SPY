@@ -137,34 +137,43 @@ export default async function handler(req) {
   // Get class memberships for member names
   const memberships = await sbFetch(`/class_memberships?class_id=eq.${class_id}&select=user_id,group_id,profiles:profiles(full_name)`)
 
-  // Build portfolio data for each group
-  const groupData = []
+  // Build portfolio data for each group (parallel)
   const allTickers = new Set()
 
-  for (const group of groups) {
-    const portfolio = await sbFetch(`/portfolios?owner_type=eq.group&owner_id=eq.${group.id}&status=eq.active&select=id,cash_balance,starting_cash`)
-    const p = portfolio?.[0]
-    if (!p) continue
+  // Fetch all portfolios for these groups in one batch
+  const groupIds = groups.map(g => g.id)
+  const portfolios = await sbFetch(`/portfolios?owner_type=eq.group&owner_id=in.(${groupIds.join(',')})&status=eq.active&select=id,owner_id,cash_balance,starting_cash`)
 
-    const holdings = await sbFetch(`/holdings?portfolio_id=eq.${p.id}&select=ticker,shares,avg_cost`)
-    const trades = await sbFetch(`/trades?portfolio_id=eq.${p.id}&executed_at=gte.${startDate}&executed_at=lte.${endDate}&select=ticker,side,shares,dollars,price,executed_at,user_id&order=executed_at.desc`)
+  // Fetch holdings and trades in parallel for all portfolios
+  const portfolioIds = (portfolios || []).map(p => p.id)
+  const [allHoldings, allTrades] = portfolioIds.length > 0 ? await Promise.all([
+    sbFetch(`/holdings?portfolio_id=in.(${portfolioIds.join(',')})&select=portfolio_id,ticker,shares,avg_cost`),
+    sbFetch(`/trades?portfolio_id=in.(${portfolioIds.join(',')})&executed_at=gte.${startDate}&executed_at=lte.${endDate}&select=portfolio_id,ticker,side,shares,dollars,price,executed_at,user_id&order=executed_at.desc`)
+  ]) : [[], []]
+
+  const groupData = groups.map(group => {
+    const p = (portfolios || []).find(p => p.owner_id === group.id)
+    if (!p) return null
+
+    const holdings = (allHoldings || []).filter(h => h.portfolio_id === p.id)
+    const trades = (allTrades || []).filter(t => t.portfolio_id === p.id)
 
     const members = (memberships || [])
       .filter(m => m.group_id === group.id)
       .map(m => m.profiles?.full_name || 'Unknown')
 
-    for (const h of (holdings || [])) allTickers.add(h.ticker)
-    for (const t of (trades || [])) allTickers.add(t.ticker)
+    for (const h of holdings) allTickers.add(h.ticker)
+    for (const t of trades) allTickers.add(t.ticker)
 
-    groupData.push({
+    return {
       name: group.name,
       members,
       startingCash: p.starting_cash,
       cashBalance: p.cash_balance,
-      holdings: holdings || [],
-      trades: trades || []
-    })
-  }
+      holdings,
+      trades
+    }
+  }).filter(Boolean)
 
   // Fetch live market data for all tickers
   const tickerList = [...allTickers]

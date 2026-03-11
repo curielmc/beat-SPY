@@ -307,7 +307,7 @@ async function generateNotes() {
       notesMeta.value = `${data.period} | ${data.groups_analyzed} groups | ${data.tickers_tracked} stocks tracked`
     }
   } catch (err) {
-    notesError.value = err.message
+    notesError.value = 'Server error — the request may have timed out. Try a shorter date range or a single group.'
   }
   generatingNotes.value = false
 }
