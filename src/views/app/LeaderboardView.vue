@@ -405,8 +405,8 @@ async function loadLeaderboard() {
       // Build per-fund entries
       for (const p of groupPortfolios) {
         const pHoldings = holdingsMap[p.id] || []
-        const startingCash = Number(p.starting_cash) || 100000
-        const cashBalance = Number(p.cash_balance) || startingCash
+        const startingCash = p.starting_cash != null ? Number(p.starting_cash) : 100000
+        const cashBalance = p.cash_balance != null ? Number(p.cash_balance) : startingCash
         const createdAt = p.created_at || new Date().toISOString()
         const m = computeEntryMetrics(pHoldings, cashBalance, startingCash, createdAt)
 
@@ -430,8 +430,8 @@ async function loadLeaderboard() {
 
       // Build aggregate group entry (combine all funds)
       const allGroupHoldings = groupPortfolios.flatMap(p => holdingsMap[p.id] || [])
-      const aggCash = groupPortfolios.reduce((s, p) => s + (Number(p.cash_balance) || 0), 0) || 100000
-      const aggStarting = groupPortfolios.reduce((s, p) => s + (Number(p.starting_cash) || 0), 0) || 100000
+      const aggCash = groupPortfolios.reduce((s, p) => s + (p.cash_balance != null ? Number(p.cash_balance) : 0), 0)
+      const aggStarting = groupPortfolios.reduce((s, p) => s + (p.starting_cash != null ? Number(p.starting_cash) : 100000), 0)
       const earliestCreated = groupPortfolios.map(p => p.created_at).filter(Boolean).sort()[0] || new Date().toISOString()
       const aggM = computeEntryMetrics(allGroupHoldings, aggCash, aggStarting, earliestCreated)
 
@@ -746,7 +746,7 @@ async function buildIndividualDatasets(enriched) {
       let history = await buildPortfolioHistory(p, trades, startingCash)
       if (!history || history.length < 2) {
         const seed = p.id.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0)
-        const cashBalance = Number(p.cash_balance) || startingCash
+        const cashBalance = p.cash_balance != null ? Number(p.cash_balance) : startingCash
         const returnPct = startingCash > 0 ? ((cashBalance - startingCash) / startingCash) * 100 : 0
         history = generateSyntheticHistory(p.created_at, returnPct, seed)
       }
