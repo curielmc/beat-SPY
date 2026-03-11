@@ -97,50 +97,64 @@ Write 3-4 engaging sentences explaining what drove today's portfolio performance
 
   // AI Call Logic
   let explanation = 'Could not generate explanation.'
-  
-  if (OPENROUTER_KEY) {
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENROUTER_KEY}`,
-        'HTTP-Referer': 'https://beat-snp.com',
-        'X-Title': 'Beat the S&P 500'
-      },
-      body: JSON.stringify({
-        model: process.env.OPENROUTER_MODEL || 'deepseek/deepseek-chat',
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: 400
-      })
-    })
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 25000); // 25 second timeout (it's a smaller task)
 
-    if (response.ok) {
-      const data = await response.json()
-      explanation = data.choices?.[0]?.message?.content || explanation
-    } else {
-      console.error('OpenRouter Error:', await response.text())
-    }
-  } else if (ANTHROPIC_KEY) {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': ANTHROPIC_KEY,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'claude-3-5-sonnet-20240620',
-        max_tokens: 400,
-        messages: [{ role: 'user', content: prompt }]
+  try {
+    if (OPENROUTER_KEY) {
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${OPENROUTER_KEY}`,
+          'HTTP-Referer': 'https://beat-snp.com',
+          'X-Title': 'Beat the S&P 500'
+        },
+        body: JSON.stringify({
+          model: process.env.OPENROUTER_MODEL || 'deepseek/deepseek-chat',
+          messages: [{ role: 'user', content: prompt }],
+          max_tokens: 400
+        }),
+        signal: controller.signal
       })
-    })
 
-    if (response.ok) {
-      const data = await response.json()
-      explanation = data.content?.[0]?.text || explanation
-    } else {
-      console.error('Anthropic Error:', await response.text())
+      if (response.ok) {
+        const data = await response.json()
+        explanation = data.choices?.[0]?.message?.content || explanation
+      } else {
+        console.error('OpenRouter Error:', await response.text())
+      }
+    } else if (ANTHROPIC_KEY) {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': ANTHROPIC_KEY,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'claude-3-5-sonnet-20240620',
+          max_tokens: 400,
+          messages: [{ role: 'user', content: prompt }]
+        }),
+        signal: controller.signal
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        explanation = data.content?.[0]?.text || explanation
+      } else {
+        console.error('Anthropic Error:', await response.text())
+      }
     }
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      explanation = 'AI analysis timed out. Please try again.'
+    } else {
+      console.error('AI Call Error:', err)
+    }
+  } finally {
+    clearTimeout(timeoutId);
   }
 
   return new Response(JSON.stringify({ explanation }), {

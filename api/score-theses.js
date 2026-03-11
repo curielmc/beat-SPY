@@ -65,68 +65,77 @@ export default async function handler(req) {
   const { groups, individualTrades } = await req.json()
 
   const callAI = async (prompt) => {
-    // OpenRouter Support
-    if (process.env.OPENROUTER_API_KEY) {
-      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
-          'HTTP-Referer': 'https://beat-snp.com',
-          'X-Title': 'Beat the S&P 500'
-        },
-        body: JSON.stringify({
-          model: process.env.OPENROUTER_MODEL || 'deepseek/deepseek-chat,anthropic/claude-3-haiku',
-          messages: [{ role: 'user', content: prompt }],
-          max_tokens: 2048
-        })
-      })
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}))
-        console.error('OpenRouter API Error:', errData)
-        throw new Error(`AI provider error: ${res.status} ${errData?.error?.message || ''}`)
-      }
-      const data = await res.json()
-      const text = data.choices?.[0]?.message?.content || '[]'
-      const cleaned = text.replace(/```json\n?|```\n?/g, '').trim()
-      try {
-        return JSON.parse(cleaned)
-      } catch (e) {
-        console.error('JSON Parse Error for AI output:', cleaned)
-        throw new Error('AI returned invalid JSON: ' + e.message)
-      }
-    }
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 50000); // 50 second timeout
 
-    // Anthropic Fallback
-    const apiKey = process.env.ANTHROPIC_KEY
-    if (apiKey) {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01'
-        },
-        body: JSON.stringify({
-          model: 'claude-3-haiku-20240307',
-          max_tokens: 2048,
-          messages: [{ role: 'user', content: prompt }]
+    try {
+      // OpenRouter Support
+      if (process.env.OPENROUTER_API_KEY) {
+        const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+            'HTTP-Referer': 'https://beat-snp.com',
+            'X-Title': 'Beat the S&P 500'
+          },
+          body: JSON.stringify({
+            model: process.env.OPENROUTER_MODEL || 'deepseek/deepseek-chat,anthropic/claude-3-haiku',
+            messages: [{ role: 'user', content: prompt }],
+            max_tokens: 2048
+          }),
+          signal: controller.signal
         })
-      })
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}))
-        console.error('Anthropic API Error:', errData)
-        throw new Error(`AI provider error: ${response.status} ${errData?.error?.message || ''}`)
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}))
+          console.error('OpenRouter API Error:', errData)
+          throw new Error(`AI provider error: ${res.status} ${errData?.error?.message || ''}`)
+        }
+        const data = await res.json()
+        const text = data.choices?.[0]?.message?.content || '[]'
+        const cleaned = text.replace(/```json\n?|```\n?/g, '').trim()
+        try {
+          return JSON.parse(cleaned)
+        } catch (e) {
+          console.error('JSON Parse Error for AI output:', cleaned)
+          throw new Error('AI returned invalid JSON: ' + e.message)
+        }
       }
-      const data = await response.json()
-      const text = data.content?.[0]?.text || '[]'
-      const cleaned = text.replace(/```json\n?|```\n?/g, '').trim()
-      try {
-        return JSON.parse(cleaned)
-      } catch (e) {
-        console.error('JSON Parse Error for Claude output:', cleaned)
-        throw new Error('Claude returned invalid JSON: ' + e.message)
+
+      // Anthropic Fallback
+      const apiKey = process.env.ANTHROPIC_KEY
+      if (apiKey) {
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': apiKey,
+            'anthropic-version': '2023-06-01'
+          },
+          body: JSON.stringify({
+            model: 'claude-3-haiku-20240307',
+            max_tokens: 2048,
+            messages: [{ role: 'user', content: prompt }]
+          }),
+          signal: controller.signal
+        })
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}))
+          console.error('Anthropic API Error:', errData)
+          throw new Error(`AI provider error: ${response.status} ${errData?.error?.message || ''}`)
+        }
+        const data = await response.json()
+        const text = data.content?.[0]?.text || '[]'
+        const cleaned = text.replace(/```json\n?|```\n?/g, '').trim()
+        try {
+          return JSON.parse(cleaned)
+        } catch (e) {
+          console.error('JSON Parse Error for Claude output:', cleaned)
+          throw new Error('Claude returned invalid JSON: ' + e.message)
+        }
       }
+    } finally {
+      clearTimeout(timeoutId);
     }
 
     throw new Error('No AI provider configured')
