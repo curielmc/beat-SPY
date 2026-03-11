@@ -22,6 +22,18 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   }
 })
 
+/**
+ * Get a valid access token, refreshing if needed.
+ * Use this instead of supabase.auth.getSession() in components.
+ */
+export async function getAccessToken() {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (session?.access_token) return session.access_token
+  // Session expired in memory — try refreshing
+  const { data: refreshed } = await supabase.auth.refreshSession()
+  return refreshed?.session?.access_token || null
+}
+
 export async function uploadAvatar(userId, file) {
   const ext = file.name.split('.').pop()
   const path = `${userId}/${Date.now()}.${ext}`

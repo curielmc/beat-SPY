@@ -259,7 +259,7 @@ import { ref, computed, onMounted } from 'vue'
 
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
-import { supabase } from '../../lib/supabase'
+import { supabase, getAccessToken } from '../../lib/supabase'
 import { downloadCSV, downloadText } from '../../utils/csvExport'
 
 const users = ref([])
@@ -398,13 +398,7 @@ async function fetchUsers() {
   errorMsg.value = ''
 
   try {
-    let { data: { session } } = await supabase.auth.getSession()
-    if (!session?.access_token) {
-      // Session may be expired in memory — try refreshing it
-      const { data: refreshed } = await supabase.auth.refreshSession()
-      session = refreshed?.session
-    }
-    const accessToken = session?.access_token
+    const accessToken = await getAccessToken()
     if (!accessToken) {
       throw new Error('Your admin session is missing. Please sign out and back in.')
     }
