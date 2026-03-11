@@ -689,17 +689,40 @@ watch(selectedRange, () => {
 })
 
 onMounted(async () => {
-  // Load fund list for selector
+  // Load fund list for selector (personal + group funds)
   const membership = await auth.getCurrentMembership()
-  if (membership?.group_id && membership.group_id !== 'personal') {
-    const gFunds = await portfolioStore.loadGroupFunds(membership.group_id)
-    funds.value = gFunds
-    // If no portfolioId specified, default to first fund
-    if (!activeFundId.value && gFunds.length > 0) {
-      activeFundId.value = gFunds[0].id
-      await portfolioStore.loadPortfolioById(gFunds[0].id)
+  const allFunds = []
+
+  // Load personal portfolio
+  const uid = auth.effectiveUserId
+  if (uid) {
+    const { data: personalPortfolio } = await supabase
+      .from('portfolios')
+      .select('id, fund_name, fund_number, owner_type')
+      .eq('owner_type', 'user')
+      .eq('owner_id', uid)
+      .or('status.eq.active,status.is.null')
+      .limit(1)
+      .maybeSingle()
+    if (personalPortfolio) {
+      allFunds.push({ ...personalPortfolio, fund_name: personalPortfolio.fund_name || 'My Portfolio' })
     }
   }
+
+  // Load group funds
+  if (membership?.group_id && membership.group_id !== 'personal') {
+    const gFunds = await portfolioStore.loadGroupFunds(membership.group_id)
+    allFunds.push(...gFunds)
+  }
+
+  funds.value = allFunds
+
+  // If no portfolioId specified, default to first fund
+  if (!activeFundId.value && allFunds.length > 0) {
+    activeFundId.value = allFunds[0].id
+    await portfolioStore.loadPortfolioById(allFunds[0].id)
+  }
+
   loadAttribution(true)
 })
 </script>
