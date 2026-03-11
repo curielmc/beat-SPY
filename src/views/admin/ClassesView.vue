@@ -155,10 +155,21 @@
                       <td :colspan="6" class="p-0">
                         <div class="bg-base-300 p-3 space-y-3">
                           <!-- Fund tabs -->
-                          <div class="tabs tabs-boxed tabs-sm bg-base-200">
-                            <button v-for="fund in group.funds" :key="fund.id" class="tab" :class="{ 'tab-active': (activeFundTab[group.id] || group.funds[0]?.id) === fund.id }" @click.stop="activeFundTab[group.id] = fund.id">
-                              {{ fund.name }}
+                          <div class="flex items-center gap-2">
+                            <div class="tabs tabs-boxed tabs-sm bg-base-200">
+                              <button v-for="fund in group.funds" :key="fund.id" class="tab" :class="{ 'tab-active': (activeFundTab[group.id] || group.funds[0]?.id) === fund.id }" @click.stop="activeFundTab[group.id] = fund.id">
+                                {{ fund.name }}
+                              </button>
+                            </div>
+                            <button class="btn btn-ghost btn-xs" @click.stop="startAdminRename(group, (activeFundTab[group.id] || group.funds[0]?.id))" title="Rename fund">
+                              <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                             </button>
+                          </div>
+                          <!-- Inline rename -->
+                          <div v-if="adminRenameFundId" class="flex items-center gap-2 mt-1">
+                            <input v-model="adminRenameName" class="input input-bordered input-xs w-48" placeholder="New fund name" @keyup.enter="saveAdminRename" @keyup.escape="adminRenameFundId = null" />
+                            <button class="btn btn-success btn-xs" @click="saveAdminRename">Save</button>
+                            <button class="btn btn-ghost btn-xs" @click="adminRenameFundId = null">Cancel</button>
                           </div>
                           <!-- Active fund details -->
                           <div v-for="fund in group.funds" :key="fund.id" v-show="(activeFundTab[group.id] || group.funds[0]?.id) === fund.id">
@@ -291,6 +302,36 @@ const leaderboards = reactive({})
 const leaderboardLoading = reactive({})
 const expandedGroups = reactive({})
 const activeFundTab = reactive({})
+const adminRenameFundId = ref(null)
+const adminRenameName = ref('')
+
+function startAdminRename(group, fundId) {
+  const fund = group.funds.find(f => f.id === fundId)
+  if (!fund) return
+  adminRenameFundId.value = fundId
+  adminRenameName.value = fund.name
+}
+
+async function saveAdminRename() {
+  const newName = adminRenameName.value.trim()
+  if (!newName || !adminRenameFundId.value) {
+    adminRenameFundId.value = null
+    return
+  }
+  await supabase
+    .from('portfolios')
+    .update({ fund_name: newName })
+    .eq('id', adminRenameFundId.value)
+  // Update local state
+  for (const cls of classes.value) {
+    const lb = leaderboards[cls.id] || []
+    for (const group of lb) {
+      const fund = group.funds?.find(f => f.id === adminRenameFundId.value)
+      if (fund) { fund.name = newName; break }
+    }
+  }
+  adminRenameFundId.value = null
+}
 
 function toggleGroupExpand(classId, groupId) {
   const key = classId + ':' + groupId

@@ -46,7 +46,7 @@
                     :class="activeFundNum === String(num) ? 'active' : ''"
                     @click="setScope(String(num))"
                   >
-                    <span>💰 Fund {{ num }}</span>
+                    <span class="flex items-center gap-1">💰 {{ getFundLabel(num) }}</span>
                     <span v-if="fundRestrictions[String(num)]" class="badge badge-xs badge-success">Custom</span>
                     <span v-else class="badge badge-xs badge-ghost">Global</span>
                   </button>
@@ -57,7 +57,7 @@
                 <h3 class="text-xs font-bold uppercase tracking-wider text-base-content/40 mb-2">Leaderboard Visibility</h3>
                 <div class="space-y-2">
                   <label v-for="fund in fundVisibility" :key="fund.fund_number" class="flex items-center justify-between cursor-pointer px-2">
-                    <span class="text-sm">Fund {{ fund.fund_number }}</span>
+                    <span class="text-sm">{{ fund.fund_name || 'Fund ' + fund.fund_number }}</span>
                     <input type="checkbox" class="toggle toggle-sm toggle-primary" :checked="!fund.hidden" @change="toggleFundHidden(fund)" />
                   </label>
                 </div>
@@ -101,9 +101,26 @@
           <div class="card bg-base-100 shadow border border-base-200">
             <div class="card-body">
               <div class="flex items-center justify-between mb-4">
-                <h2 class="card-title text-xl">
-                  {{ activeFundNum === 'global' ? '🌎 Global Class Defaults' : `💰 Fund ${activeFundNum} Parameters` }}
-                </h2>
+                <h2 v-if="activeFundNum === 'global'" class="card-title text-xl">🌎 Global Class Defaults</h2>
+                <div v-else class="flex items-center gap-2">
+                  <template v-if="editingFundNum === Number(activeFundNum)">
+                    <input
+                      v-model="editingFundName"
+                      class="input input-bordered input-sm w-48"
+                      @keyup.enter="saveRenameFund(Number(activeFundNum))"
+                      @keyup.escape="editingFundNum = null"
+                      ref="renameInput"
+                    />
+                    <button class="btn btn-success btn-xs" @click="saveRenameFund(Number(activeFundNum))">Save</button>
+                    <button class="btn btn-ghost btn-xs" @click="editingFundNum = null">Cancel</button>
+                  </template>
+                  <template v-else>
+                    <h2 class="card-title text-xl">💰 {{ getFundLabel(Number(activeFundNum)) }} Parameters</h2>
+                    <button class="btn btn-ghost btn-xs" @click="startRenameFund(Number(activeFundNum))" title="Rename fund">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                    </button>
+                  </template>
+                </div>
                 <div v-if="activeFundNum !== 'global' && !fundRestrictions[activeFundNum]" class="badge badge-info gap-2">
                   Inheriting Global Defaults
                 </div>
@@ -246,7 +263,7 @@
                   Reset to Global Defaults
                 </button>
                 <button class="btn btn-primary px-8" @click="saveRestrictions">
-                  {{ activeFundNum === 'global' ? 'Save Global Defaults' : `Save Fund ${activeFundNum} Settings` }}
+                  {{ activeFundNum === 'global' ? 'Save Global Defaults' : `Save ${getFundLabel(Number(activeFundNum))} Settings` }}
                 </button>
               </div>
             </div>
@@ -287,6 +304,9 @@ const form = reactive({
 })
 
 const fundVisibility = ref([])
+let classGroupIds_cache = []
+const editingFundNum = ref(null)
+const editingFundName = ref('')
 const groupModeLocal = ref('student_choice')
 const currentApprovalCode = ref(null)
 
@@ -322,20 +342,25 @@ onMounted(async () => {
 
     const { data: fundPorts } = await supabase
       .from('portfolios')
-      .select('fund_number, hidden')
+      .select('fund_number, fund_name, hidden')
       .eq('owner_type', 'group')
       .in('owner_id', classGroupIds.length ? classGroupIds : ['00000000-0000-0000-0000-000000000000'])
     const nums = [...new Set((fundPorts || []).map(p => p.fund_number).filter(Boolean))].sort((a,b) => a-b)
     availableFunds.value = nums.length ? nums : [1]
 
-    // Build fund visibility from first occurrence of each fund_number
+    // Build fund info from first occurrence of each fund_number
     const seen = new Map()
     for (const p of (fundPorts || [])) {
       if (p.fund_number && !seen.has(p.fund_number)) {
-        seen.set(p.fund_number, { fund_number: p.fund_number, hidden: !!p.hidden })
+        seen.set(p.fund_number, {
+          fund_number: p.fund_number,
+          fund_name: p.fund_name || null,
+          hidden: !!p.hidden
+        })
       }
     }
     fundVisibility.value = [...seen.values()].sort((a, b) => a.fund_number - b.fund_number)
+    classGroupIds_cache = classGroupIds
 
     // Default to last fund if global not preferred? Let's default to global for visibility.
     setScope('global')
@@ -354,6 +379,35 @@ const blockedTickersInput = computed({
 function setScope(scope) {
   activeFundNum.value = scope
   loadScopeForm()
+}
+
+function getFundLabel(num) {
+  const info = fundVisibility.value.find(f => f.fund_number === num)
+  return info?.fund_name || `Fund ${num}`
+}
+
+function startRenameFund(num) {
+  editingFundNum.value = num
+  editingFundName.value = getFundLabel(num)
+}
+
+async function saveRenameFund(num) {
+  const newName = editingFundName.value.trim()
+  if (!newName || !classGroupIds_cache.length) {
+    editingFundNum.value = null
+    return
+  }
+  await supabase
+    .from('portfolios')
+    .update({ fund_name: newName })
+    .eq('owner_type', 'group')
+    .in('owner_id', classGroupIds_cache)
+    .eq('fund_number', num)
+  // Update local state
+  const info = fundVisibility.value.find(f => f.fund_number === num)
+  if (info) info.fund_name = newName
+  editingFundNum.value = null
+  showSaved(`Fund renamed to "${newName}"`)
 }
 
 async function toggleFundHidden(fund) {
@@ -471,6 +525,6 @@ async function saveRestrictions() {
   }
 
   await teacher.updateRestrictions(currentClass.value.id, finalRestrictions)
-  showSaved(`${activeFundNum.value === 'global' ? 'Global defaults' : 'Fund ' + activeFundNum.value} saved!`)
+  showSaved(`${activeFundNum.value === 'global' ? 'Global defaults' : getFundLabel(Number(activeFundNum.value))} saved!`)
 }
 </script>
