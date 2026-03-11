@@ -58,7 +58,7 @@ export const usePortfolioStore = defineStore('portfolio', () => {
   const benchmarkCash = computed(() => {
     if (!portfolio.value) return 0
     const totalBenchmarkInvested = benchmarkTrades.value
-      .reduce((sum, t) => sum + (t.side === 'buy' ? t.dollars : -t.dollars), 0)
+      .reduce((sum, t) => sum + (t.side === 'buy' ? Number(t.dollars) : -Number(t.dollars)), 0)
     return startingCash.value - totalBenchmarkInvested
   })
 
@@ -71,7 +71,7 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     let holdingsValue
     if (benchmarkHoldings.value.length > 0) {
       // Normal path: use benchmark_holdings rows
-      holdingsValue = benchmarkHoldings.value.reduce((sum, h) => sum + (h.shares * bmPrice), 0)
+      holdingsValue = benchmarkHoldings.value.reduce((sum, h) => sum + (Number(h.shares) * bmPrice), 0)
     } else {
       // Fallback: compute net shares from benchmark_trades (buys minus sells)
       const netShares = benchmarkTrades.value

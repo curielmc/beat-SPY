@@ -1003,12 +1003,37 @@ async function loadCharts() {
       }))
     }
 
+    // --- Performance vs SPY chart (% return comparison) ---
+    // Only show if we have enough portfolio data points to avoid misleading spikes
     const datasets = []
-    if (portfolioHistory.length > 1) {
-      datasets.push({ label: 'My Investments', data: portfolioHistory, color: 'primary' })
-    }
-    if (spyHistory.length > 0) {
-      datasets.push({ label: 'S&P 500', data: spyHistory, color: 'sp500' })
+    if (portfolioHistory.length > 2 && spyHistory.length > 0) {
+      // Resample portfolio history to SPY's daily grid for smooth comparison
+      const portfolioSorted = [...portfolioHistory].sort((a, b) => a.date - b.date)
+      const spySorted = [...spyHistory].sort((a, b) => a.date - b.date)
+
+      function interpolatePortfolioValue(targetDate) {
+        const t = targetDate.getTime()
+        if (t <= portfolioSorted[0].date.getTime()) return portfolioSorted[0].value
+        if (t >= portfolioSorted[portfolioSorted.length - 1].date.getTime()) return portfolioSorted[portfolioSorted.length - 1].value
+        for (let i = 1; i < portfolioSorted.length; i++) {
+          if (portfolioSorted[i].date.getTime() >= t) {
+            const prev = portfolioSorted[i - 1]
+            const next = portfolioSorted[i]
+            const ratio = (t - prev.date.getTime()) / (next.date.getTime() - prev.date.getTime())
+            return prev.value + ratio * (next.value - prev.value)
+          }
+        }
+        return portfolioSorted[portfolioSorted.length - 1].value
+      }
+
+      // Build daily portfolio values aligned to SPY dates
+      const dailyPortfolio = spySorted.map(sp => ({
+        date: sp.date,
+        value: interpolatePortfolioValue(sp.date)
+      }))
+
+      datasets.push({ label: 'My Investments', data: dailyPortfolio, color: 'primary' })
+      datasets.push({ label: 'S&P 500', data: spySorted, color: 'sp500' })
     }
     performanceDatasets.value = datasets
 
@@ -1024,26 +1049,35 @@ async function loadCharts() {
     }
     if (spyHistory.length > 0) {
       pvDatasets.push({ label: portfolioStore.benchmarkTicker, data: spyHistory, color: 'sp500' })
-    } else {
-      const createdAt = portfolioStore.portfolio?.created_at
-      const spyEnd = startCash * (1 + portfolioStore.benchmarkReturnPct / 100)
-      const synthSpy = generateSyntheticHistory(createdAt, null, startCash, spyEnd, 'spy-seed')
-      pvDatasets.push({ label: portfolioStore.benchmarkTicker, data: synthSpy, color: 'sp500' })
     }
     portfolioValueDatasets.value = pvDatasets
 
     // --- Relative to S&P 500 (spread %) ---
-    // Use a 100 baseline so showPercentage computes correctly
-    const myPts = pvDatasets[0]?.data || []
-    const spyPts = pvDatasets[1]?.data || []
-    if (myPts.length > 0 && spyPts.length > 0) {
-      const myBaseline = myPts[0].value
-      const spyBaseline = spyPts[0].value
-      const spreadData = myPts.map((p, i) => {
-        const spyVal = i < spyPts.length ? spyPts[i].value : spyPts[spyPts.length - 1].value
+    // Interpolate SPY values at portfolio dates for accurate comparison
+    if (spyHistory.length > 1 && portfolioHistory.length > 1) {
+      const spySorted = [...spyHistory].sort((a, b) => a.date - b.date)
+
+      function interpolateSpyValue(targetDate) {
+        const t = targetDate.getTime()
+        if (t <= spySorted[0].date.getTime()) return spySorted[0].value
+        if (t >= spySorted[spySorted.length - 1].date.getTime()) return spySorted[spySorted.length - 1].value
+        for (let i = 1; i < spySorted.length; i++) {
+          if (spySorted[i].date.getTime() >= t) {
+            const prev = spySorted[i - 1]
+            const next = spySorted[i]
+            const ratio = (t - prev.date.getTime()) / (next.date.getTime() - prev.date.getTime())
+            return prev.value + ratio * (next.value - prev.value)
+          }
+        }
+        return spySorted[spySorted.length - 1].value
+      }
+
+      const myBaseline = portfolioHistory[0].value
+      const spyBaseline = interpolateSpyValue(portfolioHistory[0].date)
+      const spreadData = portfolioHistory.map(p => {
+        const spyVal = interpolateSpyValue(p.date)
         const myRet = ((p.value - myBaseline) / myBaseline) * 100
-        const spyRet = ((spyVal - spyBaseline) / spyBaseline) * 100
-        // Store as 100 + spread so showPercentage yields the spread %
+        const spyRet = spyBaseline > 0 ? ((spyVal - spyBaseline) / spyBaseline) * 100 : 0
         return { date: p.date, value: 100 + (myRet - spyRet) }
       })
       relativeToSpyDatasets.value = [{ label: 'vs S&P 500', data: spreadData, color: 'accent' }]
@@ -1177,11 +1211,24 @@ async function buildComparisonDatasets() {
       })
     }
 
-    // Add SPY line
-    const spyEnd = startCash * (1 + portfolioStore.benchmarkReturnPct / 100)
+    // Add SPY line using real historical data if available
     const createdAt = portfolioStore.portfolio?.created_at
-    const synthSpy = generateSyntheticHistory(createdAt, null, startCash, spyEnd, 'spy-compare')
-    datasets.push({ label: portfolioStore.benchmarkTicker, data: synthSpy, color: 'sp500' })
+    if (createdAt) {
+      const fromStr = new Date(createdAt).toISOString().split('T')[0]
+      const toStr = new Date().toISOString().split('T')[0]
+      try {
+        const spyData = await getHistoricalDaily('SPY', fromStr, toStr)
+        if (Array.isArray(spyData) && spyData.length > 0) {
+          const sorted = [...spyData].reverse()
+          const spyBase = sorted[0].close
+          const spyNormalized = sorted.map(d => ({
+            date: new Date(d.date),
+            value: (d.close / spyBase) * startCash
+          }))
+          datasets.push({ label: portfolioStore.benchmarkTicker, data: spyNormalized, color: 'sp500' })
+        }
+      } catch (e) { /* skip SPY line if fetch fails */ }
+    }
 
     comparisonDatasets.value = datasets
   } finally {
