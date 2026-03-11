@@ -181,36 +181,21 @@ export const useAuthStore = defineStore('auth', () => {
   async function init() {
     if (initialized.value) return
     loading.value = true
-    try {
-      // Recover session from localStorage
-      console.log('[AUTH] init: calling getSession...')
-      let { data: { session }, error: sessionErr } = await supabase.auth.getSession()
-      console.log('[AUTH] init: getSession result:', { hasSession: !!session, userId: session?.user?.id, expiresAt: session?.expires_at, error: sessionErr })
-      if (session?.user) {
-        currentUser.value = session.user
-        const profileResult = await fetchProfile(session.user.id)
-        if (await handleDisabledProfile(profileResult)) return
-        await ensureOwnerAdminProfile()
-      }
-    } finally {
-      loading.value = false
-      initialized.value = true
-    }
 
-    // Listen for auth state changes
+    // Set up auth listener FIRST so we don't miss any events
     supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('[AUTH] onAuthStateChange:', event, { hasSession: !!session, userId: session?.user?.id })
       // Skip side effects during masquerade session switches
       if (isMasquerading.value || _originalSession.value) return
 
-      if (event === 'SIGNED_IN' && session?.user) {
+      if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user) {
         currentUser.value = session.user
         const profileResult = await fetchProfile(session.user.id)
         if (await handleDisabledProfile(profileResult)) return
         await ensureOwnerAdminProfile()
 
         // Auto-join class if student has a pending invite and no memberships
-        if (profile.value?.role === 'student' && session.user.email) {
+        if (event === 'SIGNED_IN' && profile.value?.role === 'student' && session.user.email) {
           const { data: existing } = await supabase
             .from('class_memberships')
             .select('id')
@@ -232,6 +217,31 @@ export const useAuthStore = defineStore('auth', () => {
         profile.value = null
       }
     })
+
+    try {
+      // Recover session from localStorage
+      console.log('[AUTH] init: calling getSession...')
+      let { data: { session }, error: sessionErr } = await supabase.auth.getSession()
+      console.log('[AUTH] init: getSession result:', { hasSession: !!session, userId: session?.user?.id, expiresAt: session?.expires_at, error: sessionErr })
+
+      // If no session in memory, try refreshing from refresh token
+      if (!session) {
+        console.log('[AUTH] init: no session, trying refreshSession...')
+        const { data: refreshed } = await supabase.auth.refreshSession()
+        session = refreshed?.session
+        console.log('[AUTH] init: refreshSession result:', { hasSession: !!session })
+      }
+
+      if (session?.user) {
+        currentUser.value = session.user
+        const profileResult = await fetchProfile(session.user.id)
+        if (await handleDisabledProfile(profileResult)) return
+        await ensureOwnerAdminProfile()
+      }
+    } finally {
+      loading.value = false
+      initialized.value = true
+    }
   }
 
   async function fetchProfile(userId) {
