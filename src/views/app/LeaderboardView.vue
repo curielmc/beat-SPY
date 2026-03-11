@@ -5,6 +5,12 @@
       <p class="text-sm text-base-content/60">See how every group is performing</p>
     </div>
 
+    <!-- View Toggle -->
+    <div class="flex gap-2">
+      <button class="btn btn-sm" :class="viewMode === 'fund' ? 'btn-primary' : 'btn-ghost'" @click="viewMode = 'fund'">By Fund</button>
+      <button class="btn btn-sm" :class="viewMode === 'aggregate' ? 'btn-primary' : 'btn-ghost'" @click="viewMode = 'aggregate'">By Group</button>
+    </div>
+
     <!-- Metric Selector Pills -->
     <div class="overflow-x-auto -mx-4 px-4">
       <div class="flex gap-2 whitespace-nowrap">
@@ -106,18 +112,18 @@
       <!-- Rankings -->
       <div class="space-y-2">
         <LeaderboardEntry
-          v-for="(group, index) in sortedGroups"
-          :key="group.id"
+          v-for="(entry, index) in sortedEntries"
+          :key="entry.entryKey"
           :rank="index + 1"
-          :entry="group"
+          :entry="entry"
           :active-metric="activeMetric"
-          :is-me="group.id === myGroupId"
+          :is-me="entry.groupId === myGroupId"
           :benchmark-value="activeBenchmarkValue"
           :metric-loading="isMetricLoading(activeMetric)"
         />
       </div>
 
-      <p v-if="sortedGroups.length === 0" class="text-center text-base-content/50 py-8">No groups found in your class.</p>
+      <p v-if="sortedEntries.length === 0" class="text-center text-base-content/50 py-8">No groups found in your class.</p>
 
       <!-- Comparison Chart (disabled for now — will revisit later)
       <div v-if="!loading" class="card bg-base-100 shadow-sm mt-8">
@@ -188,21 +194,20 @@ const metrics = [
 
 // --- Highlight Stats ---
 const highlights = computed(() => {
-  const gs = groups.value
-  if (!gs.length) return null
+  const entries = sortedEntries.value
+  if (!entries.length) return null
 
   const mKey = activeMetric.value
 
   // 1. Top fund for the ACTIVE metric
-  const sorted = [...gs].sort((a, b) => (b.metrics?.[mKey] ?? -Infinity) - (a.metrics?.[mKey] ?? -Infinity))
-  const topFund = sorted[0]
+  const topFund = entries[0] // already sorted desc
 
-  // 2. Best single stock pick across all groups (always since inception for now as it's a badge of honor)
+  // 2. Best single stock pick across all entries
   let bestStockTicker = null
   let bestStockName = null
   let bestStockReturn = -Infinity
   let bestStockGroup = null
-  for (const g of gs) {
+  for (const g of entries) {
     for (const h of (g.holdings || [])) {
       const currentPrice = market.getCachedPrice(h.ticker) || Number(h.avg_cost)
       const ret = ((currentPrice - Number(h.avg_cost)) / Number(h.avg_cost)) * 100
@@ -216,19 +221,19 @@ const highlights = computed(() => {
     }
   }
 
-  // 3. How many groups beat SPY for the ACTIVE metric
+  // 3. How many entries beat SPY for the ACTIVE metric
   const spy = activeBenchmarkValue.value
-  const beatingCount = spy !== null ? gs.filter(g => (g.metrics?.[mKey] ?? -Infinity) > spy).length : null
+  const beatingCount = spy !== null ? entries.filter(g => (g.metrics?.[mKey] ?? -Infinity) > spy).length : null
 
-  return { 
-    topFund, 
+  return {
+    topFund,
     bestStock: bestStockTicker,
     bestStockName,
-    bestStockReturn, 
-    bestStockGroup, 
-    beatingCount, 
-    total: gs.length, 
-    activeMetric: mKey 
+    bestStockReturn,
+    bestStockGroup,
+    beatingCount,
+    total: entries.length,
+    activeMetric: mKey
   }
 })
 
@@ -236,9 +241,11 @@ const PERIOD_METRICS = {
   d5: 5, d20: 20, d30: 30, d90: 90, y1: 365
 }
 
+const viewMode = ref('fund')
 const activeMetric = ref('today')
 const loading = ref(true)
 const groups = ref([])
+const fundEntries = ref([])
 const myGroupId = ref(null)
 const errorMsg = ref('')
 
@@ -279,9 +286,10 @@ function isMetricLoading(key) {
   return periodMetricsLoading.value
 }
 
-// Sort by active metric
-const sortedGroups = computed(() => {
-  return [...groups.value].sort((a, b) => {
+// Sort by active metric — switches between fund-level and group-aggregate entries
+const sortedEntries = computed(() => {
+  const source = viewMode.value === 'fund' ? fundEntries.value : groups.value
+  return [...source].sort((a, b) => {
     const aVal = a.metrics?.[activeMetric.value] ?? -Infinity
     const bVal = b.metrics?.[activeMetric.value] ?? -Infinity
     return bVal - aVal
@@ -298,6 +306,7 @@ async function loadLeaderboard() {
   loading.value = true
   errorMsg.value = ''
   groups.value = []
+  fundEntries.value = []
   myGroupId.value = null
   benchmarkMetrics.value = {}
   chartDatasets.value = []
@@ -332,10 +341,11 @@ async function loadLeaderboard() {
     // Bulk fetch portfolios, holdings, trades
     const { portfolios, holdingsMap, tradesMap } = await portfolioStore.getLeaderboardData(groupIds)
 
-    // Build portfolio lookup by owner_id
-    const portfolioByGroup = {}
+    // Build portfolio lookup by owner_id (one group can have multiple funds)
+    const portfoliosByGroup = {}
     for (const p of portfolios) {
-      portfolioByGroup[p.owner_id] = p
+      if (!portfoliosByGroup[p.owner_id]) portfoliosByGroup[p.owner_id] = []
+      portfoliosByGroup[p.owner_id].push(p)
     }
 
     // Collect all unique tickers for batch quote fetch
@@ -351,15 +361,8 @@ async function loadLeaderboard() {
       market.fetchBatchProfiles([...allTickers])
     ])
 
-    // Phase 1: compute instant metrics
-    const enriched = []
-    for (const group of groupData) {
-      const p = portfolioByGroup[group.id]
-      const pHoldings = p ? (holdingsMap[p.id] || []) : []
-      const startingCash = p ? Number(p.starting_cash) : 100000
-      const cashBalance = p ? Number(p.cash_balance) : 100000
-
-      // Current value
+    // Helper: compute metrics for a set of holdings + cash
+    function computeEntryMetrics(pHoldings, cashBalance, startingCash, createdAt) {
       const holdingsValue = pHoldings.reduce((sum, h) => {
         const price = market.getCachedPrice(h.ticker) || Number(h.avg_cost)
         return sum + (Number(h.shares) * price)
@@ -367,58 +370,90 @@ async function loadLeaderboard() {
       const totalValue = holdingsValue + cashBalance
       const sinceInception = startingCash > 0 ? ((totalValue - startingCash) / startingCash) * 100 : 0
 
-      // Today's return
       const quotesMap = {}
       for (const h of pHoldings) {
         quotesMap[h.ticker] = market.getCachedQuote(h.ticker)
       }
       const today = computeTodayReturn(pHoldings, quotesMap, cashBalance)
 
-      // Performance drivers (helper/hurter)
       let topHelper = null
       let topHurter = null
       let maxGain = -Infinity
       let maxLoss = Infinity
-
       for (const h of pHoldings) {
         const currentPrice = market.getCachedPrice(h.ticker) || Number(h.avg_cost)
         const gainLoss = (currentPrice - Number(h.avg_cost)) * Number(h.shares)
         const profile = market.profilesCache[h.ticker]?.data
-        const driverObj = {
-          ticker: h.ticker,
-          name: profile?.companyName || profile?.name || null
-        }
-
-        if (gainLoss > 0 && gainLoss > maxGain) {
-          maxGain = gainLoss
-          topHelper = driverObj
-        }
-        if (gainLoss < 0 && gainLoss < maxLoss) {
-          maxLoss = gainLoss
-          topHurter = driverObj
-        }
+        const driverObj = { ticker: h.ticker, name: profile?.companyName || profile?.name || null }
+        if (gainLoss > 0 && gainLoss > maxGain) { maxGain = gainLoss; topHelper = driverObj }
+        if (gainLoss < 0 && gainLoss < maxLoss) { maxLoss = gainLoss; topHurter = driverObj }
       }
 
-      // Annualized
-      const createdAt = p?.created_at || new Date().toISOString()
       const annualized = computeAnnualizedReturn(sinceInception, createdAt)
+
+      return { totalValue, holdingsValue, sinceInception, today, annualized, drivers: { helper: topHelper, hurter: topHurter } }
+    }
+
+    // Phase 1: build fund-level entries AND aggregate group entries
+    const enriched = []       // aggregate (group-level)
+    const allFundEntries = [] // per-fund
+
+    for (const group of groupData) {
+      const groupPortfolios = portfoliosByGroup[group.id] || []
+      const memberNames = (group.memberships || []).map(m => m.profiles?.full_name?.split(' ')[0]).filter(Boolean)
+
+      // Build per-fund entries
+      for (const p of groupPortfolios) {
+        const pHoldings = holdingsMap[p.id] || []
+        const startingCash = Number(p.starting_cash) || 100000
+        const cashBalance = Number(p.cash_balance) || startingCash
+        const createdAt = p.created_at || new Date().toISOString()
+        const m = computeEntryMetrics(pHoldings, cashBalance, startingCash, createdAt)
+
+        allFundEntries.push({
+          ...group,
+          entryKey: p.id,
+          groupId: group.id,
+          name: `${group.name} — ${p.fund_name || p.name || 'Fund'}`,
+          portfolioId: p.id,
+          totalValue: m.totalValue,
+          metrics: { sinceInception: m.sinceInception, today: m.today, annualized: m.annualized },
+          drivers: m.drivers,
+          memberNames,
+          holdings: pHoldings,
+          trades: tradesMap[p.id] || [],
+          cashBalance,
+          startingCash,
+          createdAt
+        })
+      }
+
+      // Build aggregate group entry (combine all funds)
+      const allGroupHoldings = groupPortfolios.flatMap(p => holdingsMap[p.id] || [])
+      const aggCash = groupPortfolios.reduce((s, p) => s + (Number(p.cash_balance) || 0), 0) || 100000
+      const aggStarting = groupPortfolios.reduce((s, p) => s + (Number(p.starting_cash) || 0), 0) || 100000
+      const earliestCreated = groupPortfolios.map(p => p.created_at).filter(Boolean).sort()[0] || new Date().toISOString()
+      const aggM = computeEntryMetrics(allGroupHoldings, aggCash, aggStarting, earliestCreated)
 
       enriched.push({
         ...group,
-        portfolioId: p?.id,
-        totalValue,
-        metrics: { sinceInception, today, annualized },
-        drivers: { helper: topHelper, hurter: topHurter },
-        memberNames: (group.memberships || []).map(m => m.profiles?.full_name?.split(' ')[0]).filter(Boolean),
-        holdings: pHoldings,
-        trades: p ? (tradesMap[p.id] || []) : [],
-        cashBalance,
-        startingCash,
-        createdAt
+        entryKey: group.id,
+        groupId: group.id,
+        portfolioId: groupPortfolios[0]?.id,
+        totalValue: aggM.totalValue,
+        metrics: { sinceInception: aggM.sinceInception, today: aggM.today, annualized: aggM.annualized },
+        drivers: aggM.drivers,
+        memberNames,
+        holdings: allGroupHoldings,
+        trades: groupPortfolios.flatMap(p => tradesMap[p.id] || []),
+        cashBalance: aggCash,
+        startingCash: aggStarting,
+        createdAt: earliestCreated
       })
     }
 
     groups.value = enriched
+    fundEntries.value = allFundEntries
 
     // Benchmark Phase 1
     const spyQuote = market.getCachedQuote('SPY')
@@ -454,12 +489,16 @@ async function loadLeaderboard() {
       benchmarkMetrics.value.annualized = null
     }
 
-    // Build chart datasets (non-blocking)
-    buildChartDatasets(enriched, portfolioByGroup, tradesMap)
+    // Build chart datasets (non-blocking) — use first portfolio per group for chart
+    const firstPortfolioByGroup = {}
+    for (const [gid, ps] of Object.entries(portfoliosByGroup)) {
+      firstPortfolioByGroup[gid] = ps[0]
+    }
+    buildChartDatasets(enriched, firstPortfolioByGroup, tradesMap)
 
-    // Phase 2: background — period metrics + risk-adjusted
-    computePeriodMetrics(enriched)
-    computeRiskMetrics(enriched)
+    // Phase 2: background — period metrics + risk-adjusted (both views)
+    computePeriodMetrics(enriched, allFundEntries)
+    computeRiskMetrics(enriched, allFundEntries)
 
     // Auto-refresh prices every 5 minutes (300,000ms)
     // Only if market is open and tab is focused to save API calls
@@ -725,7 +764,7 @@ async function buildIndividualDatasets(enriched) {
   }
 }
 
-async function computePeriodMetrics(entries) {
+async function computePeriodMetrics(entries, fundEntriesArr) {
   try {
     const now = new Date()
     const periodDates = {}
@@ -733,8 +772,9 @@ async function computePeriodMetrics(entries) {
       periodDates[key] = new Date(now.getTime() - days * 86400000).toISOString().split('T')[0]
     }
 
-    // Get all portfolio IDs
-    const portfolioIds = entries.map(e => e.portfolioId).filter(Boolean)
+    // Get all portfolio IDs from both arrays
+    const allEntries = [...entries, ...fundEntriesArr]
+    const portfolioIds = allEntries.map(e => e.portfolioId).filter(Boolean)
 
     // Find the earliest period date we need
     const allDateStrs = Object.values(periodDates)
@@ -761,7 +801,7 @@ async function computePeriodMetrics(entries) {
     }
 
     // For each entry and period, find the closest snapshot
-    for (const entry of entries) {
+    for (const entry of allEntries) {
       const snapshots = snapshotsByPortfolio[entry.portfolioId] || []
 
       for (const [key, dateStr] of Object.entries(periodDates)) {
@@ -824,6 +864,7 @@ async function computePeriodMetrics(entries) {
 
     // Trigger reactivity
     groups.value = [...groups.value]
+    fundEntries.value = [...fundEntries.value]
   } catch (e) {
     console.error('Failed to compute period metrics:', e)
   } finally {
@@ -831,11 +872,12 @@ async function computePeriodMetrics(entries) {
   }
 }
 
-async function computeRiskMetrics(entries) {
+async function computeRiskMetrics(entries, fundEntriesArr) {
   try {
+    const allEntries = [...entries, ...fundEntriesArr]
     // Collect all unique tickers
     const allTickers = new Set()
-    for (const entry of entries) {
+    for (const entry of allEntries) {
       for (const h of entry.holdings) allTickers.add(h.ticker)
     }
     const tickerList = [...allTickers]
@@ -848,12 +890,13 @@ async function computeRiskMetrics(entries) {
     // Fetch profiles for beta data
     const profiles = await market.fetchBatchProfiles(tickerList)
 
-    for (const entry of entries) {
+    for (const entry of allEntries) {
       const sinceInception = entry.metrics.sinceInception || 0
       entry.metrics.riskAdjusted = computeRiskAdjustedReturn(sinceInception, entry.holdings, profiles)
     }
 
     groups.value = [...groups.value]
+    fundEntries.value = [...fundEntries.value]
   } catch (e) {
     console.error('Failed to compute risk metrics:', e)
   } finally {
