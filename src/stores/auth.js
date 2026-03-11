@@ -181,8 +181,23 @@ export const useAuthStore = defineStore('auth', () => {
   async function init() {
     if (initialized.value) return
     loading.value = true
+    try {
+      // Recover session from localStorage
+      console.log('[AUTH] init: calling getSession...')
+      const { data: { session }, error: sessionErr } = await supabase.auth.getSession()
+      console.log('[AUTH] init: getSession result:', { hasSession: !!session, userId: session?.user?.id, expiresAt: session?.expires_at, error: sessionErr })
+      if (session?.user) {
+        currentUser.value = session.user
+        const profileResult = await fetchProfile(session.user.id)
+        if (await handleDisabledProfile(profileResult)) return
+        await ensureOwnerAdminProfile()
+      }
+    } finally {
+      loading.value = false
+      initialized.value = true
+    }
 
-    // Set up auth listener FIRST so we don't miss any events
+    // Listen for auth state changes (after init completes)
     supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('[AUTH] onAuthStateChange:', event, { hasSession: !!session, userId: session?.user?.id })
       // Skip side effects during masquerade session switches
@@ -217,23 +232,6 @@ export const useAuthStore = defineStore('auth', () => {
         profile.value = null
       }
     })
-
-    try {
-      // Recover session from localStorage
-      console.log('[AUTH] init: calling getSession...')
-      const { data: { session }, error: sessionErr } = await supabase.auth.getSession()
-      console.log('[AUTH] init: getSession result:', { hasSession: !!session, userId: session?.user?.id, expiresAt: session?.expires_at, error: sessionErr })
-
-      if (session?.user) {
-        currentUser.value = session.user
-        const profileResult = await fetchProfile(session.user.id)
-        if (await handleDisabledProfile(profileResult)) return
-        await ensureOwnerAdminProfile()
-      }
-    } finally {
-      loading.value = false
-      initialized.value = true
-    }
   }
 
   async function fetchProfile(userId) {
