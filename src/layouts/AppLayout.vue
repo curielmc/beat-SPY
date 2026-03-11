@@ -39,59 +39,59 @@
           Admin Dashboard
         </RouterLink>
 
-        <RouterLink to="/leaderboard" class="btn btn-ghost btn-sm justify-start w-full gap-2" :class="{ 'btn-active': route.path === '/leaderboard' }" @click="sidebarOpen = false">
+        <RouterLink to="/leaderboard" class="btn btn-sm justify-start w-full gap-2" :class="route.path === '/leaderboard' ? 'btn-primary' : 'btn-ghost'" @click="sidebarOpen = false">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
           Leaderboard
         </RouterLink>
-        <RouterLink to="/training" class="btn btn-ghost btn-sm justify-start w-full gap-2" :class="{ 'btn-active': route.path.startsWith('/training') }" @click="sidebarOpen = false">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5 5.754 5 4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18c1.746 0 3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
-          Tutorials
-        </RouterLink>
-        <RouterLink to="/home" class="btn btn-ghost btn-sm justify-start w-full gap-2" :class="{ 'btn-active': route.path === '/home' }" @click="sidebarOpen = false">
+        <RouterLink to="/home" class="btn btn-sm justify-start w-full gap-2" :class="route.path === '/home' ? 'btn-primary' : 'btn-ghost'" @click="sidebarOpen = false">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1h-2z" /></svg>
           My Portfolio
         </RouterLink>
-        <RouterLink to="/my-funds" class="btn btn-ghost btn-sm justify-start w-full gap-2" :class="{ 'btn-active': route.path === '/my-funds' }" @click="sidebarOpen = false">
+        <RouterLink to="/my-funds" class="btn btn-sm justify-start w-full gap-2" :class="route.path === '/my-funds' ? 'btn-primary' : 'btn-ghost'" @click="sidebarOpen = false">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
           My Funds
         </RouterLink>
-        <RouterLink to="/portfolio-history" class="btn btn-ghost btn-sm justify-start w-full gap-2" :class="{ 'btn-active': route.path === '/portfolio-history' }" @click="sidebarOpen = false">
+        <RouterLink to="/portfolio-history" class="btn btn-sm justify-start w-full gap-2" :class="route.path === '/portfolio-history' ? 'btn-primary' : 'btn-ghost'" @click="sidebarOpen = false">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
           Portfolio History
         </RouterLink>
-        <RouterLink v-if="hasActiveClass" to="/active-class" class="btn btn-ghost btn-sm justify-start w-full gap-2" :class="{ 'btn-active': route.path === '/active-class' }" @click="sidebarOpen = false">
+        <RouterLink v-if="hasActiveClass" to="/active-class" class="btn btn-sm justify-start w-full gap-2" :class="route.path === '/active-class' ? 'btn-primary' : 'btn-ghost'" @click="sidebarOpen = false">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
           My Classes
         </RouterLink>
-        <RouterLink to="/stocks" class="btn btn-ghost btn-sm justify-start w-full gap-2" :class="{ 'btn-active': route.path === '/stocks' }" @click="sidebarOpen = false">
+        <RouterLink to="/stocks" class="btn btn-sm justify-start w-full gap-2" :class="route.path === '/stocks' || route.path.startsWith('/stocks/') ? 'btn-primary' : 'btn-ghost'" @click="sidebarOpen = false">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
           Investment Screener
         </RouterLink>
 
-        <RouterLink to="/sp500" class="btn btn-ghost btn-sm justify-start w-full gap-2" :class="{ 'btn-active': route.path === '/sp500' }" @click="sidebarOpen = false">
+        <RouterLink to="/sp500" class="btn btn-sm justify-start w-full gap-2" :class="route.path === '/sp500' ? 'btn-primary' : 'btn-ghost'" @click="sidebarOpen = false">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" /></svg>
           S&P 500
         </RouterLink>
-        <RouterLink to="/competitions" class="btn btn-ghost btn-sm justify-start w-full gap-2" :class="{ 'btn-active': route.path.startsWith('/competitions') }" @click="sidebarOpen = false">
+        <RouterLink to="/competitions" class="btn btn-sm justify-start w-full gap-2" :class="route.path.startsWith('/competitions') ? 'btn-primary' : 'btn-ghost'" @click="sidebarOpen = false">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
           Challenges
         </RouterLink>
-        <RouterLink to="/messages" class="btn btn-ghost btn-sm justify-start w-full gap-2 relative" :class="{ 'btn-active': route.path === '/messages' }" @click="sidebarOpen = false">
+        <RouterLink to="/messages" class="btn btn-sm justify-start w-full gap-2 relative" :class="route.path === '/messages' ? 'btn-primary' : 'btn-ghost'" @click="sidebarOpen = false">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
           Messages
           <span v-if="unreadMessages > 0" class="badge badge-xs badge-primary ml-auto">{{ unreadMessages }}</span>
         </RouterLink>
-        <RouterLink to="/feed" class="btn btn-ghost btn-sm justify-start w-full gap-2" :class="{ 'btn-active': route.path === '/feed' }" @click="sidebarOpen = false">
+        <RouterLink to="/feed" class="btn btn-sm justify-start w-full gap-2" :class="route.path === '/feed' ? 'btn-primary' : 'btn-ghost'" @click="sidebarOpen = false">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 20H5a2 2 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" /></svg>
           Feed
         </RouterLink>
+        <RouterLink to="/training" class="btn btn-sm justify-start w-full gap-2" :class="route.path.startsWith('/training') ? 'btn-primary' : 'btn-ghost'" @click="sidebarOpen = false">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5 5.754 5 4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18c1.746 0 3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+          Tutorials
+        </RouterLink>
       </nav>
       <div class="p-3 border-t border-base-300 space-y-1">
-        <RouterLink to="/settings" class="btn btn-ghost btn-sm justify-start w-full gap-2" :class="{ 'btn-active': route.path === '/settings' }" @click="sidebarOpen = false">
+        <RouterLink to="/settings" class="btn btn-sm justify-start w-full gap-2" :class="route.path === '/settings' ? 'btn-primary' : 'btn-ghost'" @click="sidebarOpen = false">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
           Profile Settings
         </RouterLink>
-        <RouterLink v-if="hasActiveClass" to="/team-settings" class="btn btn-ghost btn-sm justify-start w-full gap-2" :class="{ 'btn-active': route.path === '/team-settings' }" @click="sidebarOpen = false">
+        <RouterLink v-if="hasActiveClass" to="/team-settings" class="btn btn-sm justify-start w-full gap-2" :class="route.path === '/team-settings' ? 'btn-primary' : 'btn-ghost'" @click="sidebarOpen = false">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
           Team Settings
         </RouterLink>

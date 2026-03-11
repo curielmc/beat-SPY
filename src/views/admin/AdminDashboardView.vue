@@ -214,10 +214,16 @@
         <div v-else class="space-y-4">
           <div class="flex items-center justify-between">
             <p class="text-sm text-base-content/60">{{ notesMeta }}</p>
-            <div class="flex gap-2">
+            <div class="flex flex-wrap gap-2">
               <button class="btn btn-sm btn-outline" @click="copyNotes">{{ notesCopied ? 'Copied!' : 'Copy' }}</button>
-              <button class="btn btn-sm btn-outline" @click="downloadNotes('pdf')">PDF</button>
-              <button class="btn btn-sm btn-outline" @click="downloadNotes('doc')">DOC</button>
+              <button class="btn btn-sm btn-outline btn-primary" @click="exportPDF">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                PDF
+              </button>
+              <button class="btn btn-sm btn-outline btn-secondary" @click="exportDOCX">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                DOCX
+              </button>
               <button class="btn btn-sm btn-ghost" @click="classNotes = null">Regenerate</button>
             </div>
           </div>
@@ -243,6 +249,7 @@ import {
 } from 'chart.js'
 import { supabase } from '../../lib/supabase'
 import { useMarketDataStore } from '../../stores/marketData'
+import { downloadPDF, downloadDOCX } from '../../lib/notesExport'
 
 const market = useMarketDataStore()
 const tickerNames = ref({})
@@ -342,26 +349,12 @@ function copyNotes() {
   }
 }
 
-function downloadNotes(format) {
-  if (!classNotes.value) return
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Class Notes</title>
-<style>body{font-family:system-ui,sans-serif;max-width:800px;margin:40px auto;padding:0 20px;line-height:1.6}h1,h2,h3{margin-top:1.5em}li{margin:4px 0}</style>
-</head><body>${renderedNotes.value}</body></html>`
+function exportPDF() {
+  if (classNotes.value) downloadPDF(classNotes.value, notesMeta.value)
+}
 
-  if (format === 'pdf') {
-    const w = window.open('', '_blank')
-    w.document.write(html)
-    w.document.close()
-    setTimeout(() => { w.print() }, 300)
-  } else {
-    const blob = new Blob([html], { type: 'application/msword' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `class-notes-${notesDateStart.value}.doc`
-    a.click()
-    URL.revokeObjectURL(url)
-  }
+function exportDOCX() {
+  if (classNotes.value) downloadDOCX(classNotes.value, notesMeta.value)
 }
 
 const renderedNotes = computed(() => {

@@ -1,4 +1,4 @@
-export const config = { runtime: 'edge' }
+export const config = { maxDuration: 60 }
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY
@@ -92,23 +92,23 @@ function getAIConfig(prompt) {
 
 export default async function handler(req) {
   if (req.method !== 'POST') {
-    return new Response('Method not allowed', { status: 405 })
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers: { 'Content-Type': 'application/json' } })
   }
 
   const authHeader = req.headers.get('authorization')
-  if (!authHeader) return new Response('Unauthorized', { status: 401 })
+  if (!authHeader) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } })
 
   const token = authHeader.replace('Bearer ', '')
   const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
     headers: { Authorization: `Bearer ${token}`, apikey: SUPABASE_KEY }
   })
-  if (!userRes.ok) return new Response('Unauthorized', { status: 401 })
+  if (!userRes.ok) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } })
 
   const user = await userRes.json()
   const profile = await sbFetch(`/profiles?id=eq.${user.id}&select=role`)
   const role = profile?.[0]?.role
   if (role !== 'teacher' && role !== 'admin') {
-    return new Response('Forbidden', { status: 403 })
+    return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: { 'Content-Type': 'application/json' } })
   }
 
   const { class_id, date_start, date_end, group_id, custom_instructions } = await req.json()
