@@ -334,9 +334,10 @@ async function loadAttribution(isInitial = false) {
   explanation.value = ''
   explainTicker.value = ''
 
-  const portfolioId = route.query.portfolioId
-  if (portfolioId) {
-    await portfolioStore.loadPortfolioById(portfolioId)
+  // On first load, use query param if provided (subsequent loads use activeFundId from selector)
+  if (isInitial && route.query.portfolioId) {
+    activeFundId.value = route.query.portfolioId
+    await portfolioStore.loadPortfolioById(route.query.portfolioId)
   }
 
   // On initial load, if no current holdings but there are trades, auto-switch to a useful period
