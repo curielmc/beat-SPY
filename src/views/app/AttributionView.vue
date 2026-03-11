@@ -270,7 +270,7 @@ const portfolioStore = usePortfolioStore()
 const market = useMarketDataStore()
 const auth = useAuthStore()
 const loading = ref(true)
-const selectedRange = ref(route.query.range || '1D')
+const selectedRange = ref(route.query.range || 'All')
 const noDataReason = ref('')
 
 // Fund selector state
@@ -307,7 +307,7 @@ const periodLabel = computed(() => {
   const labels = {
     '1D': 'Today', '1W': '1 Week', '3W': '3 Weeks',
     '1M': '1 Month', '3M': '3 Months', '1Y': '1 Year',
-    '5Y': '5 Years', 'All': 'All Time'
+    '5Y': '5 Years', 'All': 'Since Inception'
   }
   return labels[selectedRange.value] || selectedRange.value
 })
@@ -340,9 +340,9 @@ async function loadAttribution(isInitial = false) {
     await portfolioStore.loadPortfolioById(route.query.portfolioId)
   }
 
-  // On initial load, if no current holdings but there are trades, auto-switch to a useful period
+  // On initial load with 1D, if no current holdings but there are trades, switch to All
   if (isInitial && selectedRange.value === '1D' && portfolioStore.holdings.length === 0 && portfolioStore.trades.length > 0) {
-    selectedRange.value = '1M'
+    selectedRange.value = 'All'
   }
 
   try {
