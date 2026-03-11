@@ -52,6 +52,16 @@
                   </button>
                 </li>
               </ul>
+              <!-- Fund Leaderboard Visibility -->
+              <div v-if="availableFunds.length > 1" class="mt-4 pt-3 border-t border-base-200">
+                <h3 class="text-xs font-bold uppercase tracking-wider text-base-content/40 mb-2">Leaderboard Visibility</h3>
+                <div class="space-y-2">
+                  <label v-for="fund in fundVisibility" :key="fund.fund_number" class="flex items-center justify-between cursor-pointer px-2">
+                    <span class="text-sm">Fund {{ fund.fund_number }}</span>
+                    <input type="checkbox" class="toggle toggle-sm toggle-primary" :checked="!fund.hidden" @change="toggleFundHidden(fund)" />
+                  </label>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -276,6 +286,7 @@ const form = reactive({
   requireRationale: true
 })
 
+const fundVisibility = ref([])
 const groupModeLocal = ref('student_choice')
 const currentApprovalCode = ref(null)
 
@@ -302,13 +313,29 @@ onMounted(async () => {
     }
     fundRestrictions.value = restrictions.byFund || {}
 
-    // Discover funds from portfolios
+    // Discover funds from portfolios (scoped to this class's groups)
+    const { data: classGroups } = await supabase
+      .from('groups')
+      .select('id')
+      .eq('class_id', currentClass.value.id)
+    const classGroupIds = (classGroups || []).map(g => g.id)
+
     const { data: fundPorts } = await supabase
       .from('portfolios')
-      .select('fund_number')
+      .select('fund_number, hidden')
       .eq('owner_type', 'group')
+      .in('owner_id', classGroupIds.length ? classGroupIds : ['00000000-0000-0000-0000-000000000000'])
     const nums = [...new Set((fundPorts || []).map(p => p.fund_number).filter(Boolean))].sort((a,b) => a-b)
     availableFunds.value = nums.length ? nums : [1]
+
+    // Build fund visibility from first occurrence of each fund_number
+    const seen = new Map()
+    for (const p of (fundPorts || [])) {
+      if (p.fund_number && !seen.has(p.fund_number)) {
+        seen.set(p.fund_number, { fund_number: p.fund_number, hidden: !!p.hidden })
+      }
+    }
+    fundVisibility.value = [...seen.values()].sort((a, b) => a.fund_number - b.fund_number)
 
     // Default to last fund if global not preferred? Let's default to global for visibility.
     setScope('global')
@@ -327,6 +354,24 @@ const blockedTickersInput = computed({
 function setScope(scope) {
   activeFundNum.value = scope
   loadScopeForm()
+}
+
+async function toggleFundHidden(fund) {
+  const newHidden = !fund.hidden
+  const { data: classGroups } = await supabase
+    .from('groups')
+    .select('id')
+    .eq('class_id', currentClass.value.id)
+  const groupIds = (classGroups || []).map(g => g.id)
+  if (!groupIds.length) return
+  await supabase
+    .from('portfolios')
+    .update({ hidden: newHidden })
+    .eq('owner_type', 'group')
+    .in('owner_id', groupIds)
+    .eq('fund_number', fund.fund_number)
+  fund.hidden = newHidden
+  showSaved(newHidden ? `Fund ${fund.fund_number} hidden from leaderboard` : `Fund ${fund.fund_number} visible on leaderboard`)
 }
 
 function loadScopeForm() {
