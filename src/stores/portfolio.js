@@ -679,16 +679,17 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     return updateVisibility(portfolio.value?.id, isPublic ? 'public' : 'private')
   }
 
-  // Load the single personal portfolio for the current user
+  // Load the single personal portfolio for the current (or masqueraded) user
   async function loadPersonalPortfolio() {
-    if (!auth.currentUser) return
+    const uid = auth.effectiveUserId
+    if (!uid) return
     loading.value = true
     try {
       const { data: pData } = await supabase
         .from('portfolios')
         .select('*')
         .eq('owner_type', 'user')
-        .eq('owner_id', auth.currentUser.id)
+        .eq('owner_id', uid)
         .or('status.eq.active,status.is.null')
         .order('created_at', { ascending: true })
         .limit(1)

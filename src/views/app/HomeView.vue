@@ -827,24 +827,7 @@ function generateSyntheticHistory(startDate, endDate, startValue, endValue, seed
 let refreshInterval = null
 
 onMounted(async () => {
-  // Admin masquerade mode
-  const viewAsId = auth.masqueradeUser?.id || route.query.viewAs
-  if (auth.isAdmin && viewAsId) {
-    await portfolioStore.loadPortfolio('user', viewAsId)
-    if (portfolioStore.portfolio) {
-      membership.value = { group_id: 'personal', group: { name: 'Student Portfolio' } }
-      personalVisibility.value = portfolioStore.portfolio.visibility || 'private'
-      settingsForm.value = {
-        name: portfolioStore.portfolio.name || '',
-        description: portfolioStore.portfolio.description || ''
-      }
-    }
-    loading.value = false
-    if (portfolioStore.holdings.length > 0 || portfolioStore.trades.length > 0) loadCharts()
-    return
-  }
-
-  // Get current membership
+  // Get current membership (works for both normal users and masquerade via effectiveUserId)
   membership.value = await auth.getCurrentMembership()
 
   if (membership.value?.group_id) {

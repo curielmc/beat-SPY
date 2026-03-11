@@ -232,7 +232,7 @@ onMounted(async () => {
       .from('portfolios')
       .select('*')
       .eq('owner_type', 'user')
-      .eq('owner_id', auth.currentUser?.id)
+      .eq('owner_id', auth.effectiveUserId)
       .or('status.eq.active,status.is.null')
       .order('created_at', { ascending: true })
       .limit(1)
