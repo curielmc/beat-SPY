@@ -19,6 +19,19 @@
       </div>
     </div>
 
+    <!-- Fund selector (when multiple funds exist) -->
+    <div v-if="funds.length > 1" class="flex items-center gap-2 overflow-x-auto">
+      <button
+        v-for="fund in funds"
+        :key="fund.id"
+        class="btn btn-xs whitespace-nowrap"
+        :class="activeFundId === fund.id ? 'btn-secondary' : 'btn-ghost'"
+        @click="switchFund(fund.id)"
+      >
+        {{ fund.fund_name || `Fund ${fund.fund_number}` }}
+      </button>
+    </div>
+
     <!-- Time Range Selector -->
     <div class="flex items-center gap-3">
       <span class="text-xs text-base-content/50 font-semibold">Period:</span>
@@ -247,6 +260,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { usePortfolioStore } from '../../stores/portfolio'
 import { useMarketDataStore } from '../../stores/marketData'
+import { useAuthStore } from '../../stores/auth'
 import { supabase } from '../../lib/supabase'
 import { reconstructHoldingsAsOf, reconstructCashAsOf } from '../../utils/leaderboardMetrics'
 import TimeRangeSelector from '../../components/charts/TimeRangeSelector.vue'
@@ -254,9 +268,14 @@ import TimeRangeSelector from '../../components/charts/TimeRangeSelector.vue'
 const route = useRoute()
 const portfolioStore = usePortfolioStore()
 const market = useMarketDataStore()
+const auth = useAuthStore()
 const loading = ref(true)
 const selectedRange = ref(route.query.range || '1D')
 const noDataReason = ref('')
+
+// Fund selector state
+const funds = ref([])
+const activeFundId = ref(route.query.portfolioId || null)
 
 // Portfolio label: show which portfolio/fund this is for
 const portfolioLabel = computed(() => {
@@ -657,12 +676,30 @@ async function explainStock(a) {
   finally { explaining.value = false }
 }
 
+async function switchFund(fundId) {
+  if (fundId === activeFundId.value) return
+  activeFundId.value = fundId
+  await portfolioStore.loadPortfolioById(fundId)
+  loadAttribution()
+}
+
 // ── Watch for range changes ──
 watch(selectedRange, () => {
   loadAttribution()
 })
 
-onMounted(() => {
+onMounted(async () => {
+  // Load fund list for selector
+  const membership = await auth.getCurrentMembership()
+  if (membership?.group_id && membership.group_id !== 'personal') {
+    const gFunds = await portfolioStore.loadGroupFunds(membership.group_id)
+    funds.value = gFunds
+    // If no portfolioId specified, default to first fund
+    if (!activeFundId.value && gFunds.length > 0) {
+      activeFundId.value = gFunds[0].id
+      await portfolioStore.loadPortfolioById(gFunds[0].id)
+    }
+  }
   loadAttribution(true)
 })
 </script>
