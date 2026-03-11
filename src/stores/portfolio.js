@@ -946,12 +946,13 @@ export const usePortfolioStore = defineStore('portfolio', () => {
   async function getLeaderboardData(groupIds) {
     if (!groupIds.length) return { portfolios: [], holdingsMap: {}, tradesMap: {} }
 
-    // 1. All portfolios for these groups
+    // 1. All non-hidden portfolios for these groups
     const { data: portfolios } = await supabase
       .from('portfolios')
       .select('*')
       .eq('owner_type', 'group')
       .in('owner_id', groupIds)
+      .or('hidden.eq.false,hidden.is.null')
 
     const pIds = (portfolios || []).map(p => p.id)
     if (!pIds.length) return { portfolios: [], holdingsMap: {}, tradesMap: {} }

@@ -20,6 +20,26 @@
       </div>
     </div>
 
+    <!-- Fund Visibility Controls -->
+    <div v-if="classFunds.length > 1" class="card bg-base-100 shadow-sm border border-base-300">
+      <div class="card-body p-4">
+        <h3 class="font-semibold text-sm mb-2">Fund Visibility on Leaderboard</h3>
+        <p class="text-xs text-base-content/50 mb-3">Toggle which funds students can see on the leaderboard.</p>
+        <div class="flex flex-wrap gap-3">
+          <label v-for="fund in classFunds" :key="fund.fund_number" class="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              class="toggle toggle-sm toggle-primary"
+              :checked="!fund.hidden"
+              @change="toggleFundVisibility(fund)"
+            />
+            <span class="text-sm">{{ fund.fund_name || 'Fund ' + fund.fund_number }}</span>
+            <span v-if="fund.hidden" class="badge badge-ghost badge-xs">Hidden</span>
+          </label>
+        </div>
+      </div>
+    </div>
+
     <div v-if="loading" class="flex justify-center py-12">
       <span class="loading loading-spinner loading-lg"></span>
     </div>
@@ -631,6 +651,48 @@ async function handleDeleteGroup() {
   }
 }
 
+// Fund visibility management
+const classFunds = ref([])
+
+async function loadClassFunds() {
+  const currentClass = teacher.classes[0]
+  if (!currentClass) return
+  // Get distinct fund_number/fund_name combinations for this class
+  const groupIds = rankedGroups.value.map(g => g.id)
+  if (!groupIds.length) return
+  const { data } = await supabase
+    .from('portfolios')
+    .select('fund_number, fund_name, hidden')
+    .eq('owner_type', 'group')
+    .in('owner_id', groupIds)
+    .or('status.eq.active,status.is.null')
+    .order('fund_number')
+  if (!data) return
+  // Deduplicate by fund_number
+  const seen = new Map()
+  for (const p of data) {
+    if (!seen.has(p.fund_number)) seen.set(p.fund_number, p)
+  }
+  classFunds.value = [...seen.values()]
+}
+
+async function toggleFundVisibility(fund) {
+  const newHidden = !fund.hidden
+  const groupIds = rankedGroups.value.map(g => g.id)
+  if (!groupIds.length) return
+  await supabase
+    .from('portfolios')
+    .update({ hidden: newHidden })
+    .eq('owner_type', 'group')
+    .in('owner_id', groupIds)
+    .eq('fund_number', fund.fund_number)
+  fund.hidden = newHidden
+  awardSuccess.value = newHidden
+    ? `"${fund.fund_name || 'Fund ' + fund.fund_number}" hidden from leaderboard`
+    : `"${fund.fund_name || 'Fund ' + fund.fund_number}" now visible on leaderboard`
+  setTimeout(() => { awardSuccess.value = '' }, 3000)
+}
+
 // Open New Fund for Class
 const showOpenFundModal = ref(false)
 const openingFund = ref(false)
@@ -658,6 +720,7 @@ async function handleOpenClassFund() {
     setTimeout(() => { awardSuccess.value = '' }, 5000)
     // Reload data
     rankedGroups.value = await teacher.getRankedGroups()
+    loadClassFunds()
   } finally {
     openingFund.value = false
   }
@@ -666,6 +729,7 @@ async function handleOpenClassFund() {
 onMounted(async () => {
   await teacher.loadTeacherData()
   rankedGroups.value = await teacher.getRankedGroups()
+  loadClassFunds()
 
   // Load holdings and student funds for each group
   for (const group of rankedGroups.value) {
