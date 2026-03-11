@@ -2,7 +2,6 @@ export const config = { runtime: 'edge' }
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY
-const FMP_KEY = process.env.VITE_FMP_API_KEY
 
 async function sbFetch(path) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1${path}`, {
@@ -120,128 +119,67 @@ export default async function handler(req) {
     })
   }
 
-  // Default date range: last 7 days
   const endDate = date_end || new Date().toISOString()
   const startDate = date_start || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
 
-  // Get groups for the class
+  // Fetch groups and memberships in parallel
   let groupsQuery = `/groups?class_id=eq.${class_id}&select=id,name`
   if (group_id) groupsQuery += `&id=eq.${group_id}`
-  const groups = await sbFetch(groupsQuery)
+
+  const [groups, memberships] = await Promise.all([
+    sbFetch(groupsQuery),
+    sbFetch(`/class_memberships?class_id=eq.${class_id}&select=user_id,group_id,profiles:profiles(full_name)`)
+  ])
+
   if (!groups?.length) {
     return new Response(JSON.stringify({ error: 'No groups found' }), {
       status: 404, headers: { 'Content-Type': 'application/json' }
     })
   }
 
-  // Get class memberships for member names
-  const memberships = await sbFetch(`/class_memberships?class_id=eq.${class_id}&select=user_id,group_id,profiles:profiles(full_name)`)
-
-  // Build portfolio data for each group (parallel)
-  const allTickers = new Set()
-
-  // Fetch all portfolios for these groups in one batch
+  // Batch fetch all portfolios, holdings, and trades
   const groupIds = groups.map(g => g.id)
   const portfolios = await sbFetch(`/portfolios?owner_type=eq.group&owner_id=in.(${groupIds.join(',')})&status=eq.active&select=id,owner_id,cash_balance,starting_cash`)
 
-  // Fetch holdings and trades in parallel for all portfolios
   const portfolioIds = (portfolios || []).map(p => p.id)
   const [allHoldings, allTrades] = portfolioIds.length > 0 ? await Promise.all([
     sbFetch(`/holdings?portfolio_id=in.(${portfolioIds.join(',')})&select=portfolio_id,ticker,shares,avg_cost`),
     sbFetch(`/trades?portfolio_id=in.(${portfolioIds.join(',')})&executed_at=gte.${startDate}&executed_at=lte.${endDate}&select=portfolio_id,ticker,side,shares,dollars,price,executed_at,user_id&order=executed_at.desc`)
   ]) : [[], []]
 
-  const groupData = groups.map(group => {
+  // Build a simple snapshot per group
+  const groupSnapshots = groups.map(group => {
     const p = (portfolios || []).find(p => p.owner_id === group.id)
     if (!p) return null
 
     const holdings = (allHoldings || []).filter(h => h.portfolio_id === p.id)
     const trades = (allTrades || []).filter(t => t.portfolio_id === p.id)
-
     const members = (memberships || [])
       .filter(m => m.group_id === group.id)
       .map(m => m.profiles?.full_name || 'Unknown')
 
-    for (const h of holdings) allTickers.add(h.ticker)
-    for (const t of trades) allTickers.add(t.ticker)
+    const holdingsValue = holdings.reduce((sum, h) => sum + (h.shares * h.avg_cost), 0)
+    const totalValue = holdingsValue + p.cash_balance
+    const returnPct = ((totalValue - p.starting_cash) / p.starting_cash) * 100
 
-    return {
-      name: group.name,
-      members,
-      startingCash: p.starting_cash,
-      cashBalance: p.cash_balance,
-      holdings,
-      trades
-    }
+    const holdingsText = holdings.length > 0
+      ? holdings.map(h => `${h.ticker}: ${h.shares} shares, avg cost $${h.avg_cost.toFixed(2)}`).join('\n    ')
+      : 'No holdings'
+
+    const tradesText = trades.length > 0
+      ? trades.slice(0, 10).map(t => {
+          const date = new Date(t.executed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+          return `${date}: ${t.side.toUpperCase()} ${t.ticker} — ${t.shares} shares @ $${t.price.toFixed(2)} ($${t.dollars.toFixed(0)})`
+        }).join('\n    ')
+      : 'No trades this period'
+
+    return `${group.name} (Members: ${members.join(', ')})
+   Portfolio: $${totalValue.toFixed(0)} | Return: ${returnPct >= 0 ? '+' : ''}${returnPct.toFixed(1)}% | Cash: $${p.cash_balance.toFixed(0)}
+   Holdings:
+    ${holdingsText}
+   Trades (${trades.length} in period):
+    ${tradesText}`
   }).filter(Boolean)
-
-  // Fetch live market data for all tickers
-  const tickerList = [...allTickers]
-  let quotesMap = {}
-  let newsItems = []
-
-  if (FMP_KEY && tickerList.length > 0) {
-    const [quotes, news] = await Promise.all([
-      fetch(`https://financialmodelingprep.com/api/v3/quote/${tickerList.join(',')}?apikey=${FMP_KEY}`).then(r => r.json()).catch(() => []),
-      fetch(`https://financialmodelingprep.com/api/v3/stock_news?tickers=${tickerList.join(',')}&limit=15&apikey=${FMP_KEY}`).then(r => r.json()).catch(() => [])
-    ])
-
-    for (const q of (quotes || [])) {
-      quotesMap[q.symbol] = q
-    }
-    newsItems = news || []
-  }
-
-  // Calculate portfolio values and returns
-  const groupSummaries = groupData.map(g => {
-    const holdingsValue = g.holdings.reduce((sum, h) => {
-      const price = quotesMap[h.ticker]?.price || h.avg_cost
-      return sum + (h.shares * price)
-    }, 0)
-    const totalValue = holdingsValue + g.cashBalance
-    const returnPct = ((totalValue - g.startingCash) / g.startingCash) * 100
-
-    const holdingDetails = g.holdings.map(h => {
-      const q = quotesMap[h.ticker]
-      const price = q?.price || h.avg_cost
-      const marketValue = h.shares * price
-      const costBasis = h.shares * h.avg_cost
-      const gainPct = costBasis > 0 ? ((marketValue - costBasis) / costBasis) * 100 : 0
-      return `${h.ticker}: ${h.shares} shares @ $${price.toFixed(2)} (${gainPct >= 0 ? '+' : ''}${gainPct.toFixed(1)}%), ${q?.changesPercentage != null ? 'today ' + (q.changesPercentage >= 0 ? '+' : '') + q.changesPercentage.toFixed(2) + '%' : ''}`
-    }).join('\n    ')
-
-    const tradeDetails = g.trades.slice(0, 10).map(t => {
-      const date = new Date(t.executed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-      return `${date}: ${t.side.toUpperCase()} ${t.ticker} — ${t.shares} shares @ $${t.price.toFixed(2)} ($${t.dollars.toFixed(0)})`
-    }).join('\n    ')
-
-    return {
-      name: g.name,
-      members: g.members.join(', '),
-      totalValue: totalValue.toFixed(2),
-      returnPct: returnPct.toFixed(2),
-      cashBalance: g.cashBalance.toFixed(2),
-      holdingDetails: holdingDetails || 'No holdings',
-      tradeDetails: tradeDetails || 'No trades in this period',
-      tradeCount: g.trades.length
-    }
-  }).sort((a, b) => parseFloat(b.returnPct) - parseFloat(a.returnPct))
-
-  // Format news
-  const newsContext = newsItems.length > 0
-    ? newsItems.slice(0, 10).map(n =>
-        `- ${n.symbol}: "${n.title}" (${new Date(n.publishedDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})${n.text ? '\n  ' + n.text.slice(0, 150) : ''}`
-      ).join('\n')
-    : 'No recent news found for these stocks.'
-
-  // Format group summaries for the prompt
-  const groupsText = groupSummaries.map((g, i) => `
-  ${i + 1}. ${g.name} (Members: ${g.members})
-     Portfolio Value: $${Number(g.totalValue).toLocaleString()} | Return: ${g.returnPct}% | Cash: $${Number(g.cashBalance).toLocaleString()}
-     Holdings:
-    ${g.holdingDetails}
-     Recent Trades (${g.tradeCount} in period):
-    ${g.tradeDetails}`).join('\n')
 
   const dateLabel = `${new Date(startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${new Date(endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
 
@@ -250,28 +188,23 @@ export default async function handler(req) {
 Generate class discussion notes for the teacher based on the data below. The teacher will use these to lead an engaging class discussion.
 
 Period: ${dateLabel}
-${group_id ? 'Focused on one group.' : `${groupSummaries.length} groups in the class.`}
+${group_id ? 'Focused on one group.' : `${groupSnapshots.length} groups in the class.`}
 
-=== PORTFOLIO STANDINGS (ranked by return) ===
-${groupsText}
-
-=== RELEVANT NEWS FOR THEIR STOCKS ===
-${newsContext}
+=== GROUP SNAPSHOTS (ranked by return) ===
+${groupSnapshots.join('\n\n')}
 
 === INSTRUCTIONS ===
 Write structured class notes in markdown with these sections:
 
-1. **🏆 Leaderboard Recap** — Quick ranking with returns. Who's winning and why? Who fell behind?
+1. **Leaderboard Recap** — Quick ranking with returns. Who's winning and why? Who fell behind?
 
-2. **📈 Market Movers** — What happened in the market this period that affected their stocks? Reference specific news items and price movements.
+2. **Smart Moves** — Highlight specific trades that were well-timed or strategic. Name the group and what they did.
 
-3. **🔥 Smart Moves** — Highlight specific trades that were well-timed or strategic. Name the group and what they did.
+3. **Watch Out** — Any risky positions, over-concentration, or missed opportunities? Be constructive.
 
-4. **⚠️ Watch Out** — Any risky positions, over-concentration, or missed opportunities? Be constructive.
+4. **Discussion Questions** — 3-4 thought-provoking questions the teacher can ask the class based on what's happening in their portfolios.
 
-5. **💡 Discussion Questions** — 3-4 thought-provoking questions the teacher can ask the class based on what's happening in their portfolios and the market.
-
-6. **📚 Teaching Moment** — One key investing concept illustrated by something happening in their portfolios right now. Make it concrete with a real example from the data.
+5. **Teaching Moment** — One key investing concept illustrated by something happening in their portfolios right now. Make it concrete with a real example from the data.
 
 Keep it practical, specific, and reference actual tickers, prices, and group names. Write for a teacher who wants to lead a 10-minute discussion. Use a conversational but informative tone.`
 
@@ -286,7 +219,7 @@ Keep it practical, specific, and reference actual tickers, prices, and group nam
   return new Response(JSON.stringify({
     notes,
     period: dateLabel,
-    groups_analyzed: groupSummaries.length,
-    tickers_tracked: tickerList.length
+    groups_analyzed: groupSnapshots.length,
+    tickers_tracked: [...new Set([...(allHoldings || []).map(h => h.ticker), ...(allTrades || []).map(t => t.ticker)])].length
   }), { headers: { 'Content-Type': 'application/json' } })
 }
