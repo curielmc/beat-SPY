@@ -101,7 +101,7 @@
               </thead>
               <tbody>
                 <tr v-for="t in topTickers" :key="t.ticker">
-                  <td class="font-mono font-bold">{{ t.ticker }}</td>
+                  <td><span class="font-mono font-bold">{{ t.ticker }}</span> <span class="text-base-content/50 text-xs">{{ tickerNames[t.ticker] || '' }}</span></td>
                   <td class="text-right">{{ t.count }}</td>
                   <td class="text-right font-mono">${{ Number(t.totalDollars).toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</td>
                 </tr>
@@ -147,6 +147,7 @@
             <div>
               <span class="font-mono font-bold">{{ trade.ticker }}</span>
               <span class="badge badge-xs ml-1" :class="trade.side === 'buy' ? 'badge-success' : 'badge-error'">{{ trade.side }}</span>
+              <span class="text-base-content/50 text-xs ml-1">{{ tickerNames[trade.ticker] || '' }}</span>
             </div>
             <span class="font-mono">${{ Number(trade.dollars).toFixed(2) }}</span>
           </div>
@@ -191,6 +192,11 @@
             </select>
           </div>
 
+          <div class="form-control">
+            <label class="label"><span class="label-text font-medium">Custom Instructions <span class="text-base-content/40">(optional)</span></span></label>
+            <textarea v-model="notesCustomInstructions" class="textarea textarea-bordered textarea-sm" rows="2" placeholder="e.g. Focus on risk management, mention upcoming earnings..."></textarea>
+          </div>
+
           <div class="flex gap-2 mt-2">
             <button class="btn btn-sm btn-ghost" @click="setNotesDateRange(7)">Last 7 days</button>
             <button class="btn btn-sm btn-ghost" @click="setNotesDateRange(14)">Last 14 days</button>
@@ -210,6 +216,8 @@
             <p class="text-sm text-base-content/60">{{ notesMeta }}</p>
             <div class="flex gap-2">
               <button class="btn btn-sm btn-outline" @click="copyNotes">{{ notesCopied ? 'Copied!' : 'Copy' }}</button>
+              <button class="btn btn-sm btn-outline" @click="downloadNotes('pdf')">PDF</button>
+              <button class="btn btn-sm btn-outline" @click="downloadNotes('doc')">DOC</button>
               <button class="btn btn-sm btn-ghost" @click="classNotes = null">Regenerate</button>
             </div>
           </div>
@@ -234,6 +242,10 @@ import {
   Legend
 } from 'chart.js'
 import { supabase } from '../../lib/supabase'
+import { useMarketDataStore } from '../../stores/marketData'
+
+const market = useMarketDataStore()
+const tickerNames = ref({})
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, Title, Tooltip, Legend)
 
@@ -256,6 +268,7 @@ const allClasses = ref([])
 const notesGroups = ref([])
 const notesClassId = ref('')
 const notesGroupId = ref('')
+const notesCustomInstructions = ref('')
 const todayStr = new Date().toISOString().split('T')[0]
 const sevenAgoStr = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
 const notesDateStart = ref(sevenAgoStr)
@@ -289,6 +302,7 @@ async function generateNotes() {
       date_end: new Date(notesDateEnd.value + 'T23:59:59').toISOString()
     }
     if (notesGroupId.value) body.group_id = notesGroupId.value
+    if (notesCustomInstructions.value.trim()) body.custom_instructions = notesCustomInstructions.value.trim()
 
     const res = await fetch('/api/generate-class-notes', {
       method: 'POST',
@@ -325,6 +339,28 @@ function copyNotes() {
     navigator.clipboard.writeText(classNotes.value)
     notesCopied.value = true
     setTimeout(() => { notesCopied.value = false }, 2000)
+  }
+}
+
+function downloadNotes(format) {
+  if (!classNotes.value) return
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Class Notes</title>
+<style>body{font-family:system-ui,sans-serif;max-width:800px;margin:40px auto;padding:0 20px;line-height:1.6}h1,h2,h3{margin-top:1.5em}li{margin:4px 0}</style>
+</head><body>${renderedNotes.value}</body></html>`
+
+  if (format === 'pdf') {
+    const w = window.open('', '_blank')
+    w.document.write(html)
+    w.document.close()
+    setTimeout(() => { w.print() }, 300)
+  } else {
+    const blob = new Blob([html], { type: 'application/msword' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `class-notes-${notesDateStart.value}.doc`
+    a.click()
+    URL.revokeObjectURL(url)
   }
 }
 
@@ -453,6 +489,20 @@ onMounted(async () => {
       tickerMap[t.ticker].totalDollars += Math.abs(Number(t.dollars) || 0)
     }
     topTickers.value = Object.values(tickerMap).sort((a, b) => b.count - a.count).slice(0, 10)
+
+    // Fetch company names for displayed tickers
+    const allDisplayedTickers = [...new Set([
+      ...topTickers.value.map(t => t.ticker),
+      ...(recentTrades.value || []).map(t => t.ticker)
+    ])]
+    if (allDisplayedTickers.length > 0) {
+      const profiles = await market.fetchBatchProfiles(allDisplayedTickers)
+      const names = {}
+      for (const [ticker, profile] of Object.entries(profiles)) {
+        names[ticker] = profile.companyName || profile.name || ''
+      }
+      tickerNames.value = names
+    }
   } finally {
     loading.value = false
   }

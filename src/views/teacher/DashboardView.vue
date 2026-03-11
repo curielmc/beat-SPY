@@ -117,6 +117,11 @@
             </select>
           </div>
 
+          <div class="form-control">
+            <label class="label"><span class="label-text font-medium">Custom Instructions <span class="text-base-content/40">(optional)</span></span></label>
+            <textarea v-model="notesCustomInstructions" class="textarea textarea-bordered textarea-sm" rows="2" placeholder="e.g. Focus on risk management, mention upcoming earnings..."></textarea>
+          </div>
+
           <div class="flex gap-2 mt-2">
             <button class="btn btn-sm btn-ghost" @click="setDateRange(7)">Last 7 days</button>
             <button class="btn btn-sm btn-ghost" @click="setDateRange(14)">Last 14 days</button>
@@ -143,6 +148,8 @@
               <button class="btn btn-sm btn-outline" @click="copyNotes">
                 {{ copied ? 'Copied!' : 'Copy' }}
               </button>
+              <button class="btn btn-sm btn-outline" @click="downloadNotes('pdf')">PDF</button>
+              <button class="btn btn-sm btn-outline" @click="downloadNotes('doc')">DOC</button>
               <button class="btn btn-sm btn-ghost" @click="classNotes = null">Regenerate</button>
             </div>
           </div>
@@ -188,6 +195,7 @@ const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
 const notesDateStart = ref(sevenDaysAgo.toISOString().split('T')[0])
 const notesDateEnd = ref(today.toISOString().split('T')[0])
 const notesGroupId = ref('')
+const notesCustomInstructions = ref('')
 
 function setDateRange(days) {
   const end = new Date()
@@ -217,6 +225,7 @@ async function generateNotes() {
       date_end: new Date(notesDateEnd.value + 'T23:59:59').toISOString()
     }
     if (notesGroupId.value) body.group_id = notesGroupId.value
+    if (notesCustomInstructions.value.trim()) body.custom_instructions = notesCustomInstructions.value.trim()
 
     const res = await fetch('/api/generate-class-notes', {
       method: 'POST',
@@ -254,6 +263,28 @@ function copyNotes() {
     navigator.clipboard.writeText(classNotes.value)
     copied.value = true
     setTimeout(() => { copied.value = false }, 2000)
+  }
+}
+
+function downloadNotes(format) {
+  if (!classNotes.value) return
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Class Notes</title>
+<style>body{font-family:system-ui,sans-serif;max-width:800px;margin:40px auto;padding:0 20px;line-height:1.6}h1,h2,h3{margin-top:1.5em}li{margin:4px 0}</style>
+</head><body>${renderedNotes.value}</body></html>`
+
+  if (format === 'pdf') {
+    const w = window.open('', '_blank')
+    w.document.write(html)
+    w.document.close()
+    setTimeout(() => { w.print() }, 300)
+  } else {
+    const blob = new Blob([html], { type: 'application/msword' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `class-notes-${notesDateStart.value}.doc`
+    a.click()
+    URL.revokeObjectURL(url)
   }
 }
 

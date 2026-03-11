@@ -111,7 +111,7 @@ export default async function handler(req) {
     return new Response('Forbidden', { status: 403 })
   }
 
-  const { class_id, date_start, date_end, group_id } = await req.json()
+  const { class_id, date_start, date_end, group_id, custom_instructions } = await req.json()
   if (!class_id) {
     return new Response(JSON.stringify({ error: 'class_id required' }), {
       status: 400, headers: { 'Content-Type': 'application/json' }
@@ -205,7 +205,7 @@ Write structured class notes in markdown with these sections:
 
 5. **Teaching Moment** — One key investing concept illustrated by something happening in their portfolios right now. Make it concrete with a real example from the data.
 
-Keep it practical, specific, and reference actual tickers, prices, and group names. Write for a teacher who wants to lead a 10-minute discussion. Use a conversational but informative tone.`
+Keep it practical, specific, and reference actual tickers, prices, and group names. Write for a teacher who wants to lead a 10-minute discussion. Use a conversational but informative tone.${custom_instructions ? `\n\n=== ADDITIONAL TEACHER INSTRUCTIONS ===\n${custom_instructions}` : ''}`
 
   const aiConfig = getAIConfig(prompt)
   if (!aiConfig) {
