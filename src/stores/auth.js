@@ -221,16 +221,8 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       // Recover session from localStorage
       console.log('[AUTH] init: calling getSession...')
-      let { data: { session }, error: sessionErr } = await supabase.auth.getSession()
+      const { data: { session }, error: sessionErr } = await supabase.auth.getSession()
       console.log('[AUTH] init: getSession result:', { hasSession: !!session, userId: session?.user?.id, expiresAt: session?.expires_at, error: sessionErr })
-
-      // If no session in memory, try refreshing from refresh token
-      if (!session) {
-        console.log('[AUTH] init: no session, trying refreshSession...')
-        const { data: refreshed } = await supabase.auth.refreshSession()
-        session = refreshed?.session
-        console.log('[AUTH] init: refreshSession result:', { hasSession: !!session })
-      }
 
       if (session?.user) {
         currentUser.value = session.user
