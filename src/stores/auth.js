@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { supabase } from '../lib/supabase'
+import { supabase, getAccessToken } from '../lib/supabase'
 
 export const useAuthStore = defineStore('auth', () => {
   const currentUser = ref(null)
@@ -26,6 +26,9 @@ export const useAuthStore = defineStore('auth', () => {
     const { data: { session: adminSession } } = await supabase.auth.getSession()
     if (!adminSession) return { error: 'No active session' }
 
+    const accessToken = await getAccessToken()
+    if (!accessToken) return { error: 'Your admin session expired. Please sign in again.' }
+
     _originalSession.value = {
       access_token: adminSession.access_token,
       refresh_token: adminSession.refresh_token
@@ -38,13 +41,13 @@ export const useAuthStore = defineStore('auth', () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${adminSession.access_token}`
+          Authorization: `Bearer ${accessToken}`
         },
         body: JSON.stringify({ target_user_id: user.id || user.userId })
       })
 
       if (!res.ok) {
-        const err = await res.json()
+        const err = await res.json().catch(async () => ({ error: await res.text().catch(() => 'Masquerade failed') }))
         _originalSession.value = null
         sessionStorage.removeItem('masquerade_original')
         return { error: err.error || 'Masquerade failed' }
