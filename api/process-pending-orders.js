@@ -1,5 +1,7 @@
 export const config = { runtime: 'edge' }
 
+import { getQueuedExecutionPrice } from '../src/lib/tradePricing.js'
+
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY
 const FMP_KEY = process.env.VITE_FMP_API_KEY
@@ -73,22 +75,22 @@ async function sbRpc(fn, body) {
 }
 
 async function fetchQuotes(tickers) {
-  const priceMap = {}
-  if (!FMP_KEY || tickers.length === 0) return priceMap
+  const quoteMap = {}
+  if (!FMP_KEY || tickers.length === 0) return quoteMap
 
   for (let i = 0; i < tickers.length; i += 50) {
     const batch = tickers.slice(i, i + 50)
     try {
       const quotes = await fetch(`https://financialmodelingprep.com/api/v3/quote/${batch.join(',')}?apikey=${FMP_KEY}`).then(r => r.json())
       for (const quote of (quotes || [])) {
-        priceMap[quote.symbol] = quote.price || quote.previousClose || null
+        quoteMap[quote.symbol] = quote
       }
     } catch (err) {
       // Partial quote fetches are acceptable; failed symbols will fail execution individually.
     }
   }
 
-  return priceMap
+  return quoteMap
 }
 
 export default async function handler(req) {
@@ -121,14 +123,29 @@ export default async function handler(req) {
 
   const quotes = await fetchQuotes([...tickers])
   const results = []
+  let skipped = 0
 
   for (const order of orders) {
     const benchmarkTicker = order.portfolios?.benchmark_ticker || 'SPY'
+    const executionPrice = getQueuedExecutionPrice(quotes[order.ticker])
+    const benchmarkExecutionPrice = getQueuedExecutionPrice(quotes[benchmarkTicker])
+
+    if (!executionPrice || !benchmarkExecutionPrice) {
+      skipped += 1
+      results.push({
+        id: order.id,
+        success: false,
+        skipped: true,
+        reason: 'opening_price_unavailable'
+      })
+      continue
+    }
+
     try {
       const data = await sbRpc('execute_pending_trade_order', {
         p_order_id: order.id,
-        p_price: quotes[order.ticker] ?? null,
-        p_benchmark_price: quotes[benchmarkTicker] ?? null
+        p_price: executionPrice,
+        p_benchmark_price: benchmarkExecutionPrice
       })
       results.push({ id: order.id, success: true, status: data?.status || 'executed' })
     } catch (error) {
@@ -140,6 +157,7 @@ export default async function handler(req) {
     processed: results.length,
     succeeded: results.filter(r => r.success).length,
     failed: results.filter(r => !r.success).length,
+    skipped,
     results
   }), {
     headers: { 'Content-Type': 'application/json' }

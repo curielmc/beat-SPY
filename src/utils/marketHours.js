@@ -90,12 +90,12 @@ export function getMarketHoursMessage(now = new Date()) {
   const day = easternTime.getDay()
 
   if (isUSMarketHoliday(easternTime)) {
-    return 'The market is closed for a holiday. Orders placed now will queue for the next trading session.'
+    return 'The market is closed for a holiday. Orders placed now will queue for the next trading session and use that session\'s opening price.'
   }
 
   if (day === 0 || day === 6) {
-    return 'The market is closed. Orders placed now will queue for the next trading session, Monday through Friday, 9:30 AM to 4:00 PM ET.'
+    return 'The market is closed. Orders placed now will queue for the next trading session and use that session\'s opening price, Monday through Friday, 9:30 AM to 4:00 PM ET.'
   }
 
-  return 'The market is closed. Orders placed now will queue for the next regular session at 9:30 AM ET.'
+  return 'The market is closed. Orders placed now will queue for the next regular session at 9:30 AM ET and use that session\'s opening price.'
 }

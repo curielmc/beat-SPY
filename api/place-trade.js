@@ -1,5 +1,7 @@
 export const config = { runtime: 'edge' }
 
+import { getImmediateExecutionPrice } from '../src/lib/tradePricing.js'
+
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY
 const FMP_KEY = process.env.VITE_FMP_API_KEY
@@ -12,7 +14,7 @@ async function fetchLivePrice(ticker) {
     )
     const data = await res.json()
     if (Array.isArray(data) && data.length > 0) {
-      return data[0].price || data[0].previousClose || null
+      return getImmediateExecutionPrice(data[0])
     }
   } catch (e) {
     // Fall through
@@ -94,5 +96,8 @@ export default async function handler(req) {
   }
 
   const result = await rpcRes.json()
+  if (result?.status === 'queued') {
+    return jsonResponse({ ...result, submitted_price: livePrice })
+  }
   return jsonResponse({ ...result, price: livePrice })
 }

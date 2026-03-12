@@ -383,6 +383,7 @@ import { useCompetitionsStore } from '../../stores/competitions'
 import TakeCard from '../../components/TakeCard.vue'
 import SectorLabel from '../../components/SectorLabel.vue'
 import { isMarketOpen, getMarketHoursMessage } from '../../utils/marketHours'
+import { getAvailableCashForQueuedBuys } from '../../lib/tradePricing'
 
 const route = useRoute()
 const router = useRouter()
@@ -578,16 +579,28 @@ const previewShares = computed(() => {
   return tradeAmount.value / quote.value.price
 })
 
+const queuedBuyCash = computed(() => (
+  getAvailableCashForQueuedBuys(portfolioStore.cashBalance, portfolioStore.pendingOrders)
+))
+
 const canTrade = computed(() => {
   if (!tradeAmount.value || tradeAmount.value <= 0 || !quote.value) return false
   if (requiresApproval.value && !approvalCode.value.trim()) return false
-  if (tradeMode.value === 'buy') return tradeAmount.value <= portfolioStore.cashBalance
+  if (tradeMode.value === 'buy') {
+    return isMarketOpen()
+      ? tradeAmount.value <= portfolioStore.cashBalance
+      : tradeAmount.value <= queuedBuyCash.value
+  }
   return tradeAmount.value <= maxSellDollars.value + 0.01
 })
 
-const marketClosedMessage = computed(() => (
-  isMarketOpen() ? '' : getMarketHoursMessage()
-))
+const marketClosedMessage = computed(() => {
+  if (isMarketOpen()) return ''
+  if (tradeMode.value === 'buy') {
+    return `${getMarketHoursMessage()} Only cash already in the account can fund queued buys. Available queued-buy cash: $${queuedBuyCash.value.toFixed(2)}.`
+  }
+  return getMarketHoursMessage()
+})
 
 const executeButtonLabel = computed(() => {
   if (isMarketOpen()) {
@@ -605,7 +618,8 @@ const rangePosition = computed(() => {
 
 function setQuickAmount(pct) {
   if (tradeMode.value === 'buy') {
-    tradeAmount.value = Math.floor(portfolioStore.cashBalance * (pct / 100) * 100) / 100
+    const maxBuyCash = isMarketOpen() ? portfolioStore.cashBalance : queuedBuyCash.value
+    tradeAmount.value = Math.floor(maxBuyCash * (pct / 100) * 100) / 100
   } else {
     tradeAmount.value = Math.floor(maxSellDollars.value * (pct / 100) * 100) / 100
   }
@@ -659,7 +673,7 @@ async function executeTrade() {
         : 'the next market open'
       tradeResult.value = {
         success: true,
-        message: `Queued ${action} order for ${ticker}. It will execute when the market reopens, starting ${executeAfter}.`
+        message: `Queued ${action} order for ${ticker}. It will execute at the next regular market open using that session's opening price, starting ${executeAfter}.`
       }
     } else {
       const action = tradeMode.value === 'buy' ? 'Bought' : 'Sold'

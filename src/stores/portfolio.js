@@ -4,6 +4,8 @@ import { supabase } from '../lib/supabase'
 import { useAuthStore } from './auth'
 import { getSP500Constituents } from '../services/fmpApi'
 import { useMarketDataStore } from './marketData'
+import { isMarketOpen } from '../utils/marketHours'
+import { getAvailableCashForQueuedBuys } from '../lib/tradePricing'
 
 async function serverPlaceTrade({ portfolio_id, ticker, side, dollars, rationale, approval_code, benchmark_ticker }) {
   const { data: { session } } = await supabase.auth.getSession()
@@ -326,6 +328,13 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     if (!portfolio.value) return { success: false, error: 'Portfolio not found' }
     if (dollars <= 0) return { success: false, error: 'Amount must be positive' }
     if (dollars > cashBalance.value) return { success: false, error: 'Insufficient cash' }
+    const queuedBuyCash = getAvailableCashForQueuedBuys(cashBalance.value, pendingOrders.value)
+    if (!isMarketOpen() && dollars > queuedBuyCash) {
+      return {
+        success: false,
+        error: `After-hours buy orders can only use cash already in the account. Available cash for queued buys: $${queuedBuyCash.toFixed(2)}`
+      }
+    }
     const market = useMarketDataStore()
 
     // ── Universe + Sector restrictions (group portfolios only — personal is always free) ──
