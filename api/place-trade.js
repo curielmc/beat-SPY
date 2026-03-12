@@ -187,15 +187,16 @@ export default async function handler(req) {
   const bmTicker = benchmark_ticker || 'SPY'
   const bmPrice = await fetchLivePrice(bmTicker)
 
-  // Call Supabase RPC using the user's JWT so auth.uid() resolves correctly
-  const rpcRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/place_trade_order`, {
+  // Call the service-only RPC after validating the actor/effective user server-side.
+  const rpcRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/place_trade_order_as_user`, {
     method: 'POST',
     headers: {
-      apikey: SUPABASE_ANON_KEY,
-      Authorization: `Bearer ${userJwt}`,
+      apikey: SUPABASE_SERVICE_KEY,
+      Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
+      p_user_id: effectiveUser.id,
       p_portfolio_id: portfolio_id,
       p_ticker: ticker,
       p_side: side,
