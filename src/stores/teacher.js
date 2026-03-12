@@ -60,27 +60,32 @@ export const useTeacherStore = defineStore('teacher', () => {
   }
 
   // Get ranked groups with portfolio data
-  async function getRankedGroups() {
+  async function getRankedGroups(classId = null) {
     const market = useMarketDataStore()
     const ranked = []
+    const scopedGroups = classId
+      ? groups.value.filter(group => group.class_id === classId)
+      : groups.value
 
-    for (const group of groups.value) {
-      const { data: pData } = await supabase
+    for (const group of scopedGroups) {
+      const { data: portfolioData } = await supabase
         .from('portfolios')
         .select('*')
         .eq('owner_type', 'group')
         .eq('owner_id', group.id)
-        .maybeSingle()
+        .or('status.eq.active,status.is.null')
 
       let totalValue = 100000
       let returnPct = 0
       let cash = 100000
+      let startingCash = 100000
 
-      if (pData) {
+      if (portfolioData?.length) {
+        const portfolioIds = portfolioData.map(p => p.id)
         const { data: hData } = await supabase
           .from('holdings')
           .select('*')
-          .eq('portfolio_id', pData.id)
+          .in('portfolio_id', portfolioIds)
 
         const tickers = (hData || []).map(h => h.ticker)
         if (tickers.length > 0) {
@@ -92,9 +97,10 @@ export const useTeacherStore = defineStore('teacher', () => {
           return sum + (h.shares * price)
         }, 0)
 
-        totalValue = holdingsValue + pData.cash_balance
-        returnPct = ((totalValue - pData.starting_cash) / pData.starting_cash) * 100
-        cash = pData.cash_balance
+        cash = portfolioData.reduce((sum, p) => sum + Number(p.cash_balance || 0), 0)
+        startingCash = portfolioData.reduce((sum, p) => sum + Number(p.starting_cash || 100000), 0)
+        totalValue = holdingsValue + cash
+        returnPct = startingCash > 0 ? ((totalValue - startingCash) / startingCash) * 100 : 0
       }
 
       const members = students.value.filter(s => s.group_id === group.id)
@@ -104,6 +110,8 @@ export const useTeacherStore = defineStore('teacher', () => {
         totalValue,
         returnPct,
         cash,
+        startingCash,
+        fundCount: portfolioData?.length || 0,
         members,
         memberNames: members.map(m => m.name).filter(Boolean)
       })
