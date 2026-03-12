@@ -128,15 +128,15 @@
 </template>
 
 <script setup>
-import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
+import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../stores/auth'
 
 const auth = useAuthStore()
+const route = useRoute()
 const currentTeacherId = computed(() => auth.currentUser?.id)
-
-const CLASS_ID = 'c0ee1de7-bf4d-4598-8285-44c8f89f3b22'
-const currentClassId = ref(CLASS_ID)
+const currentClassId = computed(() => route.query.class_id || auth.activeClassId || auth.membership?.class_id || null)
 
 const groups = ref([])
 const students = ref([])
@@ -156,9 +156,14 @@ function formatTime(ts) {
 }
 
 async function loadRecipients() {
+  if (!currentClassId.value) {
+    groups.value = []
+    students.value = []
+    return
+  }
   const [{ data: groupData }, { data: memberData }] = await Promise.all([
-    supabase.from('groups').select('id, name').eq('class_id', CLASS_ID),
-    supabase.from('class_memberships').select('user_id, profiles:profiles(full_name, email)').eq('class_id', CLASS_ID)
+    supabase.from('groups').select('id, name').eq('class_id', currentClassId.value),
+    supabase.from('class_memberships').select('user_id, profiles:profiles(full_name, email)').eq('class_id', currentClassId.value)
   ])
   groups.value = groupData || []
   students.value = (memberData || []).map(m => ({
@@ -175,6 +180,7 @@ async function selectRecipient(r) {
 
 async function loadThread() {
   if (!selected.value) return
+  if (!currentClassId.value) return
   loadingMessages.value = true
   thread.value = []
 
@@ -182,27 +188,27 @@ async function loadThread() {
 
   if (selected.value.type === 'class') {
     const { data } = await supabase.from('messages').select('id, content, created_at, recipient_type, recipient_id, sender_id')
-      .eq('class_id', CLASS_ID).eq('recipient_type', 'class').order('created_at', { ascending: true })
+      .eq('class_id', currentClassId.value).eq('recipient_type', 'class').order('created_at', { ascending: true })
     msgs = data || []
   } else if (selected.value.type === 'group') {
     // Teacher → group messages + student → teacher messages from group members
     const { data: toGroup } = await supabase.from('messages').select('id, content, created_at, recipient_type, recipient_id, sender_id')
-      .eq('class_id', CLASS_ID).eq('recipient_type', 'group').eq('recipient_id', selected.value.id)
+      .eq('class_id', currentClassId.value).eq('recipient_type', 'group').eq('recipient_id', selected.value.id)
     // Get group member ids
     const { data: members } = await supabase.from('class_memberships').select('user_id, profiles:profiles(full_name)').eq('group_id', selected.value.id)
     const memberIds = (members || []).map(m => m.user_id)
     memberNames.value = Object.fromEntries((members || []).map(m => [m.user_id, m.profiles?.full_name || 'Student']))
     const { data: fromGroup } = memberIds.length
       ? await supabase.from('messages').select('id, content, created_at, recipient_type, recipient_id, sender_id')
-          .eq('class_id', CLASS_ID).in('sender_id', memberIds)
+          .eq('class_id', currentClassId.value).in('sender_id', memberIds)
       : { data: [] }
     msgs = [...(toGroup || []), ...(fromGroup || [])].sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
   } else {
     // Direct: teacher → student + student → teacher
     const { data: toUser } = await supabase.from('messages').select('id, content, created_at, recipient_type, recipient_id, sender_id')
-      .eq('class_id', CLASS_ID).eq('recipient_type', 'user').eq('recipient_id', selected.value.id)
+      .eq('class_id', currentClassId.value).eq('recipient_type', 'user').eq('recipient_id', selected.value.id)
     const { data: fromUser } = await supabase.from('messages').select('id, content, created_at, recipient_type, recipient_id, sender_id')
-      .eq('class_id', CLASS_ID).eq('sender_id', selected.value.id)
+      .eq('class_id', currentClassId.value).eq('sender_id', selected.value.id)
     msgs = [...(toUser || []), ...(fromUser || [])].sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
   }
 
@@ -220,7 +226,7 @@ function subscribeRealtime() {
       event: 'INSERT',
       schema: 'public',
       table: 'messages',
-      filter: `class_id=eq.${CLASS_ID}`
+      filter: `class_id=eq.${currentClassId.value}`
     }, (payload) => {
       const msg = payload.new
       const s = selected.value
@@ -243,7 +249,7 @@ async function send() {
   draft.value = ''
 
   await supabase.from('messages').insert({
-    class_id: CLASS_ID,
+    class_id: currentClassId.value,
     sender_id: auth.currentUser.id,
     recipient_type: selected.value.type,
     recipient_id: selected.value.type === 'class' ? null : selected.value.id,
@@ -259,6 +265,23 @@ function scrollToBottom() {
   })
 }
 
-onMounted(loadRecipients)
+async function hydrateFromRoute() {
+  await loadRecipients()
+  const groupId = route.query.group_id
+  if (groupId) {
+    const group = groups.value.find(g => g.id === groupId)
+    if (group) {
+      await selectRecipient({ type: 'group', id: group.id, label: group.name })
+      return
+    }
+  }
+}
+
+onMounted(hydrateFromRoute)
+watch(() => [route.query.class_id, route.query.group_id], async () => {
+  selected.value = null
+  thread.value = []
+  await hydrateFromRoute()
+})
 onUnmounted(() => { if (realtimeSub) supabase.removeChannel(realtimeSub) })
 </script>

@@ -79,13 +79,21 @@ export const useTeacherStore = defineStore('teacher', () => {
       let returnPct = 0
       let cash = 100000
       let startingCash = 100000
+      let lastTradeAt = null
 
       if (portfolioData?.length) {
         const portfolioIds = portfolioData.map(p => p.id)
-        const { data: hData } = await supabase
-          .from('holdings')
-          .select('*')
-          .in('portfolio_id', portfolioIds)
+        const [{ data: hData }, { data: tradeData }] = await Promise.all([
+          supabase
+            .from('holdings')
+            .select('*')
+            .in('portfolio_id', portfolioIds),
+          supabase
+            .from('trades')
+            .select('portfolio_id, executed_at')
+            .in('portfolio_id', portfolioIds)
+            .order('executed_at', { ascending: false })
+        ])
 
         const tickers = (hData || []).map(h => h.ticker)
         if (tickers.length > 0) {
@@ -101,6 +109,7 @@ export const useTeacherStore = defineStore('teacher', () => {
         startingCash = portfolioData.reduce((sum, p) => sum + Number(p.starting_cash || 100000), 0)
         totalValue = holdingsValue + cash
         returnPct = startingCash > 0 ? ((totalValue - startingCash) / startingCash) * 100 : 0
+        lastTradeAt = tradeData?.[0]?.executed_at || null
       }
 
       const members = students.value.filter(s => s.group_id === group.id)
@@ -111,6 +120,7 @@ export const useTeacherStore = defineStore('teacher', () => {
         returnPct,
         cash,
         startingCash,
+        lastTradeAt,
         fundCount: portfolioData?.length || 0,
         members,
         memberNames: members.map(m => m.name).filter(Boolean)

@@ -70,6 +70,9 @@
                   <th>Members</th>
                   <th class="text-right">Return %</th>
                   <th class="text-right">Portfolio Value</th>
+                  <th class="text-right">Uninvested Cash</th>
+                  <th>Last Trade</th>
+                  <th class="text-right">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -87,9 +90,19 @@
                     {{ group.returnPct >= 0 ? '+' : '' }}{{ group.returnPct.toFixed(2) }}%
                   </td>
                   <td class="text-right font-mono">${{ group.totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</td>
+                  <td class="text-right font-mono">${{ group.cash.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</td>
+                  <td class="text-sm text-base-content/60">{{ formatTradeDate(group.lastTradeAt) }}</td>
+                  <td class="text-right">
+                    <RouterLink
+                      :to="{ name: 'teacher-messages', query: { class_id: currentClass?.id, group_id: group.id } }"
+                      class="btn btn-xs btn-outline"
+                    >
+                      Message Group
+                    </RouterLink>
+                  </td>
                 </tr>
                 <tr v-if="rankedGroups.length === 0">
-                  <td colspan="5" class="text-center text-base-content/50">No groups yet</td>
+                  <td colspan="8" class="text-center text-base-content/50">No groups yet</td>
                 </tr>
               </tbody>
             </table>
@@ -180,7 +193,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import { useTeacherStore } from '../../stores/teacher'
 import { supabase } from '../../lib/supabase'
 import { downloadPDF, downloadDOCX } from '../../lib/notesExport'
@@ -236,6 +249,15 @@ function setDateRange(days) {
   const start = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
   notesDateStart.value = start.toISOString().split('T')[0]
   notesDateEnd.value = end.toISOString().split('T')[0]
+}
+
+function formatTradeDate(value) {
+  if (!value) return 'No trades yet'
+  return new Date(value).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric'
+  })
 }
 
 function closeNotesModal() {
