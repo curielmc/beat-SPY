@@ -26,14 +26,6 @@
         <p v-if="emailError" class="text-error text-sm text-left -mt-1">{{ emailError }}</p>
         <button
           class="btn btn-primary btn-block"
-          :class="{ 'loading': submitting }"
-          :disabled="submitting"
-          @click="handleLogin"
-        >
-          Log In
-        </button>
-        <button
-          class="btn btn-outline btn-block"
           :disabled="submitting"
           @click="signUpWithEmail"
         >
@@ -102,22 +94,6 @@ async function signInWithGoogle() {
   if (result.error) {
     console.error('Google sign-in error:', result.error)
   }
-}
-
-async function handleLogin() {
-  emailError.value = validateCredentials(email.value, password.value, { allowShortPassword: true })
-  if (emailError.value) return
-
-  submitting.value = true
-  const result = await auth.login(email.value, password.value)
-  submitting.value = false
-
-  if (result.error) {
-    emailError.value = result.error
-    return
-  }
-
-  routeAfterAuth()
 }
 
 async function signUpWithEmail() {
