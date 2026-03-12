@@ -58,6 +58,7 @@
           <div class="space-y-2">
             <div v-for="student in teacher.unassignedStudents" :key="student.id" class="flex items-center gap-3 bg-base-100 rounded-lg p-3">
               <span class="font-medium flex-1">{{ student.name }}</span>
+              <button class="btn btn-ghost btn-sm text-primary" @click="viewAsStudent({ id: student.userId || student.id, name: student.name, email: student.email })">View as Student</button>
               <select v-model="assignTargets[student.id]" class="select select-bordered select-sm w-48">
                 <option value="">Select group...</option>
                 <option v-for="group in teacher.groups" :key="group.id" :value="group.id">{{ group.name }}</option>
@@ -324,6 +325,13 @@
               <div v-for="s in group.members" :key="s.id" class="flex items-center gap-2 bg-base-200 rounded-lg px-3 py-2">
                 <span class="text-sm font-medium flex-1">{{ s.name }}</span>
                 <button
+                  class="btn btn-ghost btn-xs text-primary"
+                  @click="viewAsStudent({ id: s.user_id || s.id, name: s.name, email: s.email })"
+                  title="View as this student"
+                >
+                  View as Student
+                </button>
+                <button
                   class="btn btn-ghost btn-xs text-info gap-1"
                   :disabled="sendingLessonId === (s.user_id || s.id)"
                   @click="openLessonModal(s.user_id || s.id, 'user', s.name)"
@@ -440,10 +448,14 @@
 
 <script setup>
 import { reactive, ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useTeacherStore } from '../../stores/teacher'
+import { useAuthStore } from '../../stores/auth'
 import { supabase } from '../../lib/supabase'
 
 const teacher = useTeacherStore()
+const auth = useAuthStore()
+const router = useRouter()
 
 const loading = ref(true)
 const rankedGroups = ref([])
@@ -483,6 +495,15 @@ async function saveGroupName(group) {
 async function toggleStudentConfigure(group, checked) {
   await supabase.from('groups').update({ allow_student_configure: checked }).eq('id', group.id)
   group.allow_student_configure = checked
+}
+
+async function viewAsStudent(student) {
+  const result = await auth.startMasquerade(student)
+  if (result?.error) {
+    alert('Masquerade failed: ' + result.error)
+    return
+  }
+  router.push('/leaderboard')
 }
 
 // Kick student

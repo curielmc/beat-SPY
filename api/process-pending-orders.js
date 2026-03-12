@@ -106,7 +106,7 @@ export default async function handler(req) {
   }
 
   const nowIso = new Date().toISOString()
-  const path = `/pending_trade_orders?status=in.(queued,processing)&execute_after=lte.${encodeURIComponent(nowIso)}&select=id,ticker,portfolio_id,portfolios(benchmark_ticker)&order=requested_at.asc&limit=100`
+  const path = `/pending_trade_orders?status=in.(queued,processing)&execute_after=lte.${encodeURIComponent(nowIso)}&select=id,ticker,portfolio_id,user_id,placed_by_user_id,placed_by_role,portfolios(benchmark_ticker)&order=requested_at.asc&limit=100`
   const orders = await sbFetch(path).catch(() => [])
 
   if (!orders.length) {
@@ -147,6 +147,16 @@ export default async function handler(req) {
         p_price: executionPrice,
         p_benchmark_price: benchmarkExecutionPrice
       })
+      if (data?.trade_id && order.placed_by_user_id && order.placed_by_role) {
+        await sbFetch(`/trades?id=eq.${data.trade_id}`, {
+          method: 'PATCH',
+          headers: { Prefer: 'return=minimal' },
+          body: JSON.stringify({
+            placed_by_user_id: order.placed_by_user_id,
+            placed_by_role: order.placed_by_role
+          })
+        }).catch(() => {})
+      }
       results.push({ id: order.id, success: true, status: data?.status || 'executed' })
     } catch (error) {
       results.push({ id: order.id, success: false, error: error.message })

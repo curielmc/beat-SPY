@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { supabase } from '../lib/supabase'
+import { supabase, getMasqueradeActorToken } from '../lib/supabase'
 import { useAuthStore } from './auth'
 import { getSP500Constituents } from '../services/fmpApi'
 import { useMarketDataStore } from './marketData'
@@ -10,12 +10,14 @@ import { getAvailableCashForQueuedBuys } from '../lib/tradePricing'
 async function serverPlaceTrade({ portfolio_id, ticker, side, dollars, rationale, approval_code, benchmark_ticker }) {
   const { data: { session } } = await supabase.auth.getSession()
   if (!session?.access_token) throw new Error('Not authenticated')
+  const actorToken = getMasqueradeActorToken()
 
   const res = await fetch('/api/place-trade', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${session.access_token}`
+      Authorization: `Bearer ${session.access_token}`,
+      ...(actorToken ? { 'X-Actor-Authorization': `Bearer ${actorToken}` } : {})
     },
     body: JSON.stringify({ portfolio_id, ticker, side, dollars, rationale, approval_code, benchmark_ticker })
   })

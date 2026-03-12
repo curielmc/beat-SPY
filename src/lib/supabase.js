@@ -38,6 +38,14 @@ export async function getAccessToken() {
   }
 }
 
+export function getMasqueradeActorToken() {
+  try {
+    return JSON.parse(sessionStorage.getItem('masquerade_original') || 'null')?.access_token || null
+  } catch {
+    return null
+  }
+}
+
 export async function uploadAvatar(userId, file) {
   const ext = file.name.split('.').pop()
   const path = `${userId}/${Date.now()}.${ext}`

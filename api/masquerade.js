@@ -28,7 +28,7 @@ export default async function handler(req) {
   const callerRole = profiles?.[0]?.role
   const callerEmail = profiles?.[0]?.email?.toLowerCase()
 
-  if (callerRole !== 'admin' && callerEmail !== 'martin@myecfo.com') {
+  if (!['admin', 'teacher'].includes(callerRole) && callerEmail !== 'martin@myecfo.com') {
     return new Response('Forbidden', { status: 403 })
   }
 
@@ -37,6 +37,38 @@ export default async function handler(req) {
     return new Response(JSON.stringify({ error: 'target_user_id required' }), {
       status: 400, headers: { 'Content-Type': 'application/json' }
     })
+  }
+
+  const targetProfileRes = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${target_user_id}&select=id,role,email`, {
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
+  })
+  const targetProfiles = await targetProfileRes.json()
+  const targetProfile = targetProfiles?.[0] || null
+  if (!targetProfile) {
+    return new Response(JSON.stringify({ error: 'Target profile not found' }), {
+      status: 404, headers: { 'Content-Type': 'application/json' }
+    })
+  }
+
+  if (callerRole === 'teacher') {
+    if (targetProfile.role !== 'student') {
+      return new Response(JSON.stringify({ error: 'Teachers can only view students in their classes' }), {
+        status: 403, headers: { 'Content-Type': 'application/json' }
+      })
+    }
+
+    const membershipRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/class_memberships?user_id=eq.${target_user_id}&select=id,classes!inner(teacher_id)&classes.teacher_id=eq.${caller.id}&limit=1`,
+      {
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
+      }
+    )
+    const memberships = await membershipRes.json().catch(() => [])
+    if (!Array.isArray(memberships) || memberships.length === 0) {
+      return new Response(JSON.stringify({ error: 'Teachers can only view students in their own classes' }), {
+        status: 403, headers: { 'Content-Type': 'application/json' }
+      })
+    }
   }
 
   // Get target user's email

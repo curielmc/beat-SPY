@@ -11,6 +11,7 @@ export const useAuthStore = defineStore('auth', () => {
   // Admin masquerade — real session swap
   const masqueradeUser = ref(JSON.parse(sessionStorage.getItem('masquerade') || 'null'))
   const _originalSession = ref(JSON.parse(sessionStorage.getItem('masquerade_original') || 'null'))
+  const masqueradeActor = ref(JSON.parse(sessionStorage.getItem('masquerade_actor') || 'null'))
 
   function _clearCaches() {
     allMemberships.value = []
@@ -34,6 +35,12 @@ export const useAuthStore = defineStore('auth', () => {
       refresh_token: adminSession.refresh_token
     }
     sessionStorage.setItem('masquerade_original', JSON.stringify(_originalSession.value))
+    masqueradeActor.value = {
+      id: currentUser.value?.id || null,
+      email: currentUser.value?.email || null,
+      role: profile.value?.role || null
+    }
+    sessionStorage.setItem('masquerade_actor', JSON.stringify(masqueradeActor.value))
 
     // Call the masquerade API to get a magic link token for the target user
     try {
@@ -85,6 +92,8 @@ export const useAuthStore = defineStore('auth', () => {
       }
       _originalSession.value = null
       sessionStorage.removeItem('masquerade_original')
+      masqueradeActor.value = null
+      sessionStorage.removeItem('masquerade_actor')
       return { error: err.message }
     }
   }
@@ -104,8 +113,10 @@ export const useAuthStore = defineStore('auth', () => {
 
     masqueradeUser.value = null
     _originalSession.value = null
+    masqueradeActor.value = null
     sessionStorage.removeItem('masquerade')
     sessionStorage.removeItem('masquerade_original')
+    sessionStorage.removeItem('masquerade_actor')
     _clearCaches()
   }
 
@@ -133,8 +144,8 @@ export const useAuthStore = defineStore('auth', () => {
   const isLoggedIn = computed(() => !!currentUser.value)
   const isTeacher = computed(() => userType.value === 'teacher')
   const isAdmin = computed(() => {
-    // During masquerade, admin is still an admin (for route guards and nav)
-    if (isMasquerading.value) return true
+    // Preserve the original actor's admin access during masquerade.
+    if (isMasquerading.value) return masqueradeActor.value?.role === 'admin'
     const role = profile.value?.role
     const email = currentUser.value?.email?.toLowerCase()
     // Hardcoded fallback for the owner to prevent lockouts
@@ -585,6 +596,7 @@ export const useAuthStore = defineStore('auth', () => {
     init, fetchProfile, signup, login, signInWithOAuth,
     updateProfile, joinClass, validateClassCode, checkEmailInvite,
     startMasquerade, stopMasquerade, isMasquerading, masqueradeUser, effectiveUserId,
+    masqueradeActor,
     getGroupsForClass, getCurrentMembership, getGroupMembers,
     fetchPublicProfile, fetchPublicPortfolios, logout
   }

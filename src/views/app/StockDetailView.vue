@@ -93,9 +93,13 @@
 
             <div class="card-body p-4 space-y-4">
               <!-- Educator Mode Warning -->
-              <div v-if="auth.isTeacher || auth.isAdmin" class="alert alert-warning py-2 rounded-lg">
+              <div v-if="educatorTradingDisabled" class="alert alert-warning py-2 rounded-lg">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                 <span class="text-xs font-semibold">Educator Mode: Execution Disabled</span>
+              </div>
+              <div v-else-if="auth.isMasquerading && auth.masqueradeActor?.role" class="alert alert-info py-2 rounded-lg text-xs">
+                <span class="font-bold">{{ auth.masqueradeActor.role === 'admin' ? 'Admin' : 'Teacher' }} Action:</span>
+                Trades placed here will be recorded on behalf of {{ auth.profile?.full_name || auth.masqueradeUser?.email }}.
               </div>
 
               <!-- Competition Context Banner -->
@@ -130,7 +134,7 @@
                         v-model.number="tradeAmount"
                         type="number"
                         min="0"
-                        :max="tradeMode === 'buy' ? portfolioStore.cashBalance : maxSellDollars"
+                        :max="tradeMode === 'buy' ? (isMarketOpen() ? portfolioStore.cashBalance : queuedBuyCash) : maxSellDollars"
                         step="0.01"
                         class="input input-bordered w-full pl-7 font-mono text-lg"
                         placeholder="0.00"
@@ -207,11 +211,11 @@
                 <button
                   class="btn btn-block shadow-lg"
                   :class="tradeMode === 'buy' ? 'btn-success' : 'btn-error'"
-                  :disabled="!canTrade || executing || auth.isTeacher || auth.isAdmin"
+                  :disabled="!canTrade || executing || educatorTradingDisabled"
                   @click="executeTrade"
                 >
                   <span v-if="executing" class="loading loading-spinner loading-sm"></span>
-                  <template v-if="auth.isTeacher || auth.isAdmin">Trading Disabled for Educators</template>
+                  <template v-if="educatorTradingDisabled">Trading Disabled for Educators</template>
                   <template v-else>{{ executeButtonLabel }}</template>
                 </button>
                 <div v-if="tradeResult" class="alert mt-3 py-2" :class="tradeResult.success ? 'alert-success' : 'alert-error'">
@@ -582,6 +586,7 @@ const previewShares = computed(() => {
 const queuedBuyCash = computed(() => (
   getAvailableCashForQueuedBuys(portfolioStore.cashBalance, portfolioStore.pendingOrders)
 ))
+const educatorTradingDisabled = computed(() => (auth.isTeacher || auth.isAdmin) && !auth.isMasquerading)
 
 const canTrade = computed(() => {
   if (!tradeAmount.value || tradeAmount.value <= 0 || !quote.value) return false
