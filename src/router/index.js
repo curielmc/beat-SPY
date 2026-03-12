@@ -8,9 +8,9 @@ const router = createRouter({
       path: '/',
       component: () => import('../layouts/AuthLayout.vue'),
       children: [
-        { path: '', name: 'landing', component: () => import('../views/auth/LandingView.vue') },
+        { path: '', name: 'login', component: () => import('../views/auth/LoginView.vue') },
+        { path: 'login', redirect: { name: 'login' } },
         { path: 'signup', name: 'signup', component: () => import('../views/auth/SignupView.vue') },
-        { path: 'login', name: 'login', component: () => import('../views/auth/LoginView.vue') },
         { path: 'teacher-signup', name: 'teacher-signup', component: () => import('../views/auth/TeacherSignupView.vue') }
       ]
     },
@@ -109,7 +109,7 @@ router.beforeEach(async (to) => {
 
   // Redirect unauthenticated users away from protected routes
   if (to.matched.some(r => r.meta.requiresAuth) && !isLoggedIn) {
-    return { name: 'landing' }
+    return { name: 'login' }
   }
 
   // Role-based access control
@@ -132,7 +132,7 @@ router.beforeEach(async (to) => {
   // }
 
   // Redirect logged-in users away from auth pages
-  const authPages = ['landing', 'login', 'signup', 'teacher-signup']
+  const authPages = ['login', 'signup', 'teacher-signup']
   if (authPages.includes(to.name) && isLoggedIn) {
     if (userRole === 'admin') return { name: 'admin-dashboard' }
     if (userRole === 'teacher') return { name: 'teacher-dashboard' }
