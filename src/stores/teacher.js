@@ -80,6 +80,7 @@ export const useTeacherStore = defineStore('teacher', () => {
       let cash = 100000
       let startingCash = 100000
       let lastTradeAt = null
+      let funds = []
 
       if (portfolioData?.length) {
         const portfolioIds = portfolioData.map(p => p.id)
@@ -100,14 +101,50 @@ export const useTeacherStore = defineStore('teacher', () => {
           await market.fetchBatchQuotes(tickers)
         }
 
-        const holdingsValue = (hData || []).reduce((sum, h) => {
-          const price = market.getCachedPrice(h.ticker) || h.avg_cost
-          return sum + (h.shares * price)
-        }, 0)
+        const holdingsByPortfolioId = new Map()
+        for (const holding of (hData || [])) {
+          const currentPrice = market.getCachedPrice(holding.ticker) || holding.avg_cost
+          const marketValue = Number(holding.shares || 0) * Number(currentPrice || 0)
+          const costBasis = Number(holding.shares || 0) * Number(holding.avg_cost || 0)
+          const enrichedHolding = {
+            ...holding,
+            currentPrice,
+            marketValue,
+            gainLoss: marketValue - costBasis
+          }
+
+          if (!holdingsByPortfolioId.has(holding.portfolio_id)) {
+            holdingsByPortfolioId.set(holding.portfolio_id, [])
+          }
+          holdingsByPortfolioId.get(holding.portfolio_id).push(enrichedHolding)
+        }
+
+        funds = portfolioData
+          .map((portfolio) => {
+            const holdings = (holdingsByPortfolioId.get(portfolio.id) || [])
+              .sort((a, b) => b.marketValue - a.marketValue)
+            const investedValue = holdings.reduce((sum, holding) => sum + Number(holding.marketValue || 0), 0)
+            const fundCash = Number(portfolio.cash_balance || 0)
+            const fundStartingCash = Number(portfolio.starting_cash || portfolio.fund_starting_cash || 100000)
+            const fundTotalValue = investedValue + fundCash
+            const fundReturnPct = fundStartingCash > 0
+              ? ((fundTotalValue - fundStartingCash) / fundStartingCash) * 100
+              : 0
+
+            return {
+              ...portfolio,
+              holdings,
+              investedValue,
+              totalValue: fundTotalValue,
+              returnPct: fundReturnPct,
+              positionsCount: holdings.length
+            }
+          })
+          .sort((a, b) => (a.fund_number || 1) - (b.fund_number || 1))
 
         cash = portfolioData.reduce((sum, p) => sum + Number(p.cash_balance || 0), 0)
         startingCash = portfolioData.reduce((sum, p) => sum + Number(p.starting_cash || 100000), 0)
-        totalValue = holdingsValue + cash
+        totalValue = funds.reduce((sum, fund) => sum + Number(fund.totalValue || 0), 0)
         returnPct = startingCash > 0 ? ((totalValue - startingCash) / startingCash) * 100 : 0
         lastTradeAt = tradeData?.[0]?.executed_at || null
       }
@@ -122,6 +159,7 @@ export const useTeacherStore = defineStore('teacher', () => {
         startingCash,
         lastTradeAt,
         fundCount: portfolioData?.length || 0,
+        funds,
         members,
         memberNames: members.map(m => m.name).filter(Boolean)
       })

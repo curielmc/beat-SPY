@@ -65,31 +65,78 @@
             <table class="table table-zebra">
               <thead>
                 <tr>
-                  <th>Rank</th>
-                  <th>Group</th>
-                  <th>Members</th>
-                  <th class="text-right">Return %</th>
-                  <th class="text-right">Portfolio Value</th>
-                  <th class="text-right">Uninvested Cash</th>
-                  <th>Last Trade</th>
+                  <th>
+                    <button class="btn btn-ghost btn-xs px-0 normal-case" @click="setSort('rank')">
+                      Rank {{ sortIndicator('rank') }}
+                    </button>
+                  </th>
+                  <th>
+                    <button class="btn btn-ghost btn-xs px-0 normal-case" @click="setSort('name')">
+                      Group {{ sortIndicator('name') }}
+                    </button>
+                  </th>
+                  <th>
+                    <button class="btn btn-ghost btn-xs px-0 normal-case" @click="setSort('members')">
+                      Members {{ sortIndicator('members') }}
+                    </button>
+                  </th>
+                  <th class="text-right">
+                    <button class="btn btn-ghost btn-xs px-0 normal-case" @click="setSort('returnPct')">
+                      Return % {{ sortIndicator('returnPct') }}
+                    </button>
+                  </th>
+                  <th class="text-right">
+                    <button class="btn btn-ghost btn-xs px-0 normal-case" @click="setSort('totalValue')">
+                      All Funds {{ sortIndicator('totalValue') }}
+                    </button>
+                  </th>
+                  <th class="text-right">
+                    <button class="btn btn-ghost btn-xs px-0 normal-case" @click="setSort('cash')">
+                      Uninvested Cash {{ sortIndicator('cash') }}
+                    </button>
+                  </th>
+                  <th>
+                    <button class="btn btn-ghost btn-xs px-0 normal-case" @click="setSort('lastTradeAt')">
+                      Last Trade {{ sortIndicator('lastTradeAt') }}
+                    </button>
+                  </th>
                   <th class="text-right">Action</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="(group, i) in rankedGroups" :key="group.id">
+                <tr v-for="(group, i) in sortedGroups" :key="group.id">
                   <td>
                     <span class="badge" :class="i === 0 ? 'badge-warning' : 'badge-ghost'">{{ i + 1 }}</span>
                   </td>
                   <td class="font-medium">{{ group.name }}</td>
                   <td>
-                    <div class="flex flex-wrap gap-1">
+                    <div class="flex flex-wrap items-center gap-1">
                       <span v-for="name in group.memberNames" :key="name" class="badge badge-sm badge-outline">{{ name.split(' ')[0] }}</span>
+                      <button
+                        v-if="group.members.length"
+                        class="btn btn-ghost btn-xs"
+                        title="View member emails"
+                        @click="openMemberModal(group)"
+                      >
+                        Emails
+                      </button>
                     </div>
                   </td>
                   <td class="text-right font-mono" :class="group.returnPct >= 0 ? 'text-success' : 'text-error'">
                     {{ group.returnPct >= 0 ? '+' : '' }}{{ group.returnPct.toFixed(2) }}%
                   </td>
-                  <td class="text-right font-mono">${{ group.totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</td>
+                  <td class="text-right">
+                    <div class="flex items-center justify-end gap-2">
+                      <span class="font-mono">${{ group.totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span>
+                      <button
+                        class="btn btn-ghost btn-xs"
+                        title="View all funds and positions"
+                        @click="openFundsModal(group)"
+                      >
+                        Funds
+                      </button>
+                    </div>
+                  </td>
                   <td class="text-right font-mono">${{ group.cash.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</td>
                   <td class="text-sm text-base-content/60">{{ formatTradeDate(group.lastTradeAt) }}</td>
                   <td class="text-right">
@@ -111,7 +158,7 @@
                     </div>
                   </td>
                 </tr>
-                <tr v-if="rankedGroups.length === 0">
+                <tr v-if="sortedGroups.length === 0">
                   <td colspan="8" class="text-center text-base-content/50">No groups yet</td>
                 </tr>
               </tbody>
@@ -184,6 +231,132 @@
         </div>
       </div>
       <form method="dialog" class="modal-backdrop" @click="showLessonModal = false"><button>close</button></form>
+    </dialog>
+
+    <dialog class="modal" :class="{ 'modal-open': showMembersModal }">
+      <div class="modal-box max-w-xl">
+        <h3 class="font-bold text-lg mb-1">Member Emails</h3>
+        <p class="text-sm text-base-content/60 mb-4">
+          {{ selectedGroup?.name || 'Group' }} · {{ selectedGroupEmails.length }} student{{ selectedGroupEmails.length === 1 ? '' : 's' }}
+        </p>
+
+        <div class="space-y-3">
+          <div class="flex flex-wrap gap-2">
+            <span v-for="member in selectedGroup?.members || []" :key="member.id" class="badge badge-outline">
+              {{ member.name || member.email || 'Student' }}
+            </span>
+          </div>
+
+          <textarea
+            class="textarea textarea-bordered w-full h-40 font-mono text-sm"
+            readonly
+            :value="selectedGroupEmailList"
+          ></textarea>
+
+          <div class="flex items-center justify-between gap-3">
+            <p class="text-xs text-base-content/50">Comma-separated so you can paste directly into an email.</p>
+            <button class="btn btn-sm btn-outline" :disabled="!selectedGroupEmails.length" @click="copyMemberEmails">
+              {{ copiedMemberEmails ? 'Copied!' : 'Copy Emails' }}
+            </button>
+          </div>
+        </div>
+
+        <div class="modal-action">
+          <button class="btn btn-ghost" @click="showMembersModal = false">Close</button>
+        </div>
+      </div>
+      <form method="dialog" class="modal-backdrop" @click="showMembersModal = false"><button>close</button></form>
+    </dialog>
+
+    <dialog class="modal" :class="{ 'modal-open': showFundsModal }">
+      <div class="modal-box max-w-4xl">
+        <h3 class="font-bold text-lg mb-1">All Funds</h3>
+        <p class="text-sm text-base-content/60 mb-4">
+          {{ selectedGroup?.name || 'Group' }} · {{ selectedGroup?.fundCount || 0 }} fund{{ (selectedGroup?.fundCount || 0) === 1 ? '' : 's' }}
+        </p>
+
+        <div v-if="selectedGroup?.funds?.length" class="space-y-4">
+          <div class="overflow-x-auto">
+            <table class="table table-sm table-zebra">
+              <thead>
+                <tr>
+                  <th>Fund</th>
+                  <th class="text-right">Positions</th>
+                  <th class="text-right">Invested</th>
+                  <th class="text-right">Cash</th>
+                  <th class="text-right">Value</th>
+                  <th class="text-right">Return</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="fund in selectedGroup.funds" :key="fund.id">
+                  <td>
+                    <div class="font-semibold">{{ formatFundName(fund) }}</div>
+                    <div class="text-xs text-base-content/45">{{ fund.fund_thesis || selectedGroup.name }}</div>
+                  </td>
+                  <td class="text-right font-mono">{{ fund.positionsCount }}</td>
+                  <td class="text-right font-mono">${{ fund.investedValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</td>
+                  <td class="text-right font-mono">${{ Number(fund.cash_balance || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</td>
+                  <td class="text-right font-mono font-semibold">${{ fund.totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</td>
+                  <td class="text-right font-mono" :class="fund.returnPct >= 0 ? 'text-success' : 'text-error'">
+                    {{ fund.returnPct >= 0 ? '+' : '' }}{{ fund.returnPct.toFixed(2) }}%
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div v-for="fund in selectedGroup.funds" :key="`${fund.id}-positions`" class="rounded-xl border border-base-300 bg-base-100/70">
+            <div class="flex items-center justify-between gap-3 px-4 py-3 border-b border-base-300">
+              <div>
+                <div class="font-semibold">{{ formatFundName(fund) }}</div>
+                <div class="text-xs text-base-content/45">{{ fund.fund_thesis || selectedGroup.name }}</div>
+              </div>
+              <div class="text-right">
+                <div class="text-xs text-base-content/45">Current Value</div>
+                <div class="font-mono font-semibold">${{ fund.totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</div>
+              </div>
+            </div>
+
+            <div v-if="fund.holdings.length === 0" class="px-4 py-4 text-sm text-base-content/45">
+              No invested positions in this fund yet.
+            </div>
+            <div v-else class="overflow-x-auto">
+              <table class="table table-sm">
+                <thead>
+                  <tr>
+                    <th>Stock</th>
+                    <th class="text-right">Shares</th>
+                    <th class="text-right">Price</th>
+                    <th class="text-right">Value</th>
+                    <th class="text-right">Gain/Loss</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="holding in fund.holdings" :key="`${fund.id}-${holding.ticker}`">
+                    <td class="font-mono font-semibold">{{ holding.ticker }}</td>
+                    <td class="text-right font-mono">{{ Number(holding.shares || 0).toLocaleString('en-US', { maximumFractionDigits: 4 }) }}</td>
+                    <td class="text-right font-mono">${{ Number(holding.currentPrice || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</td>
+                    <td class="text-right font-mono">${{ Number(holding.marketValue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</td>
+                    <td class="text-right font-mono" :class="holding.gainLoss >= 0 ? 'text-success' : 'text-error'">
+                      {{ holding.gainLoss >= 0 ? '+' : '-' }}${{ Math.abs(Number(holding.gainLoss || 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div v-else class="py-8 text-center text-base-content/50">
+          No funds found for this group.
+        </div>
+
+        <div class="modal-action">
+          <button class="btn btn-ghost" @click="showFundsModal = false">Close</button>
+        </div>
+      </div>
+      <form method="dialog" class="modal-backdrop" @click="showFundsModal = false"><button>close</button></form>
     </dialog>
 
     <!-- Class Notes Modal -->
@@ -267,7 +440,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { useTeacherStore } from '../../stores/teacher'
 import { supabase } from '../../lib/supabase'
@@ -277,6 +450,12 @@ const route = useRoute()
 const teacher = useTeacherStore()
 const loading = ref(true)
 const rankedGroups = ref([])
+const sortKey = ref('returnPct')
+const sortDirection = ref('desc')
+const showMembersModal = ref(false)
+const showFundsModal = ref(false)
+const selectedGroup = ref(null)
+const copiedMemberEmails = ref(false)
 
 const currentClass = computed(() => {
   const qid = route.query.class_id
@@ -301,6 +480,38 @@ const dashboardSummary = computed(() => {
   const cash = rankedGroups.value.reduce((sum, group) => sum + Number(group.cash || 0), 0)
   const returnPct = totalStartingCash > 0 ? ((totalValue - totalStartingCash) / totalStartingCash) * 100 : 0
   return { totalValue, totalStartingCash, cash, returnPct }
+})
+
+const selectedGroupEmails = computed(() =>
+  (selectedGroup.value?.members || [])
+    .map(member => member.email?.trim())
+    .filter(Boolean)
+)
+
+const selectedGroupEmailList = computed(() => selectedGroupEmails.value.join(', '))
+
+const sortedGroups = computed(() => {
+  const groups = [...rankedGroups.value]
+
+  groups.sort((a, b) => {
+    let comparison = 0
+
+    if (sortKey.value === 'rank') {
+      comparison = Number(b.returnPct || 0) - Number(a.returnPct || 0)
+    } else if (sortKey.value === 'name') {
+      comparison = (a.name || '').localeCompare(b.name || '')
+    } else if (sortKey.value === 'members') {
+      comparison = Number(a.members?.length || 0) - Number(b.members?.length || 0)
+    } else if (sortKey.value === 'lastTradeAt') {
+      comparison = new Date(a.lastTradeAt || 0).getTime() - new Date(b.lastTradeAt || 0).getTime()
+    } else {
+      comparison = Number(a[sortKey.value] || 0) - Number(b[sortKey.value] || 0)
+    }
+
+    return sortDirection.value === 'asc' ? comparison : -comparison
+  })
+
+  return groups
 })
 
 const sendingLessonId = ref(null)
@@ -361,6 +572,43 @@ function formatTradeDate(value) {
     day: 'numeric',
     year: 'numeric'
   })
+}
+
+function formatFundName(fund) {
+  return fund?.fund_name || `Fund ${fund?.fund_number || 1}`
+}
+
+function setSort(key) {
+  if (sortKey.value === key) {
+    sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc'
+    return
+  }
+
+  sortKey.value = key
+  sortDirection.value = key === 'name' || key === 'members' ? 'asc' : 'desc'
+}
+
+function sortIndicator(key) {
+  if (sortKey.value !== key) return ''
+  return sortDirection.value === 'asc' ? '↑' : '↓'
+}
+
+function openMemberModal(group) {
+  selectedGroup.value = group
+  copiedMemberEmails.value = false
+  showMembersModal.value = true
+}
+
+function openFundsModal(group) {
+  selectedGroup.value = group
+  showFundsModal.value = true
+}
+
+function copyMemberEmails() {
+  if (!selectedGroupEmailList.value) return
+  navigator.clipboard.writeText(selectedGroupEmailList.value)
+  copiedMemberEmails.value = true
+  setTimeout(() => { copiedMemberEmails.value = false }, 2000)
 }
 
 function formatLessonType(type) {
@@ -500,9 +748,28 @@ const renderedNotes = computed(() => {
     .replace(/\n/g, '<br>')
 })
 
-onMounted(async () => {
-  await teacher.loadTeacherData()
+async function loadDashboard() {
+  if (!teacher.classes.length || (route.query.class_id && !currentClass.value)) {
+    rankedGroups.value = []
+    loading.value = false
+    return
+  }
+
+  loading.value = true
   rankedGroups.value = await teacher.getRankedGroups(currentClass.value?.id || null)
   loading.value = false
+}
+
+onMounted(async () => {
+  await teacher.loadTeacherData()
+  await loadDashboard()
 })
+
+watch(
+  () => currentClass.value?.id,
+  async (newId, oldId) => {
+    if (newId === oldId) return
+    await loadDashboard()
+  }
+)
 </script>
