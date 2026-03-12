@@ -398,6 +398,18 @@ async function fetchUsers() {
   errorMsg.value = ''
 
   try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .order('created_at', { ascending: false, nullsFirst: false })
+
+    if (!error) {
+      users.value = data || []
+      return
+    }
+
+    console.warn('[Admin Users] direct profile query failed, falling back to API:', error)
+
     const accessToken = await getAccessToken()
     if (!accessToken) {
       throw new Error('Your admin session is missing. Please sign out and back in.')
@@ -411,7 +423,7 @@ async function fetchUsers() {
 
     const payload = await response.json().catch(() => ({}))
     if (!response.ok) {
-      throw new Error(payload.error || 'Failed to load users')
+      throw new Error(payload.error || error?.message || 'Failed to load users')
     }
 
     users.value = payload.users || []

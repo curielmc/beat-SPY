@@ -188,8 +188,12 @@ export const useAuthStore = defineStore('auth', () => {
       console.log('[AUTH] init: getSession result:', { hasSession: !!session, userId: session?.user?.id, expiresAt: session?.expires_at, error: sessionErr })
       if (session?.user) {
         currentUser.value = session.user
-        const profileResult = await fetchProfile(session.user.id)
-        if (await handleDisabledProfile(profileResult)) return
+        const profileResult = await requireProfile(
+          session.user.id,
+          'Your saved session is missing its profile. Please sign in again.'
+        )
+        if (profileResult.error) return
+        if (await handleDisabledProfile(profileResult.profile)) return
         await ensureOwnerAdminProfile()
       }
     } finally {
@@ -205,8 +209,12 @@ export const useAuthStore = defineStore('auth', () => {
 
       if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user) {
         currentUser.value = session.user
-        const profileResult = await fetchProfile(session.user.id)
-        if (await handleDisabledProfile(profileResult)) return
+        const profileResult = await requireProfile(
+          session.user.id,
+          'Your account signed in, but the profile is not available yet. Please try again.'
+        )
+        if (profileResult.error) return
+        if (await handleDisabledProfile(profileResult.profile)) return
         await ensureOwnerAdminProfile()
 
         // Auto-join class if student has a pending invite and no memberships
@@ -250,6 +258,31 @@ export const useAuthStore = defineStore('auth', () => {
     return data
   }
 
+  async function waitForProfile(userId, {
+    timeoutMs = 4000,
+    intervalMs = 250
+  } = {}) {
+    const deadline = Date.now() + timeoutMs
+
+    while (Date.now() < deadline) {
+      const data = await fetchProfile(userId)
+      if (data) return data
+      await new Promise(resolve => setTimeout(resolve, intervalMs))
+    }
+
+    return null
+  }
+
+  async function requireProfile(userId, fallbackMessage = 'We could not load your account profile. Please try again.') {
+    const profileData = await waitForProfile(userId)
+    if (profileData) return { profile: profileData }
+
+    await supabase.auth.signOut()
+    currentUser.value = null
+    profile.value = null
+    return { error: fallbackMessage }
+  }
+
   // Email/Password signup
   async function signup({ email, password, fullName, role = 'student' }) {
     const { data, error } = await supabase.auth.signUp({
@@ -263,11 +296,12 @@ export const useAuthStore = defineStore('auth', () => {
       }
     })
     if (error) return { error: error.message }
-    // Profile is created by the database trigger
     currentUser.value = data.user
-    // Wait a moment for the trigger to fire, then fetch profile
-    await new Promise(r => setTimeout(r, 500))
-    await fetchProfile(data.user.id)
+    const profileResult = await requireProfile(
+      data.user.id,
+      'Your account was created, but your student profile is not ready yet. Please try logging in again in a moment.'
+    )
+    if (profileResult.error) return profileResult
     return { user: data.user }
   }
 
@@ -279,8 +313,12 @@ export const useAuthStore = defineStore('auth', () => {
     })
     if (error) return { error: error.message }
     currentUser.value = data.user
-    const profileResult = await fetchProfile(data.user.id)
-    const disabled = await handleDisabledProfile(profileResult)
+    const profileResult = await requireProfile(
+      data.user.id,
+      'Your account authenticated, but your profile could not be loaded. Please contact your teacher or try again shortly.'
+    )
+    if (profileResult.error) return profileResult
+    const disabled = await handleDisabledProfile(profileResult.profile)
     if (disabled) return disabled
     return { user: data.user }
   }

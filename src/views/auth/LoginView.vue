@@ -45,6 +45,7 @@ import { ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
 import LogoIcon from '../../components/LogoIcon.vue'
+import { getRouteForRole, validateCredentials } from '../../lib/authFlow'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -55,6 +56,11 @@ const loading = ref(false)
 
 async function handleLogin() {
   error.value = ''
+  const validationError = validateCredentials(email.value, password.value, { allowShortPassword: true })
+  if (validationError) {
+    error.value = validationError
+    return
+  }
   loading.value = true
   const result = await auth.login(email.value, password.value)
   loading.value = false
@@ -67,9 +73,7 @@ async function handleLogin() {
   // Route based on role
   const role = auth.profile?.role
   console.log('[Login] Success. Role:', role, 'Profile:', auth.profile)
-  if (role === 'admin') router.push('/admin')
-  else if (role === 'teacher') router.push('/teacher')
-  else router.push('/leaderboard')
+  router.push(getRouteForRole(role))
 }
 
 async function signInWithGoogle() {

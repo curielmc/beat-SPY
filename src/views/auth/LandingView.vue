@@ -28,9 +28,16 @@
           class="btn btn-primary btn-block"
           :class="{ 'loading': submitting }"
           :disabled="submitting"
+          @click="handleLogin"
+        >
+          Log In
+        </button>
+        <button
+          class="btn btn-outline btn-block"
+          :disabled="submitting"
           @click="signUpWithEmail"
         >
-          Log In / Sign Up
+          Create Student Account
         </button>
 
         <!-- Divider -->
@@ -76,6 +83,7 @@ import { ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
 import LogoIcon from '../../components/LogoIcon.vue'
+import { getRouteForRole, validateCredentials } from '../../lib/authFlow'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -85,6 +93,10 @@ const password = ref('')
 const emailError = ref('')
 const submitting = ref(false)
 
+function routeAfterAuth() {
+  router.push(getRouteForRole(auth.profile?.role))
+}
+
 async function signInWithGoogle() {
   const result = await auth.signInWithOAuth('google')
   if (result.error) {
@@ -92,24 +104,27 @@ async function signInWithGoogle() {
   }
 }
 
-
-async function signUpWithEmail() {
-  emailError.value = ''
-  if (!email.value.includes('@')) { emailError.value = 'Enter a valid email'; return }
-  if (password.value.length < 6) { emailError.value = 'Password must be at least 6 characters'; return }
+async function handleLogin() {
+  emailError.value = validateCredentials(email.value, password.value, { allowShortPassword: true })
+  if (emailError.value) return
 
   submitting.value = true
+  const result = await auth.login(email.value, password.value)
+  submitting.value = false
 
-  // Try login first (existing user), fall back to signup (new user)
-  const loginResult = await auth.login(email.value, password.value)
-  if (!loginResult.error) {
-    submitting.value = false
-    const role = auth.profile?.role
-    if (role === 'admin') router.push('/admin')
-    else if (role === 'teacher') router.push('/teacher')
-    else router.push('/leaderboard')
+  if (result.error) {
+    emailError.value = result.error
     return
   }
+
+  routeAfterAuth()
+}
+
+async function signUpWithEmail() {
+  emailError.value = validateCredentials(email.value, password.value)
+  if (emailError.value) return
+
+  submitting.value = true
 
   // Check for a pending class invite before creating account
   const invite = await auth.checkEmailInvite(email.value)
@@ -134,6 +149,6 @@ async function signUpWithEmail() {
   }
 
   submitting.value = false
-  router.push('/leaderboard')
+  routeAfterAuth()
 }
 </script>
