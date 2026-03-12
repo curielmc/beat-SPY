@@ -118,6 +118,19 @@
                 </button>
               </div>
 
+              <div class="rounded-xl border p-3" :class="isGroupPortfolio ? 'border-secondary/40 bg-secondary/10' : 'border-primary/30 bg-primary/5'">
+                <div class="flex items-start justify-between gap-3">
+                  <div>
+                    <p class="text-[10px] uppercase tracking-[0.2em] text-base-content/45 font-bold">Active Fund</p>
+                    <p class="text-sm font-bold mt-1">{{ activePortfolioLabel }}</p>
+                    <p class="text-xs text-base-content/60 mt-1">{{ activePortfolioContext }}</p>
+                  </div>
+                  <span class="badge badge-sm" :class="isGroupPortfolio ? 'badge-secondary' : 'badge-primary'">
+                    {{ isGroupPortfolio ? 'Group Fund' : 'Personal' }}
+                  </span>
+                </div>
+              </div>
+
               <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <!-- Inputs Side -->
                 <div class="space-y-4">
@@ -140,8 +153,19 @@
                         placeholder="0.00"
                       />
                     </div>
-                    <div class="flex gap-1 mt-2">
-                      <button v-for="pct in [25, 50, 75, 100]" :key="pct" class="btn btn-xs btn-ghost border border-base-300 flex-1" @click="setQuickAmount(pct)">{{ pct }}%</button>
+                    <div v-if="tradeMode === 'buy'" class="mt-2">
+                      <p class="text-[10px] uppercase font-bold text-base-content/40 mb-1.5 ml-0.5">Hot Buttons</p>
+                      <div class="grid grid-cols-3 sm:grid-cols-5 gap-1">
+                        <button v-for="amount in [10000, 20000, 25000, 50000, 100000]" :key="amount" class="btn btn-xs btn-ghost border border-base-300" @click="setHotAmount(amount)">
+                          ${{ amount.toLocaleString() }}
+                        </button>
+                      </div>
+                    </div>
+                    <div class="mt-2">
+                      <p class="text-[10px] uppercase font-bold text-base-content/40 mb-1.5 ml-0.5">Percentages</p>
+                      <div class="flex gap-1">
+                      <button v-for="pct in [20, 40, 60, 80, 100]" :key="pct" class="btn btn-xs btn-ghost border border-base-300 flex-1" @click="setQuickAmount(pct)">{{ pct }}%</button>
+                      </div>
                     </div>
                   </div>
 
@@ -573,6 +597,23 @@ async function submitTake() {
 
 const currentHolding = computed(() => portfolioStore.getHolding(ticker))
 
+const activePortfolioLabel = computed(() => {
+  if (isGroupPortfolio.value) {
+    const fundNumber = portfolioStore.portfolio?.fund_number || 1
+    const fundName = portfolioStore.portfolio?.fund_name || `Fund ${fundNumber}`
+    return `${fundName}`
+  }
+  return auth.profile?.full_name || 'My Investments'
+})
+
+const activePortfolioContext = computed(() => {
+  if (isGroupPortfolio.value) {
+    const groupName = membership.value?.group?.name || 'your group'
+    return `This order will be placed in ${activePortfolioLabel.value} for ${groupName}.`
+  }
+  return 'This order will be placed in your personal investment account.'
+})
+
 const maxSellDollars = computed(() => {
   if (!currentHolding.value || !quote.value) return 0
   return currentHolding.value.shares * quote.value.price
@@ -628,6 +669,12 @@ function setQuickAmount(pct) {
   } else {
     tradeAmount.value = Math.floor(maxSellDollars.value * (pct / 100) * 100) / 100
   }
+}
+
+function setHotAmount(amount) {
+  if (tradeMode.value !== 'buy') return
+  const maxBuyCash = isMarketOpen() ? portfolioStore.cashBalance : queuedBuyCash.value
+  tradeAmount.value = Math.min(amount, Math.floor(maxBuyCash * 100) / 100)
 }
 
 async function executeTrade() {

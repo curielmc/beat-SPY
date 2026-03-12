@@ -16,76 +16,68 @@
       <p class="text-sm mt-1">Start investing from the home page!</p>
     </div>
 
-    <!-- My Investments Card -->
-    <div v-if="personalPortfolio" class="card bg-base-100 shadow">
+    <!-- Funds Overview Table -->
+    <div v-if="allFundsEnriched.length > 0" class="card bg-base-100 shadow">
       <div class="card-body p-4">
-        <div class="flex items-start justify-between">
-          <div>
-            <span class="badge badge-sm badge-primary">My Investments</span>
-            <h3 class="font-bold mt-1">{{ auth.profile?.full_name || 'My Investments' }}</h3>
-          </div>
-          <span class="badge badge-ghost badge-sm">{{ personalPortfolio.visibility || 'private' }}</span>
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="font-semibold flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+            Fund Summary
+          </h3>
+          <span v-if="groupEnriched.length > 0" class="text-xs uppercase tracking-wide text-base-content/45">Group {{ groupName }}</span>
         </div>
-        <div class="mt-3 space-y-1">
-          <div class="flex justify-between text-sm">
-            <span class="text-base-content/60">Current Value</span>
-            <span class="font-mono font-bold">${{ personalData._totalValue.toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</span>
-          </div>
-          <div class="flex justify-between text-sm">
-            <span class="text-base-content/60">Return</span>
-            <span class="font-mono" :class="personalData._returnPct >= 0 ? 'text-success' : 'text-error'">
-              {{ personalData._returnPct >= 0 ? '+' : '' }}{{ personalData._returnPct.toFixed(2) }}%
-            </span>
-          </div>
-          <div class="flex justify-between text-sm">
-            <span class="text-base-content/60">vs {{ personalData._benchmarkLabel || 'SPY' }}</span>
-            <span class="font-mono" :class="personalData._vsSpy >= 0 ? 'text-success' : 'text-error'">
-              {{ personalData._vsSpy >= 0 ? '+' : '' }}{{ personalData._vsSpy.toFixed(2) }}%
-            </span>
-          </div>
-        </div>
-        <div class="mt-3">
-          <RouterLink :to="{ name: 'home' }" class="btn btn-sm btn-outline btn-block">View Investments</RouterLink>
-        </div>
-      </div>
-    </div>
-
-    <!-- Group Funds Section -->
-    <div v-if="groupEnriched.length > 0">
-      <h2 class="text-sm font-semibold text-base-content/60 uppercase tracking-wide mb-2">Group Funds — {{ groupName }}</h2>
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div v-for="fund in groupEnriched" :key="fund.id" class="card bg-base-100 shadow border-l-4 border-secondary">
-          <div class="card-body p-4">
-            <div class="flex items-start justify-between">
-              <div>
-                <span class="badge badge-sm badge-secondary">Fund {{ fund.fund_number || 1 }}</span>
-                <h3 class="font-bold mt-1">{{ fund.fund_name || 'Group Fund' }}</h3>
-                <p v-if="fund.fund_thesis" class="text-xs text-base-content/50 mt-0.5">{{ fund.fund_thesis }}</p>
-              </div>
-              <span class="badge badge-ghost badge-sm">active</span>
-            </div>
-            <div class="mt-3 space-y-1">
-              <div class="flex justify-between text-sm">
-                <span class="text-base-content/60">Current Value</span>
-                <span class="font-mono font-bold">${{ fund._totalValue.toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</span>
-              </div>
-              <div class="flex justify-between text-sm">
-                <span class="text-base-content/60">Return</span>
-                <span class="font-mono" :class="fund._returnPct >= 0 ? 'text-success' : 'text-error'">
+        <div class="overflow-x-auto">
+          <table class="table table-sm table-zebra">
+            <thead>
+              <tr>
+                <th>Fund</th>
+                <th>Type</th>
+                <th class="text-right">Starting</th>
+                <th class="text-right">Current</th>
+                <th class="text-right">Return</th>
+                <th class="text-right">vs Benchmark</th>
+                <th class="text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-if="personalPortfolio">
+                <td class="font-semibold">
+                  <div>{{ auth.profile?.full_name || 'My Investments' }}</div>
+                  <div class="text-xs text-base-content/45">{{ personalPortfolio.visibility || 'private' }}</div>
+                </td>
+                <td><span class="badge badge-xs badge-primary">Personal</span></td>
+                <td class="text-right font-mono">${{ Number(personalPortfolio.starting_cash || 100000).toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</td>
+                <td class="text-right font-mono">${{ personalData._totalValue.toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</td>
+                <td class="text-right font-mono" :class="personalData._returnPct >= 0 ? 'text-success' : 'text-error'">
+                  {{ personalData._returnPct >= 0 ? '+' : '' }}{{ personalData._returnPct.toFixed(2) }}%
+                </td>
+                <td class="text-right font-mono" :class="personalData._vsSpy >= 0 ? 'text-success' : 'text-error'">
+                  {{ personalData._vsSpy >= 0 ? '+' : '' }}{{ personalData._vsSpy.toFixed(2) }}%
+                </td>
+                <td class="text-right">
+                  <RouterLink :to="{ name: 'home' }" class="btn btn-xs btn-outline">Open</RouterLink>
+                </td>
+              </tr>
+              <tr v-for="fund in groupEnriched" :key="fund.id">
+                <td class="font-semibold">
+                  <div>{{ fund.fund_name || 'Fund ' + (fund.fund_number || 1) }}</div>
+                  <div class="text-xs text-base-content/45">{{ fund.fund_thesis || 'Group fund' }}</div>
+                </td>
+                <td><span class="badge badge-xs badge-secondary">Fund {{ fund.fund_number || 1 }}</span></td>
+                <td class="text-right font-mono">${{ Number(fund.starting_cash || 100000).toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</td>
+                <td class="text-right font-mono">${{ fund._totalValue.toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</td>
+                <td class="text-right font-mono" :class="fund._returnPct >= 0 ? 'text-success' : 'text-error'">
                   {{ fund._returnPct >= 0 ? '+' : '' }}{{ fund._returnPct.toFixed(2) }}%
-                </span>
-              </div>
-              <div class="flex justify-between text-sm">
-                <span class="text-base-content/60">vs {{ fund._benchmarkLabel || 'SPY' }}</span>
-                <span class="font-mono" :class="fund._vsSpy >= 0 ? 'text-success' : 'text-error'">
+                </td>
+                <td class="text-right font-mono" :class="fund._vsSpy >= 0 ? 'text-success' : 'text-error'">
                   {{ fund._vsSpy >= 0 ? '+' : '' }}{{ fund._vsSpy.toFixed(2) }}%
-                </span>
-              </div>
-            </div>
-            <div class="mt-3">
-              <RouterLink :to="{ name: 'home', query: { fund: fund.id } }" class="btn btn-sm btn-outline btn-secondary btn-block">View Fund</RouterLink>
-            </div>
-          </div>
+                </td>
+                <td class="text-right">
+                  <RouterLink :to="{ name: 'home', query: { fund: fund.id } }" class="btn btn-xs btn-outline btn-secondary">Open</RouterLink>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -102,56 +94,6 @@
           :show-percentage="true"
           height="250px"
         />
-      </div>
-    </div>
-
-    <!-- Funds Summary Table -->
-    <div v-if="allFundsEnriched.length > 0" class="card bg-base-100 shadow">
-      <div class="card-body p-4">
-        <h3 class="font-semibold mb-2 flex items-center gap-2">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
-          Fund Summary
-        </h3>
-        <div class="overflow-x-auto">
-          <table class="table table-sm table-zebra">
-            <thead>
-              <tr>
-                <th>Fund</th>
-                <th>Type</th>
-                <th class="text-right">Starting</th>
-                <th class="text-right">Current</th>
-                <th class="text-right">Return</th>
-                <th class="text-right">vs Benchmark</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-if="personalPortfolio">
-                <td class="font-semibold">{{ auth.profile?.full_name || 'My Investments' }}</td>
-                <td><span class="badge badge-xs badge-primary">My Investments</span></td>
-                <td class="text-right font-mono">${{ Number(personalPortfolio.starting_cash || 100000).toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</td>
-                <td class="text-right font-mono">${{ personalData._totalValue.toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</td>
-                <td class="text-right font-mono" :class="personalData._returnPct >= 0 ? 'text-success' : 'text-error'">
-                  {{ personalData._returnPct >= 0 ? '+' : '' }}{{ personalData._returnPct.toFixed(2) }}%
-                </td>
-                <td class="text-right font-mono" :class="personalData._vsSpy >= 0 ? 'text-success' : 'text-error'">
-                  {{ personalData._vsSpy >= 0 ? '+' : '' }}{{ personalData._vsSpy.toFixed(2) }}%
-                </td>
-              </tr>
-              <tr v-for="fund in groupEnriched" :key="fund.id">
-                <td class="font-semibold">{{ fund.fund_name || 'Fund ' + (fund.fund_number || 1) }}</td>
-                <td><span class="badge badge-xs badge-secondary">Group</span></td>
-                <td class="text-right font-mono">${{ Number(fund.starting_cash || 100000).toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</td>
-                <td class="text-right font-mono">${{ fund._totalValue.toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</td>
-                <td class="text-right font-mono" :class="fund._returnPct >= 0 ? 'text-success' : 'text-error'">
-                  {{ fund._returnPct >= 0 ? '+' : '' }}{{ fund._returnPct.toFixed(2) }}%
-                </td>
-                <td class="text-right font-mono" :class="fund._vsSpy >= 0 ? 'text-success' : 'text-error'">
-                  {{ fund._vsSpy >= 0 ? '+' : '' }}{{ fund._vsSpy.toFixed(2) }}%
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
       </div>
     </div>
 
