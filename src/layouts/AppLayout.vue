@@ -73,7 +73,7 @@
           <span v-if="unreadMessages > 0" class="badge badge-xs badge-primary ml-auto">{{ unreadMessages }}</span>
         </RouterLink>
         <RouterLink to="/feed" class="btn btn-sm justify-start w-full gap-2" :class="route.path === '/feed' ? 'btn-primary' : 'btn-ghost'" @click="sidebarOpen = false">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 20H5a2 2 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" /></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 20H5a2 2 0 1-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" /></svg>
           Feed
         </RouterLink>
         <RouterLink to="/training" class="btn btn-sm justify-start w-full gap-2" :class="route.path.startsWith('/training') ? 'btn-primary' : 'btn-ghost'" @click="sidebarOpen = false">
