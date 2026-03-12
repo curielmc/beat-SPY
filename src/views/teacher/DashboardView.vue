@@ -93,12 +93,22 @@
                   <td class="text-right font-mono">${{ group.cash.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</td>
                   <td class="text-sm text-base-content/60">{{ formatTradeDate(group.lastTradeAt) }}</td>
                   <td class="text-right">
-                    <RouterLink
-                      :to="{ name: 'teacher-messages', query: { class_id: currentClass?.id, group_id: group.id } }"
-                      class="btn btn-xs btn-outline"
-                    >
-                      Message Group
-                    </RouterLink>
+                    <div class="flex justify-end gap-2">
+                      <button
+                        class="btn btn-xs btn-outline btn-info"
+                        :disabled="sendingLessonId === group.id"
+                        @click="openLessonModal(group.id, 'group', group.name)"
+                      >
+                        <span v-if="sendingLessonId === group.id" class="loading loading-spinner loading-xs"></span>
+                        <span v-else>Send Lesson</span>
+                      </button>
+                      <RouterLink
+                        :to="{ name: 'teacher-messages', query: { class_id: currentClass?.id, group_id: group.id } }"
+                        class="btn btn-xs btn-outline"
+                      >
+                        Message Group
+                      </RouterLink>
+                    </div>
                   </td>
                 </tr>
                 <tr v-if="rankedGroups.length === 0">
@@ -109,7 +119,72 @@
           </div>
         </div>
       </div>
+
+      <div v-if="lessonSuccess" class="alert alert-info">
+        <span>{{ lessonSuccess }}</span>
+      </div>
     </template>
+
+    <dialog class="modal" :class="{ 'modal-open': showLessonModal }">
+      <div class="modal-box max-w-2xl">
+        <h3 class="font-bold text-lg mb-1">Send Investment Lesson</h3>
+        <p class="text-sm text-base-content/60 mb-4">
+          Sending to: <strong>{{ lessonTargetName }}</strong>
+          <span class="badge badge-sm ml-1">{{ lessonTargetType }}</span>
+        </p>
+
+        <div class="flex gap-2 mb-3">
+          <input
+            v-model="lessonSearch"
+            type="text"
+            placeholder="Search lessons..."
+            class="input input-bordered input-sm flex-1"
+          />
+          <select v-model="lessonTypeFilter" class="select select-bordered select-sm">
+            <option value="">All Categories</option>
+            <option v-for="t in lessonTypes" :key="t" :value="t">{{ formatLessonType(t) }}</option>
+          </select>
+          <select v-model="lessonDifficultyFilter" class="select select-bordered select-sm">
+            <option value="">All Levels</option>
+            <option value="basic">Basic</option>
+            <option value="advanced">Advanced</option>
+          </select>
+        </div>
+
+        <div class="max-h-72 overflow-y-auto border border-base-300 rounded-lg mb-4">
+          <div
+            v-for="lesson in filteredLessons"
+            :key="lesson.id"
+            class="px-3 py-2 border-b border-base-200 cursor-pointer hover:bg-base-200 transition-colors"
+            :class="{ 'bg-info/10 border-info/30': selectedLessonId === lesson.id }"
+            @click="selectedLessonId = selectedLessonId === lesson.id ? null : lesson.id"
+          >
+            <div class="flex items-center gap-2">
+              <span class="font-medium text-sm flex-1">{{ lesson.title }}</span>
+              <span class="badge badge-xs" :class="lesson.difficulty === 'advanced' ? 'badge-warning' : 'badge-success'">{{ lesson.difficulty }}</span>
+              <span class="badge badge-xs badge-ghost">{{ formatLessonType(lesson.lesson_type) }}</span>
+            </div>
+            <p class="text-xs text-base-content/50 mt-1 line-clamp-2">{{ lesson.content }}</p>
+          </div>
+          <div v-if="filteredLessons.length === 0" class="p-4 text-center text-base-content/50 text-sm">
+            No lessons match your search.
+          </div>
+        </div>
+
+        <div class="modal-action">
+          <button class="btn btn-ghost" @click="showLessonModal = false">Cancel</button>
+          <button class="btn btn-outline btn-info" :disabled="sendingLessonId" @click="confirmSendLesson(null)">
+            <span v-if="sendingLessonId && !selectedLessonId" class="loading loading-spinner loading-xs"></span>
+            Send Random Lesson
+          </button>
+          <button class="btn btn-info" :disabled="!selectedLessonId || sendingLessonId" @click="confirmSendLesson(selectedLessonId)">
+            <span v-if="sendingLessonId && selectedLessonId" class="loading loading-spinner loading-xs"></span>
+            Send Selected Lesson
+          </button>
+        </div>
+      </div>
+      <form method="dialog" class="modal-backdrop" @click="showLessonModal = false"><button>close</button></form>
+    </dialog>
 
     <!-- Class Notes Modal -->
     <dialog :class="['modal', showNotesModal && 'modal-open']">
@@ -228,6 +303,34 @@ const dashboardSummary = computed(() => {
   return { totalValue, totalStartingCash, cash, returnPct }
 })
 
+const sendingLessonId = ref(null)
+const lessonSuccess = ref('')
+const showLessonModal = ref(false)
+const allLessons = ref([])
+const lessonSearch = ref('')
+const lessonTypeFilter = ref('')
+const lessonDifficultyFilter = ref('')
+const selectedLessonId = ref(null)
+const lessonTargetId = ref(null)
+const lessonTargetType = ref('')
+const lessonTargetName = ref('')
+
+const lessonTypes = computed(() => {
+  const types = new Set(allLessons.value.map(l => l.lesson_type))
+  return [...types].sort()
+})
+
+const filteredLessons = computed(() => {
+  let result = allLessons.value
+  if (lessonTypeFilter.value) result = result.filter(l => l.lesson_type === lessonTypeFilter.value)
+  if (lessonDifficultyFilter.value) result = result.filter(l => l.difficulty === lessonDifficultyFilter.value)
+  if (lessonSearch.value) {
+    const q = lessonSearch.value.toLowerCase()
+    result = result.filter(l => l.title.toLowerCase().includes(q) || l.content.toLowerCase().includes(q))
+  }
+  return result
+})
+
 // Class Notes state
 const showNotesModal = ref(false)
 const generatingNotes = ref(false)
@@ -258,6 +361,57 @@ function formatTradeDate(value) {
     day: 'numeric',
     year: 'numeric'
   })
+}
+
+function formatLessonType(type) {
+  return type.replace(/_/g, ' ').replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+}
+
+async function loadLessons() {
+  if (allLessons.value.length > 0) return
+  const { data } = await supabase.from('investment_lessons').select('*').order('lesson_type').order('title')
+  allLessons.value = data || []
+}
+
+function openLessonModal(ownerId, ownerType, name) {
+  lessonTargetId.value = ownerId
+  lessonTargetType.value = ownerType
+  lessonTargetName.value = name
+  selectedLessonId.value = null
+  lessonSearch.value = ''
+  lessonTypeFilter.value = ''
+  lessonDifficultyFilter.value = ''
+  loadLessons()
+  showLessonModal.value = true
+}
+
+async function confirmSendLesson(lessonId) {
+  sendingLessonId.value = lessonTargetId.value
+  lessonSuccess.value = ''
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) return
+    const body = { owner_id: lessonTargetId.value, owner_type: lessonTargetType.value }
+    if (lessonId) body.lesson_id = lessonId
+    const res = await fetch('/api/send-lesson', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`
+      },
+      body: JSON.stringify(body)
+    })
+    const result = await res.json()
+    if (res.ok) {
+      lessonSuccess.value = `Lesson sent to ${lessonTargetName.value}: \"${result.lesson_title}\" (${result.difficulty})`
+      showLessonModal.value = false
+    } else {
+      lessonSuccess.value = `Error: ${result.error || 'Failed to send lesson'}`
+    }
+    setTimeout(() => { lessonSuccess.value = '' }, 5000)
+  } finally {
+    sendingLessonId.value = null
+  }
 }
 
 function closeNotesModal() {
