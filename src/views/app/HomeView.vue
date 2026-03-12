@@ -98,6 +98,116 @@
       </button>
     </div>
 
+    <div v-if="activeTab === 'group' && allGroupFundSnapshots.length > 0" class="space-y-4">
+      <div class="card bg-base-100 shadow">
+        <div class="card-body p-4">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="font-semibold">All Group Funds</h3>
+            <span class="text-xs text-base-content/50">Viewing every invested fund and its positions</span>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="table table-sm table-zebra">
+              <thead>
+                <tr>
+                  <th>Fund</th>
+                  <th class="text-right">Positions</th>
+                  <th class="text-right">Invested</th>
+                  <th class="text-right">Cash</th>
+                  <th class="text-right">Total</th>
+                  <th class="text-right">Return</th>
+                  <th class="text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="fund in allGroupFundSnapshots" :key="fund.id">
+                  <td>
+                    <div class="font-semibold">{{ fund.fund_name || `Fund ${fund.fund_number || 1}` }}</div>
+                    <div class="text-xs text-base-content/45">{{ fund.fund_thesis || membership?.group?.name }}</div>
+                  </td>
+                  <td class="text-right font-mono">{{ fund.holdings.length }}</td>
+                  <td class="text-right font-mono">${{ fund.investedValue.toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</td>
+                  <td class="text-right font-mono">${{ fund.cashBalance.toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</td>
+                  <td class="text-right font-mono font-semibold">${{ fund.totalValue.toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</td>
+                  <td class="text-right font-mono" :class="fund.returnPct >= 0 ? 'text-success' : 'text-error'">
+                    {{ fund.returnPct >= 0 ? '+' : '' }}{{ fund.returnPct.toFixed(2) }}%
+                  </td>
+                  <td class="text-right">
+                    <button
+                      class="btn btn-xs"
+                      :class="activeFundId === fund.id ? 'btn-secondary' : 'btn-ghost'"
+                      @click="switchFund(fund)"
+                    >
+                      {{ activeFundId === fund.id ? 'Open' : 'View Fund' }}
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="card bg-base-100 shadow">
+        <div class="card-body p-4">
+          <h3 class="font-semibold mb-3">Positions Across All Funds</h3>
+          <div class="space-y-4">
+            <div v-for="fund in investedGroupFunds" :key="fund.id" class="rounded-xl border border-base-300 bg-base-100/60">
+              <div class="flex items-center justify-between gap-3 px-4 py-3 border-b border-base-300">
+                <div>
+                  <div class="font-semibold">{{ fund.fund_name || `Fund ${fund.fund_number || 1}` }}</div>
+                  <div class="text-xs text-base-content/45">{{ fund.fund_thesis || membership?.group?.name }}</div>
+                </div>
+                <div class="text-right">
+                  <div class="text-xs text-base-content/45">Current Value</div>
+                  <div class="font-mono font-semibold">${{ fund.totalValue.toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</div>
+                </div>
+              </div>
+              <div v-if="fund.holdings.length === 0" class="px-4 py-4 text-sm text-base-content/45">
+                No invested positions in this fund yet.
+              </div>
+              <div v-else class="overflow-x-auto">
+                <table class="table table-sm">
+                  <thead>
+                    <tr>
+                      <th>Stock</th>
+                      <th class="text-right">Shares</th>
+                      <th class="text-right">Price</th>
+                      <th class="text-right">Value</th>
+                      <th class="text-right">Gain/Loss</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="h in fund.holdings" :key="`${fund.id}-${h.ticker}`">
+                      <td>
+                        <RouterLink :to="`/stocks/${h.ticker}`" class="flex items-center gap-2 group">
+                          <div class="avatar">
+                            <div class="w-7 h-7 rounded bg-base-200 flex items-center justify-center overflow-hidden border border-base-300">
+                              <img v-if="h.image" :src="h.image" :alt="h.ticker" />
+                              <span v-else class="text-[9px] font-bold text-base-content/40">{{ h.ticker }}</span>
+                            </div>
+                          </div>
+                          <div>
+                            <div class="font-mono font-bold text-xs group-hover:text-primary transition-colors">{{ h.ticker }}</div>
+                            <div class="text-[10px] text-base-content/45 max-w-[140px] truncate">{{ h.companyName || '' }}</div>
+                          </div>
+                        </RouterLink>
+                      </td>
+                      <td class="text-right font-mono text-xs">{{ Number(h.shares).toFixed(2) }}</td>
+                      <td class="text-right font-mono text-xs">${{ h.currentPrice.toFixed(2) }}</td>
+                      <td class="text-right font-mono text-xs font-semibold">${{ h.marketValue.toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</td>
+                      <td class="text-right font-mono text-xs" :class="h.gainLoss >= 0 ? 'text-success' : 'text-error'">
+                        {{ h.gainLoss >= 0 ? '+' : '' }}{{ h.gainLossPct.toFixed(2) }}%
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Loading spinner during tab switch -->
     <div v-if="switchingTab" class="flex justify-center py-10">
       <span class="loading loading-spinner loading-lg"></span>
@@ -722,6 +832,7 @@ const personalVisibility = ref('private')
 // Multi-fund state (group funds only — personal has exactly 1 portfolio)
 const groupFunds = ref([])
 const activeFundId = ref(null)
+const allGroupFundSnapshots = ref([])
 
 const activeFund = computed(() =>
   groupFunds.value.find(f => f.id === activeFundId.value) || null
@@ -732,6 +843,9 @@ const activeFundName = computed(() => {
   if (!f) return portfolioStore.portfolio?.fund_name || 'Group Fund'
   return f.fund_name || `Fund ${f.fund_number}`
 })
+const investedGroupFunds = computed(() =>
+  allGroupFundSnapshots.value.filter(fund => fund.holdings.length > 0)
+)
 const resetting = ref(false)
 const closing = ref(false)
 const isPersonalPortfolio = computed(() => {
@@ -766,6 +880,7 @@ async function handleSellAll() {
       }
       // Refresh charts and data
       resetCharts()
+      if (activeTab.value === 'group') await loadAllGroupFundSnapshots()
       if (portfolioStore.holdings.length > 0 || portfolioStore.trades.length > 0) loadCharts()
     } else {
       sellAllError.value = res.error || 'Failed to liquidate positions'
@@ -826,6 +941,75 @@ function generateSyntheticHistory(startDate, endDate, startValue, endValue, seed
 
 let refreshInterval = null
 
+async function loadAllGroupFundSnapshots() {
+  if (!groupFunds.value.length) {
+    allGroupFundSnapshots.value = []
+    return
+  }
+
+  const fundIds = groupFunds.value.map(f => f.id)
+  const [{ data: holdingsData }, { data: tradesData }] = await Promise.all([
+    supabase
+      .from('holdings')
+      .select('portfolio_id, ticker, shares, avg_cost')
+      .in('portfolio_id', fundIds),
+    supabase
+      .from('trades')
+      .select('portfolio_id, ticker, side, dollars, shares, price, executed_at')
+      .in('portfolio_id', fundIds)
+  ])
+
+  const tickers = [...new Set((holdingsData || []).map(h => h.ticker).filter(Boolean))]
+  if (tickers.length > 0) {
+    await market.fetchBatchQuotes(tickers)
+    try {
+      await market.fetchBatchProfiles(tickers)
+    } catch (e) {
+      console.warn('Failed to fetch group fund profiles', e)
+    }
+  }
+
+  allGroupFundSnapshots.value = groupFunds.value.map(fund => {
+    const fundHoldings = (holdingsData || []).filter(h => h.portfolio_id === fund.id)
+    const fundTrades = (tradesData || []).filter(t => t.portfolio_id === fund.id)
+    const holdings = fundHoldings.map(h => {
+      const currentPrice = market.getCachedPrice(h.ticker) || Number(h.avg_cost) || 0
+      const shares = Number(h.shares)
+      const avgCost = Number(h.avg_cost) || 0
+      const marketValue = shares * currentPrice
+      const costBasis = shares * avgCost
+      const gainLoss = marketValue - costBasis
+      const gainLossPct = costBasis > 0 ? (gainLoss / costBasis) * 100 : 0
+      const profile = market.profilesCache?.[h.ticker]?.data
+      return {
+        ...h,
+        currentPrice,
+        marketValue,
+        gainLoss,
+        gainLossPct,
+        companyName: profile?.companyName || profile?.name || null,
+        image: profile?.image || null
+      }
+    }).sort((a, b) => b.marketValue - a.marketValue)
+
+    const investedValue = holdings.reduce((sum, h) => sum + h.marketValue, 0)
+    const cashBalance = Number(fund.cash_balance || 0)
+    const totalValue = investedValue + cashBalance
+    const startingCash = Number(fund.starting_cash || fund.fund_starting_cash || 100000)
+    const returnPct = startingCash > 0 ? ((totalValue - startingCash) / startingCash) * 100 : 0
+
+    return {
+      ...fund,
+      holdings,
+      trades: fundTrades,
+      investedValue,
+      cashBalance,
+      totalValue,
+      returnPct
+    }
+  }).sort((a, b) => (a.fund_number || 0) - (b.fund_number || 0))
+}
+
 onMounted(async () => {
   // Get current membership (works for both normal users and masquerade via effectiveUserId)
   membership.value = await auth.getCurrentMembership()
@@ -838,6 +1022,7 @@ onMounted(async () => {
       portfolioStore.loadGroupFunds(membership.value.group_id)
     ])
     groupFunds.value = gFunds
+    await loadAllGroupFundSnapshots()
 
     // Default: load personal portfolio
     if (portfolioStore.portfolio) {
@@ -1353,6 +1538,7 @@ async function switchTab(tab) {
     } else {
       // Group tab: load first group fund
       if (groupFunds.value.length > 0) {
+        await loadAllGroupFundSnapshots()
         activeFundId.value = groupFunds.value[0].id
         await portfolioStore.loadPortfolioById(groupFunds.value[0].id)
       } else {
