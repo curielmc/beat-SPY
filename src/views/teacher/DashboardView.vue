@@ -187,6 +187,15 @@
                   <td class="py-4 text-right">
                     <div class="flex justify-end gap-2">
                       <button
+                        class="btn btn-square btn-sm btn-outline btn-warning tooltip tooltip-left"
+                        data-tip="Quick messages"
+                        @click="openQuickMessageModal(group)"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                      </button>
+                      <button
                         class="btn btn-square btn-sm btn-outline btn-info tooltip tooltip-left"
                         data-tip="Send lesson"
                         :disabled="sendingLessonId === group.id"
@@ -529,6 +538,52 @@
       </div>
       <form method="dialog" class="modal-backdrop" @click="closeNotesModal"><button>close</button></form>
     </dialog>
+
+    <!-- Quick Messages Modal -->
+    <dialog class="modal" :class="{ 'modal-open': showQuickMessageModal }">
+      <div class="modal-box max-w-lg">
+        <h3 class="font-bold text-lg mb-1 flex items-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+          Quick Messages
+        </h3>
+        <p class="text-sm text-base-content/60 mb-4">
+          Send to: <strong>{{ quickMessageGroup?.name }}</strong>
+        </p>
+
+        <div class="space-y-2">
+          <button
+            v-for="(qm, idx) in quickMessages"
+            :key="idx"
+            class="w-full text-left border border-base-300 rounded-xl px-4 py-3 hover:bg-base-200 hover:border-primary/30 transition-all group"
+            :disabled="sendingQuickMessage"
+            @click="sendQuickMessage(qm)"
+          >
+            <div class="flex items-start gap-3">
+              <span class="text-xl mt-0.5">{{ qm.icon }}</span>
+              <div class="flex-1 min-w-0">
+                <div class="font-semibold text-sm group-hover:text-primary transition-colors">{{ qm.label }}</div>
+                <p class="text-xs text-base-content/50 mt-1 leading-relaxed">{{ qm.message }}</p>
+              </div>
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-base-content/30 group-hover:text-primary mt-1 flex-shrink-0 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+              </svg>
+            </div>
+          </button>
+        </div>
+
+        <div v-if="quickMessageSuccess" class="alert alert-success mt-4 py-2 text-sm">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+          <span>{{ quickMessageSuccess }}</span>
+        </div>
+
+        <div class="modal-action">
+          <button class="btn btn-ghost" @click="showQuickMessageModal = false">Close</button>
+        </div>
+      </div>
+      <form method="dialog" class="modal-backdrop" @click="showQuickMessageModal = false"><button>close</button></form>
+    </dialog>
   </div>
 </template>
 
@@ -649,6 +704,72 @@ const filteredLessons = computed(() => {
   }
   return result
 })
+
+// Quick Messages state
+const showQuickMessageModal = ref(false)
+const quickMessageGroup = ref(null)
+const sendingQuickMessage = ref(false)
+const quickMessageSuccess = ref('')
+
+const quickMessages = [
+  {
+    icon: '💰',
+    label: 'Remind to Invest',
+    message: 'Hey team! We noticed you still have uninvested cash sitting in your fund. Remember — cash earns nothing. Research some stocks and put that money to work!'
+  },
+  {
+    icon: '📊',
+    label: 'Review Your Portfolio',
+    message: 'Time for a portfolio check-in! Take a few minutes to review your holdings. Are your stocks performing the way you expected? Any changes you want to make?'
+  },
+  {
+    icon: '🔍',
+    label: 'Do Your Research',
+    message: 'Before making your next trade, make sure you do your homework. Look at the company\'s fundamentals, recent news, and earnings. Smart investors research first!'
+  },
+  {
+    icon: '🏆',
+    label: 'Great Job!',
+    message: 'Your team is doing awesome work! Keep up the great investing strategy. Stay focused, stay disciplined, and keep learning from every trade.'
+  },
+  {
+    icon: '📈',
+    label: 'Check the Market',
+    message: 'Have you looked at the market today? Check what\'s moving and think about how current events might affect your portfolio. Stay informed!'
+  },
+  {
+    icon: '🤝',
+    label: 'Discuss as a Team',
+    message: 'Reminder: the best investment decisions come from teamwork. Get together with your group, share your ideas, and make a plan before your next trade.'
+  }
+]
+
+function openQuickMessageModal(group) {
+  quickMessageGroup.value = group
+  quickMessageSuccess.value = ''
+  showQuickMessageModal.value = true
+}
+
+async function sendQuickMessage(qm) {
+  if (!quickMessageGroup.value || !currentClass.value) return
+  sendingQuickMessage.value = true
+  quickMessageSuccess.value = ''
+
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) { sendingQuickMessage.value = false; return }
+
+  await supabase.from('messages').insert({
+    class_id: currentClass.value.id,
+    sender_id: session.user.id,
+    recipient_type: 'group',
+    recipient_id: quickMessageGroup.value.id,
+    content: qm.message
+  })
+
+  quickMessageSuccess.value = `"${qm.label}" sent to ${quickMessageGroup.value.name}!`
+  sendingQuickMessage.value = false
+  setTimeout(() => { quickMessageSuccess.value = '' }, 3000)
+}
 
 // Class Notes state
 const showNotesModal = ref(false)

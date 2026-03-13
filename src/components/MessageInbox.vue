@@ -44,6 +44,17 @@
 
     <!-- Right panel: thread -->
     <div class="flex-1 flex flex-col min-w-0">
+      <!-- Email tip banner -->
+      <div v-if="showEmailTip" class="bg-warning/10 border-b border-warning/20 px-4 py-2 flex items-center gap-3 text-sm">
+        <span class="text-warning font-bold">!</span>
+        <p class="flex-1 text-base-content/70">
+          Not getting email notifications? Check your <strong>spam/junk folder</strong> for messages from
+          <code class="bg-base-200 px-1 rounded text-xs">beat-snp@agentmail.to</code>
+          and mark them as "Not Spam."
+        </p>
+        <button class="btn btn-ghost btn-xs" @click="dismissEmailTip">Dismiss</button>
+      </div>
+
       <!-- Header -->
       <div class="p-4 border-b border-base-300 bg-base-100">
         <p class="font-bold text-sm">
@@ -154,6 +165,12 @@ const myGroup = ref(null)
 const currentClassId = ref(null)
 const teacherId = ref(null)
 const senderNames = ref({})
+
+const showEmailTip = ref(!localStorage.getItem('beat-snp-email-tip-dismissed'))
+function dismissEmailTip() {
+  showEmailTip.value = false
+  localStorage.setItem('beat-snp-email-tip-dismissed', '1')
+}
 
 const activeThread = ref('teacher-inbox')
 const thread = ref([])

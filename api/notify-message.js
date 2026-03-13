@@ -62,6 +62,14 @@ export default async function handler(req) {
     recipientLabel = 'you'
   }
 
+  // CC the teacher (sender) on every message they send
+  if (msg.sender_id) {
+    const teacher = await sbFetch(`/profiles?id=eq.${msg.sender_id}&select=email,full_name`)
+    if (teacher?.[0]?.email && !emails.some(e => e.email === teacher[0].email)) {
+      emails.push({ email: teacher[0].email, name: teacher[0].full_name, user_id: msg.sender_id })
+    }
+  }
+
   if (!emails.length) return new Response(JSON.stringify({ skipped: 'no emails found' }), { status: 200 })
 
   // Send via AgentMail
