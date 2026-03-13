@@ -1,12 +1,29 @@
 <template>
   <div class="space-y-6">
-    <div class="flex items-start justify-between">
-      <div>
+    <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+      <div class="space-y-3">
         <h1 class="text-2xl font-bold flex items-center gap-2">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
           Dashboard
         </h1>
         <p class="text-sm text-base-content/60 mt-1">Overview of <strong>{{ currentClass?.class_name }}</strong> &mdash; {{ currentClass?.school }}</p>
+        <div class="flex flex-wrap gap-2">
+          <button class="btn btn-outline btn-sm gap-2" :disabled="!classStudents.length" @click="openClassContactsModal">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8m-18 8h18a2 2 0 002-2V8a2 2 0 00-2-2H3a2 2 0 00-2 2v6a2 2 0 002 2z" />
+            </svg>
+            All Contacts
+          </button>
+          <RouterLink
+            :to="{ name: 'teacher-messages', query: { class_id: currentClass?.id, recipient: 'class' } }"
+            class="btn btn-outline btn-sm gap-2"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            </svg>
+            Message Class
+          </RouterLink>
+        </div>
       </div>
       <button class="btn btn-primary btn-sm gap-2" @click="showNotesModal = true" :disabled="loading">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
@@ -57,7 +74,7 @@
       <!-- Leaderboard Table -->
       <div class="card bg-base-100 shadow border border-base-200">
         <div class="card-body p-5 xl:p-6">
-          <div class="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <h2 class="card-title flex items-center gap-2">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
@@ -65,7 +82,16 @@
               </h2>
               <p class="text-xs text-base-content/50 mt-1">Sortable performance snapshot for every group in this class.</p>
             </div>
-            <div class="text-xs text-base-content/45">Click any heading to reorder the board.</div>
+            <div class="flex flex-wrap items-center gap-2 sm:justify-end">
+              <button class="btn btn-ghost btn-xs" :disabled="!classStudents.length" @click="openClassContactsModal">All Contacts</button>
+              <RouterLink
+                :to="{ name: 'teacher-messages', query: { class_id: currentClass?.id, recipient: 'class' } }"
+                class="btn btn-ghost btn-xs"
+              >
+                Message Class
+              </RouterLink>
+              <div class="text-xs text-base-content/45">Click any heading to reorder the board.</div>
+            </div>
           </div>
           <div class="overflow-x-auto mt-4">
             <table class="table w-full">
@@ -173,12 +199,12 @@
                       </button>
                       <RouterLink
                         :to="{ name: 'teacher-messages', query: { class_id: currentClass?.id, group_id: group.id } }"
-                        class="btn btn-square btn-sm btn-outline tooltip tooltip-left"
-                        data-tip="Message group"
+                        class="btn btn-sm btn-outline gap-2"
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                         </svg>
+                        Message
                       </RouterLink>
                     </div>
                   </td>
@@ -291,6 +317,48 @@
         </div>
       </div>
       <form method="dialog" class="modal-backdrop" @click="showMembersModal = false"><button>close</button></form>
+    </dialog>
+
+    <dialog class="modal" :class="{ 'modal-open': showClassContactsModal }">
+      <div class="modal-box max-w-2xl">
+        <h3 class="font-bold text-lg mb-1">Class Contacts</h3>
+        <p class="text-sm text-base-content/60 mb-4">
+          {{ currentClass?.class_name || 'Current class' }} · {{ classContactRows.length }} student{{ classContactRows.length === 1 ? '' : 's' }}
+        </p>
+
+        <div class="space-y-3">
+          <div class="flex flex-wrap gap-2">
+            <span v-for="student in classContactRows" :key="student.id" class="badge badge-outline">
+              {{ student.name }}
+            </span>
+          </div>
+
+          <textarea
+            class="textarea textarea-bordered w-full h-48 font-mono text-sm"
+            readonly
+            :value="classEmailList"
+          ></textarea>
+
+          <div class="flex items-center justify-between gap-3">
+            <p class="text-xs text-base-content/50">Comma-separated so you can paste directly into an email.</p>
+            <button class="btn btn-sm btn-outline" :disabled="!classEmailList" @click="copyClassEmails">
+              {{ copiedClassEmails ? 'Copied!' : 'Copy Emails' }}
+            </button>
+          </div>
+        </div>
+
+        <div class="modal-action">
+          <RouterLink
+            :to="{ name: 'teacher-messages', query: { class_id: currentClass?.id, recipient: 'class' } }"
+            class="btn btn-primary"
+            @click="showClassContactsModal = false"
+          >
+            Message Class
+          </RouterLink>
+          <button class="btn btn-ghost" @click="showClassContactsModal = false">Close</button>
+        </div>
+      </div>
+      <form method="dialog" class="modal-backdrop" @click="showClassContactsModal = false"><button>close</button></form>
     </dialog>
 
     <dialog class="modal" :class="{ 'modal-open': showFundsModal }">
@@ -479,8 +547,10 @@ const sortKey = ref('returnPct')
 const sortDirection = ref('desc')
 const showMembersModal = ref(false)
 const showFundsModal = ref(false)
+const showClassContactsModal = ref(false)
 const selectedGroup = ref(null)
 const copiedMemberEmails = ref(false)
+const copiedClassEmails = ref(false)
 
 const currentClass = computed(() => {
   const qid = route.query.class_id
@@ -514,6 +584,19 @@ const selectedGroupEmails = computed(() =>
 )
 
 const selectedGroupEmailList = computed(() => selectedGroupEmails.value.join(', '))
+
+const classContactRows = computed(() =>
+  classStudents.value
+    .map(student => ({
+      id: student.id || student.user_id,
+      name: student.name || student.email || 'Student',
+      email: student.email?.trim() || ''
+    }))
+    .filter(student => student.email)
+    .sort((a, b) => a.name.localeCompare(b.name))
+)
+
+const classEmailList = computed(() => classContactRows.value.map(student => student.email).join(', '))
 
 const sortedGroups = computed(() => {
   const groups = [...rankedGroups.value]
@@ -644,11 +727,23 @@ function openFundsModal(group) {
   showFundsModal.value = true
 }
 
+function openClassContactsModal() {
+  copiedClassEmails.value = false
+  showClassContactsModal.value = true
+}
+
 function copyMemberEmails() {
   if (!selectedGroupEmailList.value) return
   navigator.clipboard.writeText(selectedGroupEmailList.value)
   copiedMemberEmails.value = true
   setTimeout(() => { copiedMemberEmails.value = false }, 2000)
+}
+
+function copyClassEmails() {
+  if (!classEmailList.value) return
+  navigator.clipboard.writeText(classEmailList.value)
+  copiedClassEmails.value = true
+  setTimeout(() => { copiedClassEmails.value = false }, 2000)
 }
 
 function formatLessonType(type) {

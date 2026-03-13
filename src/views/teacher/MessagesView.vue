@@ -267,6 +267,10 @@ function scrollToBottom() {
 
 async function hydrateFromRoute() {
   await loadRecipients()
+  if (route.query.recipient === 'class' && currentClassId.value) {
+    await selectRecipient({ type: 'class', id: currentClassId.value, label: '📢 All Students' })
+    return
+  }
   const groupId = route.query.group_id
   if (groupId) {
     const group = groups.value.find(g => g.id === groupId)
@@ -278,7 +282,7 @@ async function hydrateFromRoute() {
 }
 
 onMounted(hydrateFromRoute)
-watch(() => [route.query.class_id, route.query.group_id], async () => {
+watch(() => [route.query.class_id, route.query.group_id, route.query.recipient], async () => {
   selected.value = null
   thread.value = []
   await hydrateFromRoute()
