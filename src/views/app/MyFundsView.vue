@@ -7,7 +7,7 @@
     <div class="flex items-center justify-between">
       <h1 class="text-xl font-bold flex items-center gap-2">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
-        My Funds
+        Group Funds
       </h1>
     </div>
 
@@ -36,7 +36,6 @@
                 <th class="text-right">Current</th>
                 <th class="text-right">Return</th>
                 <th class="text-right">vs Benchmark</th>
-                <th class="text-right">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -54,9 +53,6 @@
                 <td class="text-right font-mono" :class="personalData._vsSpy >= 0 ? 'text-success' : 'text-error'">
                   {{ personalData._vsSpy >= 0 ? '+' : '' }}{{ personalData._vsSpy.toFixed(2) }}%
                 </td>
-                <td class="text-right">
-                  <RouterLink :to="{ name: 'home' }" class="btn btn-xs btn-outline">Open</RouterLink>
-                </td>
               </tr>
               <tr v-for="fund in groupEnriched" :key="fund.id">
                 <td class="font-semibold">
@@ -71,9 +67,6 @@
                 </td>
                 <td class="text-right font-mono" :class="fund._vsSpy >= 0 ? 'text-success' : 'text-error'">
                   {{ fund._vsSpy >= 0 ? '+' : '' }}{{ fund._vsSpy.toFixed(2) }}%
-                </td>
-                <td class="text-right">
-                  <RouterLink :to="{ name: 'home', query: { fund: fund.id } }" class="btn btn-xs btn-outline btn-secondary">Open</RouterLink>
                 </td>
               </tr>
             </tbody>
@@ -147,7 +140,6 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { RouterLink } from 'vue-router'
 import { usePortfolioStore } from '../../stores/portfolio'
 import { useAuthStore } from '../../stores/auth'
 import { useMarketDataStore } from '../../stores/marketData'

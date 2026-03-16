@@ -80,8 +80,20 @@
       </div>
     </div>
 
+    <div v-else-if="showStudentGroupNotice" class="card border border-secondary/20 bg-secondary/5 shadow-sm">
+      <div class="card-body p-4">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 class="font-semibold text-base">My Investments</h2>
+            <p class="text-sm text-base-content/65">This page is now just your personal portfolio. Team portfolios live under Group Funds.</p>
+          </div>
+          <RouterLink to="/my-funds" class="btn btn-outline btn-sm">Open Group Funds</RouterLink>
+        </div>
+      </div>
+    </div>
+
     <!-- Level 1: Personal / Group tabs -->
-    <div v-if="hasGroupPortfolio" class="flex gap-2">
+    <div v-if="showGroupTabsOnHome && hasGroupPortfolio" class="flex gap-2">
       <button
         class="flex-1 py-2 px-4 rounded-lg text-sm font-semibold transition-all"
         :class="activeTab === 'personal'
@@ -103,7 +115,7 @@
     </div>
 
     <!-- Level 2: Fund selector (group tab only) -->
-    <div v-if="activeTab === 'group' && groupFunds.length > 0" class="flex items-center gap-2 overflow-x-auto pb-1">
+    <div v-if="showGroupTabsOnHome && activeTab === 'group' && groupFunds.length > 0" class="flex items-center gap-2 overflow-x-auto pb-1">
       <button
         v-for="fund in groupFunds"
         :key="fund.id"
@@ -115,7 +127,7 @@
       </button>
     </div>
 
-    <div v-if="activeTab === 'group' && allGroupFundSnapshots.length > 0" class="space-y-4">
+    <div v-if="showGroupTabsOnHome && activeTab === 'group' && allGroupFundSnapshots.length > 0" class="space-y-4">
       <div class="card bg-base-100 shadow">
         <div class="card-body p-4">
           <div class="flex items-center justify-between mb-2">
@@ -873,6 +885,8 @@ const activeFund = computed(() =>
   groupFunds.value.find(f => f.id === activeFundId.value) || null
 )
 const isTeacherRoute = computed(() => route.path.startsWith('/teacher'))
+const showGroupTabsOnHome = computed(() => isTeacherRoute.value)
+const showStudentGroupNotice = computed(() => !isTeacherRoute.value && hasGroupPortfolio.value)
 const stocksListLocation = computed(() => isTeacherRoute.value ? '/teacher/stocks' : '/stocks')
 const teacherScreenerLocation = computed(() => isTeacherRoute.value ? '/teacher/screener' : '/screener')
 const activeFundName = computed(() => {
@@ -1085,7 +1099,7 @@ onMounted(async () => {
     if (portfolioStore.portfolio) {
       activeTab.value = 'personal'
       personalVisibility.value = portfolioStore.portfolio.visibility || 'private'
-    } else if (groupFunds.value.length > 0) {
+    } else if (isTeacherRoute.value && groupFunds.value.length > 0) {
       // No personal portfolio, load first group fund
       activeFundId.value = groupFunds.value[0].id
       await portfolioStore.loadPortfolioById(groupFunds.value[0].id)
@@ -1117,7 +1131,7 @@ onMounted(async () => {
 
   // If ?fund=xxx query param, switch to that group fund
   const fundQueryId = route.query.fund
-  if (fundQueryId) {
+  if (fundQueryId && isTeacherRoute.value) {
     const groupMatch = groupFunds.value.find(f => f.id === fundQueryId)
     if (groupMatch) {
       activeTab.value = 'group'
