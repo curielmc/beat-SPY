@@ -137,10 +137,14 @@
             </div>
             <p class="mt-1 text-sm text-base-content/60">{{ selectedFundCard.fund_thesis || 'Group fund' }}</p>
           </div>
-          <div class="grid grid-cols-2 gap-3 text-sm lg:min-w-[320px]">
+          <div class="grid grid-cols-1 gap-3 text-sm sm:grid-cols-3 lg:min-w-[460px]">
             <div class="rounded-xl border border-base-300 bg-base-200/40 p-3">
               <div class="text-xs uppercase tracking-wide text-base-content/45">Current Value</div>
               <div class="mt-1 font-mono text-lg font-semibold">${{ selectedFundCard._totalValue.toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</div>
+            </div>
+            <div class="rounded-xl border border-base-300 bg-base-200/40 p-3">
+              <div class="text-xs uppercase tracking-wide text-base-content/45">Cash Available</div>
+              <div class="mt-1 font-mono text-lg font-semibold">${{ Number(selectedFundCard.cash_balance || 0).toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</div>
             </div>
             <div class="rounded-xl border border-base-300 bg-base-200/40 p-3">
               <div class="text-xs uppercase tracking-wide text-base-content/45">Return</div>
