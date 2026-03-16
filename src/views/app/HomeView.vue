@@ -147,9 +147,26 @@
         </div>
       </div>
 
-      <div class="card bg-base-100 shadow">
-        <div class="card-body p-4">
-          <h3 class="font-semibold mb-3">Positions Across All Funds</h3>
+      <details class="card bg-base-100 shadow group">
+        <summary class="flex cursor-pointer list-none items-center justify-between gap-3 p-4">
+          <div>
+            <h3 class="font-semibold">Positions Across All Funds</h3>
+            <p class="text-xs text-base-content/50">Expand to view every position across each invested fund.</p>
+          </div>
+          <div class="flex items-center gap-2 text-xs text-base-content/50">
+            <span>{{ investedGroupFunds.length }} funds</span>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-4 w-4 transition-transform group-open:rotate-180"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </div>
+        </summary>
+        <div class="card-body border-t border-base-300 p-4 pt-4">
           <div class="space-y-4">
             <div v-for="fund in investedGroupFunds" :key="fund.id" class="rounded-xl border border-base-300 bg-base-100/60">
               <div class="flex items-center justify-between gap-3 px-4 py-3 border-b border-base-300">
@@ -187,7 +204,16 @@
                             </div>
                           </div>
                           <div>
-                            <div class="font-mono font-bold text-xs group-hover:text-primary transition-colors">{{ h.ticker }}</div>
+                            <div class="flex items-center gap-1.5">
+                              <div class="font-mono font-bold text-xs group-hover:text-primary transition-colors">{{ h.ticker }}</div>
+                              <span
+                                class="tooltip tooltip-right text-base-content/55"
+                                :data-tip="h.sector || 'Unknown'"
+                                :aria-label="`Sector: ${h.sector || 'Unknown'}`"
+                              >
+                                <SectorLabel :sector="h.sector" size="xs" :show-label="false" />
+                              </span>
+                            </div>
                             <div class="text-[10px] text-base-content/45 max-w-[140px] truncate">{{ h.companyName || '' }}</div>
                           </div>
                         </RouterLink>
@@ -205,7 +231,7 @@
             </div>
           </div>
         </div>
-      </div>
+      </details>
     </div>
 
     <!-- Loading spinner during tab switch -->
@@ -805,6 +831,7 @@ import { supabase } from '../../lib/supabase'
 import { getHistoricalDaily, getBatchProfiles } from '../../services/fmpApi'
 import PortfolioLineChart from '../../components/charts/PortfolioLineChart.vue'
 import PortfolioPieChart from '../../components/charts/PortfolioPieChart.vue'
+import SectorLabel from '../../components/SectorLabel.vue'
 import TimeRangeSelector from '../../components/charts/TimeRangeSelector.vue'
 import { isMarketOpen } from '../../utils/marketHours'
 
@@ -988,7 +1015,8 @@ async function loadAllGroupFundSnapshots() {
         gainLoss,
         gainLossPct,
         companyName: profile?.companyName || profile?.name || null,
-        image: profile?.image || null
+        image: profile?.image || null,
+        sector: profile?.sector || 'Unknown'
       }
     }).sort((a, b) => b.marketValue - a.marketValue)
 
