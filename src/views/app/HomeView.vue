@@ -46,7 +46,7 @@
     <div class="text-6xl">&#9203;</div>
     <h2 class="text-2xl font-bold">Waiting for Group Assignment</h2>
     <p class="text-base-content/60 text-center max-w-md">Your teacher hasn't assigned you to a group yet. Check back soon or explore the stocks page in the meantime!</p>
-    <RouterLink to="/stocks" class="btn btn-primary">Browse Stocks</RouterLink>
+    <RouterLink :to="stocksListLocation" class="btn btn-primary">Browse Stocks</RouterLink>
   </div>
 
   <!-- Bonus Cash Notification Modal -->
@@ -147,91 +147,88 @@
         </div>
       </div>
 
-      <details class="card bg-base-100 shadow group">
-        <summary class="flex cursor-pointer list-none items-center justify-between gap-3 p-4">
+      <div class="card bg-base-100 shadow">
+        <div class="flex items-center justify-between gap-3 p-4">
           <div>
             <h3 class="font-semibold">Positions Across All Funds</h3>
-            <p class="text-xs text-base-content/50">Expand to view every position across each invested fund.</p>
+            <p class="text-xs text-base-content/50">Expand each fund to view its positions.</p>
           </div>
-          <div class="flex items-center gap-2 text-xs text-base-content/50">
-            <span>{{ investedGroupFunds.length }} funds</span>
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="h-4 w-4 transition-transform group-open:rotate-180"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-            </svg>
-          </div>
-        </summary>
+          <div class="text-xs text-base-content/50">{{ investedGroupFunds.length }} funds</div>
+        </div>
         <div class="card-body border-t border-base-300 p-4 pt-4">
           <div class="space-y-4">
-            <div v-for="fund in investedGroupFunds" :key="fund.id" class="rounded-xl border border-base-300 bg-base-100/60">
-              <div class="flex items-center justify-between gap-3 px-4 py-3 border-b border-base-300">
+            <details v-for="fund in investedGroupFunds" :key="fund.id" class="group rounded-xl border border-base-300 bg-base-100/60">
+              <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
                 <div>
                   <div class="font-semibold">{{ fund.fund_name || `Fund ${fund.fund_number || 1}` }}</div>
                   <div class="text-xs text-base-content/45">{{ fund.fund_thesis || membership?.group?.name }}</div>
                 </div>
-                <div class="text-right">
-                  <div class="text-xs text-base-content/45">Current Value</div>
-                  <div class="font-mono font-semibold">${{ fund.totalValue.toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</div>
+                <div class="flex items-center gap-4">
+                  <div class="text-right">
+                    <div class="text-xs text-base-content/45">Current Value</div>
+                    <div class="font-mono font-semibold">${{ fund.totalValue.toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</div>
+                  </div>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    class="h-4 w-4 text-base-content/50 transition-transform group-open:rotate-180"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </summary>
+              <div class="border-t border-base-300">
+                <div v-if="fund.holdings.length === 0" class="px-4 py-4 text-sm text-base-content/45">
+                  No invested positions in this fund yet.
+                </div>
+                <div v-else class="overflow-x-auto">
+                  <table class="table table-sm">
+                    <thead>
+                      <tr>
+                        <th>Stock</th>
+                        <th>Sector</th>
+                        <th class="text-right">Shares</th>
+                        <th class="text-right">Price</th>
+                        <th class="text-right">Value</th>
+                        <th class="text-right">Gain/Loss</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="h in fund.holdings" :key="`${fund.id}-${h.ticker}`">
+                        <td>
+                          <RouterLink :to="stockDetailLocation(h.ticker)" class="flex items-center gap-2 group">
+                            <div class="avatar">
+                              <div class="w-7 h-7 rounded bg-base-200 flex items-center justify-center overflow-hidden border border-base-300">
+                                <img v-if="h.image" :src="h.image" :alt="h.ticker" />
+                                <span v-else class="text-[9px] font-bold text-base-content/40">{{ h.ticker }}</span>
+                              </div>
+                            </div>
+                            <div>
+                              <div class="font-mono font-bold text-xs group-hover:text-primary transition-colors">{{ h.ticker }}</div>
+                              <div class="text-[10px] text-base-content/45 max-w-[140px] truncate">{{ h.companyName || '' }}</div>
+                            </div>
+                          </RouterLink>
+                        </td>
+                        <td class="text-xs text-base-content/70">
+                          <SectorLabel :sector="h.sector" size="xs" />
+                        </td>
+                        <td class="text-right font-mono text-xs">{{ Number(h.shares).toFixed(2) }}</td>
+                        <td class="text-right font-mono text-xs">${{ h.currentPrice.toFixed(2) }}</td>
+                        <td class="text-right font-mono text-xs font-semibold">${{ h.marketValue.toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</td>
+                        <td class="text-right font-mono text-xs" :class="h.gainLoss >= 0 ? 'text-success' : 'text-error'">
+                          {{ h.gainLoss >= 0 ? '+' : '' }}{{ h.gainLossPct.toFixed(2) }}%
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
               </div>
-              <div v-if="fund.holdings.length === 0" class="px-4 py-4 text-sm text-base-content/45">
-                No invested positions in this fund yet.
-              </div>
-              <div v-else class="overflow-x-auto">
-                <table class="table table-sm">
-                  <thead>
-                    <tr>
-                      <th>Stock</th>
-                      <th class="text-right">Shares</th>
-                      <th class="text-right">Price</th>
-                      <th class="text-right">Value</th>
-                      <th class="text-right">Gain/Loss</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr v-for="h in fund.holdings" :key="`${fund.id}-${h.ticker}`">
-                      <td>
-                        <RouterLink :to="`/stocks/${h.ticker}`" class="flex items-center gap-2 group">
-                          <div class="avatar">
-                            <div class="w-7 h-7 rounded bg-base-200 flex items-center justify-center overflow-hidden border border-base-300">
-                              <img v-if="h.image" :src="h.image" :alt="h.ticker" />
-                              <span v-else class="text-[9px] font-bold text-base-content/40">{{ h.ticker }}</span>
-                            </div>
-                          </div>
-                          <div>
-                            <div class="flex items-center gap-1.5">
-                              <div class="font-mono font-bold text-xs group-hover:text-primary transition-colors">{{ h.ticker }}</div>
-                              <span
-                                class="tooltip tooltip-right text-base-content/55"
-                                :data-tip="h.sector || 'Unknown'"
-                                :aria-label="`Sector: ${h.sector || 'Unknown'}`"
-                              >
-                                <SectorLabel :sector="h.sector" size="xs" :show-label="false" />
-                              </span>
-                            </div>
-                            <div class="text-[10px] text-base-content/45 max-w-[140px] truncate">{{ h.companyName || '' }}</div>
-                          </div>
-                        </RouterLink>
-                      </td>
-                      <td class="text-right font-mono text-xs">{{ Number(h.shares).toFixed(2) }}</td>
-                      <td class="text-right font-mono text-xs">${{ h.currentPrice.toFixed(2) }}</td>
-                      <td class="text-right font-mono text-xs font-semibold">${{ h.marketValue.toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</td>
-                      <td class="text-right font-mono text-xs" :class="h.gainLoss >= 0 ? 'text-success' : 'text-error'">
-                        {{ h.gainLoss >= 0 ? '+' : '' }}{{ h.gainLossPct.toFixed(2) }}%
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            </details>
           </div>
         </div>
-      </details>
+      </div>
     </div>
 
     <!-- Loading spinner during tab switch -->
@@ -418,7 +415,7 @@
           </button>
         </div>
         <div v-if="portfolioStore.holdings.length === 0" class="text-base-content/50 text-center py-6 text-lg">
-          No holdings yet. <RouterLink to="/stocks" class="link link-primary">Buy some stocks, ETFs, or other investments!</RouterLink>
+          No holdings yet. <RouterLink :to="stocksListLocation" class="link link-primary">Buy some stocks, ETFs, or other investments!</RouterLink>
         </div>
         <div class="overflow-x-auto" v-else>
           <table class="table table-sm table-zebra">
@@ -435,7 +432,7 @@
             <tbody>
               <tr v-for="h in portfolioStore.holdings" :key="h.ticker">
                 <td>
-                  <RouterLink :to="`/stocks/${h.ticker}`" class="flex items-center gap-2 group">
+                  <RouterLink :to="stockDetailLocation(h.ticker)" class="flex items-center gap-2 group">
                     <div class="avatar">
                       <div class="w-8 h-8 rounded bg-base-200 flex items-center justify-center overflow-hidden border border-base-300">
                         <img v-if="h.image" :src="h.image" :alt="h.ticker" />
@@ -456,10 +453,10 @@
                 </td>
                 <td class="text-center">
                   <div class="flex items-center justify-center gap-1">
-                    <RouterLink :to="{ path: `/stocks/${h.ticker}`, query: { mode: 'buy' } }" class="btn btn-ghost btn-xs text-success px-1 hover:bg-success/10" title="Buy more">
+                    <RouterLink :to="stockDetailLocation(h.ticker, { mode: 'buy' })" class="btn btn-ghost btn-xs text-success px-1 hover:bg-success/10" title="Buy more">
                       <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" /></svg>
                     </RouterLink>
-                    <RouterLink :to="{ path: `/stocks/${h.ticker}`, query: { mode: 'sell' } }" class="btn btn-ghost btn-xs text-error px-1 hover:bg-error/10" title="Sell shares">
+                    <RouterLink :to="stockDetailLocation(h.ticker, { mode: 'sell' })" class="btn btn-ghost btn-xs text-error px-1 hover:bg-error/10" title="Sell shares">
                       <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd" /></svg>
                     </RouterLink>
                   </div>
@@ -672,7 +669,7 @@
                 <tr class="hover">
                   <td class="text-[10px] text-base-content/50">{{ new Date(t.executed_at).toLocaleDateString() }}</td>
                   <td>
-                    <RouterLink :to="`/stocks/${t.ticker}`" class="flex items-center gap-2 group">
+                    <RouterLink :to="stockDetailLocation(t.ticker)" class="flex items-center gap-2 group">
                       <div class="avatar">
                         <div class="w-6 h-6 rounded bg-base-200 flex items-center justify-center overflow-hidden border border-base-300">
                           <img v-if="market.profilesCache[t.ticker]?.data?.image" :src="market.profilesCache[t.ticker].data.image" :alt="t.ticker" />
@@ -864,6 +861,8 @@ const allGroupFundSnapshots = ref([])
 const activeFund = computed(() =>
   groupFunds.value.find(f => f.id === activeFundId.value) || null
 )
+const isTeacherRoute = computed(() => route.path.startsWith('/teacher'))
+const stocksListLocation = computed(() => isTeacherRoute.value ? '/teacher/stocks' : '/stocks')
 const activeFundName = computed(() => {
   if (activeTab.value === 'personal') return auth.profile?.full_name || 'My Investments'
   const f = activeFund.value
@@ -888,6 +887,13 @@ const showSellAllModal = ref(false)
 const sellingAll = ref(false)
 const sellAllRationale = ref('')
 const sellAllError = ref('')
+
+function stockDetailLocation(ticker, query = {}) {
+  if (isTeacherRoute.value) {
+    return { name: 'teacher-stock-detail', params: { ticker }, query }
+  }
+  return { path: `/stocks/${ticker}`, query }
+}
 
 async function handleSellAll() {
   sellAllError.value = ''
