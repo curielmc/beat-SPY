@@ -1,17 +1,19 @@
 <template>
   <!-- Masquerade banner -->
-  <div v-if="auth.isMasquerading" class="bg-warning text-warning-content px-4 py-2 flex items-center justify-between text-sm font-medium z-50 sticky top-0">
-    <div class="flex items-center gap-2">
+  <div v-if="auth.isMasquerading" class="sticky top-0 z-50 flex flex-col gap-2 bg-warning px-3 py-2 text-sm font-medium text-warning-content sm:flex-row sm:items-center sm:justify-between sm:px-4">
+    <div class="flex min-w-0 items-center gap-2">
       <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-      Viewing as <strong class="ml-1">{{ auth.profile?.full_name || auth.masqueradeUser?.email }}</strong>
+      <span class="min-w-0 truncate">Viewing as <strong class="ml-1">{{ auth.profile?.full_name || auth.masqueradeUser?.email }}</strong></span>
     </div>
-    <button class="btn btn-xs btn-warning border border-warning-content/30" @click="exitMasquerade">✕ Exit</button>
+    <button class="btn btn-xs btn-warning border border-warning-content/30 self-start sm:self-auto" @click="exitMasquerade">✕ Exit</button>
   </div>
   <div class="min-h-screen bg-base-200 flex flex-col">
     <!-- Admin preview banner -->
-    <div v-if="viewingAs" class="bg-error text-error-content text-center py-2 px-4 text-sm font-semibold flex items-center justify-center gap-3 shrink-0">
-      <span>Viewing as {{ viewingAs.full_name }} ({{ viewingAs.email }})</span>
+    <div v-if="viewingAs" class="shrink-0 bg-error px-3 py-2 text-sm font-semibold text-error-content sm:px-4">
+      <div class="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-center sm:gap-3">
+      <span class="min-w-0 truncate">Viewing as {{ viewingAs.full_name }} ({{ viewingAs.email }})</span>
       <RouterLink to="/admin/users" class="btn btn-xs btn-ghost bg-error-content/20 hover:bg-error-content/30">Back to Admin</RouterLink>
+      </div>
     </div>
 
     <div class="flex flex-1 min-h-0">
@@ -19,7 +21,7 @@
     <div v-if="sidebarOpen" class="fixed inset-0 bg-black/40 z-30 lg:hidden" @click="sidebarOpen = false"></div>
 
     <!-- Sidebar -->
-    <aside class="fixed lg:sticky top-0 left-0 z-40 h-screen w-56 bg-base-100 border-r border-base-300 flex flex-col transition-transform lg:translate-x-0" :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'">
+    <aside class="fixed left-0 top-0 z-40 flex h-dvh max-h-dvh w-56 flex-col border-r border-base-300 bg-base-100 transition-transform lg:sticky lg:translate-x-0" :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'">
       <div class="p-4 border-b border-base-300 flex items-start justify-between">
         <div class="flex flex-col gap-3">
           <LogoIcon size="sm" />
@@ -94,7 +96,7 @@
           <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
         </button>
       </div>
-      <div class="p-4">
+      <div class="p-3 sm:p-4">
         <RouterView />
       </div>
     </div>

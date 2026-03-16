@@ -4,7 +4,7 @@
   </div>
 
   <div v-else class="space-y-4">
-    <div class="flex items-center justify-between">
+    <div class="flex items-center justify-between gap-3">
       <h1 class="text-xl font-bold flex items-center gap-2">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
         Group Funds
@@ -40,7 +40,7 @@
           </h3>
           <span v-if="groupEnriched.length > 0" class="text-xs uppercase tracking-wide text-base-content/45">Group {{ groupName }}</span>
         </div>
-        <div class="overflow-x-auto">
+        <div class="hidden overflow-x-auto md:block">
           <table class="table table-sm table-zebra">
             <thead>
               <tr>
@@ -50,14 +50,24 @@
                 <th class="text-right">Current</th>
                 <th class="text-right">Return</th>
                 <th class="text-right">vs Benchmark</th>
-                <th class="text-right">Action</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="fund in groupEnriched" :key="fund.id">
                 <td class="font-semibold">
-                  <div>{{ fund.fund_name || 'Fund ' + (fund.fund_number || 1) }}</div>
-                  <div class="text-xs text-base-content/45">{{ fund.fund_thesis || 'Group fund' }}</div>
+                  <div class="flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                      <div>{{ fund.fund_name || 'Fund ' + (fund.fund_number || 1) }}</div>
+                      <div class="text-xs text-base-content/45">{{ fund.fund_thesis || 'Group fund' }}</div>
+                    </div>
+                    <button
+                      class="btn btn-xs shrink-0"
+                      :class="selectedFundId === fund.id ? 'btn-secondary' : 'btn-outline'"
+                      @click="toggleFund(fund)"
+                    >
+                      {{ selectedFundId === fund.id ? 'Hide' : 'Open' }}
+                    </button>
+                  </div>
                 </td>
                 <td><span class="badge badge-xs badge-secondary">Fund {{ fund.fund_number || 1 }}</span></td>
                 <td class="text-right font-mono">${{ Number(fund.starting_cash || 100000).toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</td>
@@ -68,18 +78,51 @@
                 <td class="text-right font-mono" :class="fund._vsSpy >= 0 ? 'text-success' : 'text-error'">
                   {{ fund._vsSpy >= 0 ? '+' : '' }}{{ fund._vsSpy.toFixed(2) }}%
                 </td>
-                <td class="text-right">
-                  <button
-                    class="btn btn-xs"
-                    :class="selectedFundId === fund.id ? 'btn-secondary' : 'btn-outline'"
-                    @click="toggleFund(fund)"
-                  >
-                    {{ selectedFundId === fund.id ? 'Hide' : 'Open' }}
-                  </button>
-                </td>
               </tr>
             </tbody>
           </table>
+        </div>
+        <div class="space-y-3 md:hidden">
+          <div v-for="fund in groupEnriched" :key="`mobile-${fund.id}`" class="rounded-2xl border border-base-300 bg-base-200/30 p-4">
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <div class="font-semibold">{{ fund.fund_name || 'Fund ' + (fund.fund_number || 1) }}</div>
+                <div class="text-xs text-base-content/50">{{ fund.fund_thesis || 'Group fund' }}</div>
+              </div>
+              <button
+                class="btn btn-xs shrink-0"
+                :class="selectedFundId === fund.id ? 'btn-secondary' : 'btn-outline'"
+                @click="toggleFund(fund)"
+              >
+                {{ selectedFundId === fund.id ? 'Hide' : 'Open' }}
+              </button>
+            </div>
+            <div class="mt-2">
+              <span class="badge badge-secondary badge-sm whitespace-nowrap">Fund {{ fund.fund_number || 1 }}</span>
+            </div>
+            <div class="mt-4 grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <div class="text-xs uppercase tracking-wide text-base-content/45">Starting</div>
+                <div class="mt-1 font-mono">${{ Number(fund.starting_cash || 100000).toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</div>
+              </div>
+              <div>
+                <div class="text-xs uppercase tracking-wide text-base-content/45">Current</div>
+                <div class="mt-1 font-mono">${{ fund._totalValue.toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</div>
+              </div>
+              <div>
+                <div class="text-xs uppercase tracking-wide text-base-content/45">Return</div>
+                <div class="mt-1 font-mono" :class="fund._returnPct >= 0 ? 'text-success' : 'text-error'">
+                  {{ fund._returnPct >= 0 ? '+' : '' }}{{ fund._returnPct.toFixed(2) }}%
+                </div>
+              </div>
+              <div>
+                <div class="text-xs uppercase tracking-wide text-base-content/45">vs Benchmark</div>
+                <div class="mt-1 font-mono" :class="fund._vsSpy >= 0 ? 'text-success' : 'text-error'">
+                  {{ fund._vsSpy >= 0 ? '+' : '' }}{{ fund._vsSpy.toFixed(2) }}%
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -108,9 +151,9 @@
           </div>
         </div>
 
-        <div class="flex flex-wrap gap-2">
-          <RouterLink :to="{ path: '/stocks', query: { fund: selectedFundCard.id } }" class="btn btn-primary btn-sm">Browse Stocks For This Fund</RouterLink>
-          <RouterLink :to="{ path: '/screener', query: { fund: selectedFundCard.id } }" class="btn btn-outline btn-sm">Advanced Screener</RouterLink>
+        <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+          <RouterLink :to="{ path: '/stocks', query: { fund: selectedFundCard.id } }" class="btn btn-primary btn-sm w-full sm:w-auto">Browse Stocks For This Fund</RouterLink>
+          <RouterLink :to="{ path: '/screener', query: { fund: selectedFundCard.id } }" class="btn btn-outline btn-sm w-full sm:w-auto">Advanced Screener</RouterLink>
         </div>
 
         <div v-if="selectedFundLoading" class="flex justify-center py-6">
@@ -124,11 +167,11 @@
           </div>
 
           <div v-else class="space-y-3">
-            <div class="flex items-center justify-between">
+            <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
               <h4 class="font-semibold">Current Holdings</h4>
               <div class="text-xs text-base-content/50">Buy and sell below stay inside this fund.</div>
             </div>
-            <div class="overflow-x-auto">
+            <div class="hidden overflow-x-auto md:block">
               <table class="table table-sm table-zebra">
                 <thead>
                   <tr>
@@ -179,6 +222,47 @@
                   </tr>
                 </tbody>
               </table>
+            </div>
+            <div class="space-y-3 md:hidden">
+              <div v-for="holding in selectedFundDetails.holdings" :key="`mobile-holding-${holding.ticker}`" class="rounded-2xl border border-base-300 bg-base-200/30 p-4">
+                <RouterLink :to="stockDetailLocation(holding.ticker, { fund: selectedFundCard.id })" class="flex items-center gap-3">
+                  <div class="avatar">
+                    <div class="w-10 rounded bg-base-200 flex items-center justify-center overflow-hidden border border-base-300">
+                      <img v-if="holding.image" :src="holding.image" :alt="holding.ticker" />
+                      <span v-else class="text-[10px] font-bold text-base-content/40">{{ holding.ticker }}</span>
+                    </div>
+                  </div>
+                  <div class="min-w-0">
+                    <div class="font-mono font-bold">{{ holding.ticker }}</div>
+                    <div class="truncate text-xs text-base-content/50">{{ holding.companyName || '' }}</div>
+                    <div class="mt-1 text-xs text-base-content/60"><SectorLabel :sector="holding.sector" size="xs" /></div>
+                  </div>
+                </RouterLink>
+                <div class="mt-4 grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <div class="text-xs uppercase tracking-wide text-base-content/45">Shares</div>
+                    <div class="mt-1 font-mono">{{ Number(holding.shares).toFixed(2) }}</div>
+                  </div>
+                  <div>
+                    <div class="text-xs uppercase tracking-wide text-base-content/45">Price</div>
+                    <div class="mt-1 font-mono">${{ holding.currentPrice.toFixed(2) }}</div>
+                  </div>
+                  <div>
+                    <div class="text-xs uppercase tracking-wide text-base-content/45">Value</div>
+                    <div class="mt-1 font-mono">${{ holding.marketValue.toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</div>
+                  </div>
+                  <div>
+                    <div class="text-xs uppercase tracking-wide text-base-content/45">Gain/Loss</div>
+                    <div class="mt-1 font-mono" :class="holding.gainLoss >= 0 ? 'text-success' : 'text-error'">
+                      {{ holding.gainLoss >= 0 ? '+' : '' }}{{ holding.gainLossPct.toFixed(2) }}%
+                    </div>
+                  </div>
+                </div>
+                <div class="mt-4 grid grid-cols-2 gap-2">
+                  <RouterLink :to="stockDetailLocation(holding.ticker, { fund: selectedFundCard.id, mode: 'buy' })" class="btn btn-sm btn-outline text-success">Buy More</RouterLink>
+                  <RouterLink :to="stockDetailLocation(holding.ticker, { fund: selectedFundCard.id, mode: 'sell' })" class="btn btn-sm btn-outline text-error">Sell</RouterLink>
+                </div>
+              </div>
             </div>
           </div>
         </div>
