@@ -164,88 +164,82 @@
         </div>
       </div>
 
-      <div class="card bg-base-100 shadow">
-        <div class="flex items-center justify-between gap-3 p-4">
+      <details class="card bg-base-100 shadow">
+        <summary class="flex cursor-pointer list-none items-center justify-between gap-3 p-4">
           <div>
             <h3 class="font-semibold">Positions Across All Funds</h3>
-            <p class="text-xs text-base-content/50">Expand each fund to view its positions.</p>
+            <p class="text-xs text-base-content/50">Expand to view one combined holdings table across every invested fund.</p>
           </div>
-          <div class="text-xs text-base-content/50">{{ investedGroupFunds.length }} funds</div>
-        </div>
+          <div class="flex items-center gap-3 text-xs text-base-content/50">
+            <span>{{ allFundHoldingRows.length }} positions</span>
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </div>
+        </summary>
         <div class="card-body border-t border-base-300 p-4 pt-4">
-          <div class="space-y-4">
-            <details v-for="fund in investedGroupFunds" :key="fund.id" class="group rounded-xl border border-base-300 bg-base-100/60">
-              <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
-                <div>
-                  <div class="font-semibold">{{ fund.fund_name || `Fund ${fund.fund_number || 1}` }}</div>
-                  <div class="text-xs text-base-content/45">{{ fund.fund_thesis || membership?.group?.name }}</div>
-                </div>
-                <div class="flex items-center gap-4">
-                  <div class="text-right">
-                    <div class="text-xs text-base-content/45">Current Value</div>
-                    <div class="font-mono font-semibold">${{ fund.totalValue.toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</div>
-                  </div>
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    class="h-4 w-4 text-base-content/50 transition-transform group-open:rotate-180"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
-              </summary>
-              <div class="border-t border-base-300">
-                <div v-if="fund.holdings.length === 0" class="px-4 py-4 text-sm text-base-content/45">
-                  No invested positions in this fund yet.
-                </div>
-                <div v-else class="overflow-x-auto">
-                  <table class="table table-sm">
-                    <thead>
-                      <tr>
-                        <th>Stock</th>
-                        <th>Sector</th>
-                        <th class="text-right">Shares</th>
-                        <th class="text-right">Price</th>
-                        <th class="text-right">Value</th>
-                        <th class="text-right">Gain/Loss</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr v-for="h in fund.holdings" :key="`${fund.id}-${h.ticker}`">
-                        <td>
-                          <RouterLink :to="stockDetailLocation(h.ticker)" class="flex items-center gap-2 group">
-                            <div class="avatar">
-                              <div class="w-7 h-7 rounded bg-base-200 flex items-center justify-center overflow-hidden border border-base-300">
-                                <img v-if="h.image" :src="h.image" :alt="h.ticker" />
-                                <span v-else class="text-[9px] font-bold text-base-content/40">{{ h.ticker }}</span>
-                              </div>
-                            </div>
-                            <div>
-                              <div class="font-mono font-bold text-xs group-hover:text-primary transition-colors">{{ h.ticker }}</div>
-                              <div class="text-[10px] text-base-content/45 max-w-[140px] truncate">{{ h.companyName || '' }}</div>
-                            </div>
-                          </RouterLink>
-                        </td>
-                        <td class="text-xs text-base-content/70">
-                          <SectorLabel :sector="h.sector" size="xs" />
-                        </td>
-                        <td class="text-right font-mono text-xs">{{ Number(h.shares).toFixed(2) }}</td>
-                        <td class="text-right font-mono text-xs">${{ h.currentPrice.toFixed(2) }}</td>
-                        <td class="text-right font-mono text-xs font-semibold">${{ h.marketValue.toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</td>
-                        <td class="text-right font-mono text-xs" :class="h.gainLoss >= 0 ? 'text-success' : 'text-error'">
-                          {{ h.gainLoss >= 0 ? '+' : '' }}{{ h.gainLossPct.toFixed(2) }}%
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </details>
+          <div v-if="allFundHoldingRows.length === 0" class="text-sm text-base-content/45">
+            No invested positions across any fund yet.
+          </div>
+          <div v-else class="overflow-x-auto">
+            <table class="table table-sm table-zebra">
+              <thead>
+                <tr>
+                  <th>Fund</th>
+                  <th>Stock</th>
+                  <th>Sector</th>
+                  <th class="text-right">Shares</th>
+                  <th class="text-right">Price</th>
+                  <th class="text-right">Value</th>
+                  <th class="text-right">Gain/Loss</th>
+                  <th class="text-center">Trade</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="holding in allFundHoldingRows" :key="`${holding.fundId}-${holding.ticker}`">
+                  <td>
+                    <div class="font-semibold text-xs">{{ holding.fundName }}</div>
+                    <div class="text-[10px] text-base-content/45 max-w-[160px] truncate">{{ holding.fundThesis }}</div>
+                  </td>
+                  <td>
+                    <RouterLink :to="stockDetailLocation(holding.ticker, { fund: holding.fundId })" class="flex items-center gap-2 group">
+                      <div class="avatar">
+                        <div class="w-7 h-7 rounded bg-base-200 flex items-center justify-center overflow-hidden border border-base-300">
+                          <img v-if="holding.image" :src="holding.image" :alt="holding.ticker" />
+                          <span v-else class="text-[9px] font-bold text-base-content/40">{{ holding.ticker }}</span>
+                        </div>
+                      </div>
+                      <div>
+                        <div class="font-mono font-bold text-xs group-hover:text-primary transition-colors">{{ holding.ticker }}</div>
+                        <div class="text-[10px] text-base-content/45 max-w-[140px] truncate">{{ holding.companyName || '' }}</div>
+                      </div>
+                    </RouterLink>
+                  </td>
+                  <td class="text-xs text-base-content/70">
+                    <SectorLabel :sector="holding.sector" size="xs" />
+                  </td>
+                  <td class="text-right font-mono text-xs">{{ Number(holding.shares).toFixed(2) }}</td>
+                  <td class="text-right font-mono text-xs">${{ holding.currentPrice.toFixed(2) }}</td>
+                  <td class="text-right font-mono text-xs font-semibold">${{ holding.marketValue.toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</td>
+                  <td class="text-right font-mono text-xs" :class="holding.gainLoss >= 0 ? 'text-success' : 'text-error'">
+                    {{ holding.gainLoss >= 0 ? '+' : '' }}{{ holding.gainLossPct.toFixed(2) }}%
+                  </td>
+                  <td class="text-center">
+                    <div class="flex items-center justify-center gap-1">
+                      <RouterLink :to="stockDetailLocation(holding.ticker, { mode: 'buy', fund: holding.fundId })" class="btn btn-ghost btn-xs text-success px-1 hover:bg-success/10" title="Buy more">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" /></svg>
+                      </RouterLink>
+                      <RouterLink :to="stockDetailLocation(holding.ticker, { mode: 'sell', fund: holding.fundId })" class="btn btn-ghost btn-xs text-error px-1 hover:bg-error/10" title="Sell shares">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd" /></svg>
+                      </RouterLink>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
-      </div>
+      </details>
     </div>
 
     <!-- Loading spinner during tab switch -->
@@ -418,7 +412,7 @@
     </div>
 
     <!-- Holdings -->
-    <div class="card bg-base-100 shadow">
+    <div v-if="!showTeacherGroupOverviewOnly" class="card bg-base-100 shadow">
       <div class="card-body p-4">
         <div class="flex items-center justify-between mb-2">
           <h3 class="font-semibold">Holdings</h3>
@@ -718,7 +712,7 @@
     </div>
 
     <!-- Charts Section -->
-    <div v-if="portfolioStore.holdings.length > 0 || portfolioStore.cashBalance > 0 || portfolioStore.trades.length > 0" class="space-y-4">
+    <div v-if="!isTeacherRoute && (portfolioStore.holdings.length > 0 || portfolioStore.cashBalance > 0 || portfolioStore.trades.length > 0)" class="space-y-4">
       <div class="flex items-center justify-between gap-2 flex-wrap">
         <div class="flex items-center gap-3">
           <h3 class="font-semibold text-sm">Charts</h3>
@@ -887,8 +881,19 @@ const activeFundName = computed(() => {
   if (!f) return portfolioStore.portfolio?.fund_name || 'Group Fund'
   return f.fund_name || `Fund ${f.fund_number}`
 })
+const showTeacherGroupOverviewOnly = computed(() => isTeacherRoute.value && activeTab.value === 'group')
 const investedGroupFunds = computed(() =>
   allGroupFundSnapshots.value.filter(fund => fund.holdings.length > 0)
+)
+const allFundHoldingRows = computed(() =>
+  investedGroupFunds.value.flatMap(fund =>
+    fund.holdings.map(holding => ({
+      ...holding,
+      fundId: fund.id,
+      fundName: fund.fund_name || `Fund ${fund.fund_number || 1}`,
+      fundThesis: fund.fund_thesis || membership.value?.group?.name || ''
+    }))
+  )
 )
 const resetting = ref(false)
 const closing = ref(false)

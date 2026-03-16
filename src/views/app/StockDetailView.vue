@@ -502,18 +502,21 @@ onMounted(async () => {
     tradeMode.value = route.query.mode
   }
 
-  // Ensure portfolio is loaded (handles direct navigation / page refresh)
-  if (!portfolioStore.portfolio && auth.isLoggedIn) {
+  // Load group funds for switching
+  if (membership.value?.group_id) {
+    groupFunds.value = await portfolioStore.loadGroupFunds(membership.value.group_id)
+  }
+
+  const requestedFundId = typeof route.query.fund === 'string' ? route.query.fund : null
+  if (requestedFundId && groupFunds.value.some(fund => fund.id === requestedFundId)) {
+    await portfolioStore.loadPortfolioById(requestedFundId)
+  } else if (!portfolioStore.portfolio && auth.isLoggedIn) {
+    // Ensure portfolio is loaded (handles direct navigation / page refresh)
     if (membership.value?.group_id) {
       await portfolioStore.loadPortfolio('group', membership.value.group_id)
     } else if (auth.currentUser?.id) {
       await portfolioStore.loadPortfolio('user', auth.currentUser.id)
     }
-  }
-
-  // Load group funds for switching
-  if (membership.value?.group_id) {
-    groupFunds.value = await portfolioStore.loadGroupFunds(membership.value.group_id)
   }
 
   loading.value = false
