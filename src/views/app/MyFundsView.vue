@@ -11,6 +11,20 @@
       </h1>
     </div>
 
+    <div v-if="groupEnriched.length > 0" class="card border border-secondary/20 bg-secondary/5 shadow-sm">
+      <div class="card-body p-4">
+        <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 class="font-semibold text-base">Open A Fund To Trade</h2>
+            <p class="text-sm text-base-content/65">Use the Open button for a group fund to see its holdings, then buy more or sell from that fund.</p>
+          </div>
+          <div class="text-sm text-base-content/55">
+            Trading is always tied to the specific fund you open.
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div v-if="!personalPortfolio && groupEnriched.length === 0" class="text-center py-10 text-base-content/50">
       <p class="text-lg">No funds yet.</p>
       <p class="text-sm mt-1">Start investing from the home page!</p>
@@ -36,6 +50,7 @@
                 <th class="text-right">Current</th>
                 <th class="text-right">Return</th>
                 <th class="text-right">vs Benchmark</th>
+                <th class="text-right">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -53,6 +68,9 @@
                 <td class="text-right font-mono" :class="personalData._vsSpy >= 0 ? 'text-success' : 'text-error'">
                   {{ personalData._vsSpy >= 0 ? '+' : '' }}{{ personalData._vsSpy.toFixed(2) }}%
                 </td>
+                <td class="text-right">
+                  <RouterLink to="/home" class="btn btn-xs btn-outline">Open</RouterLink>
+                </td>
               </tr>
               <tr v-for="fund in groupEnriched" :key="fund.id">
                 <td class="font-semibold">
@@ -68,9 +86,119 @@
                 <td class="text-right font-mono" :class="fund._vsSpy >= 0 ? 'text-success' : 'text-error'">
                   {{ fund._vsSpy >= 0 ? '+' : '' }}{{ fund._vsSpy.toFixed(2) }}%
                 </td>
+                <td class="text-right">
+                  <button
+                    class="btn btn-xs"
+                    :class="selectedFundId === fund.id ? 'btn-secondary' : 'btn-outline'"
+                    @click="toggleFund(fund)"
+                  >
+                    {{ selectedFundId === fund.id ? 'Hide' : 'Open' }}
+                  </button>
+                </td>
               </tr>
             </tbody>
           </table>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="selectedFundCard" class="card bg-base-100 shadow">
+      <div class="card-body p-4 space-y-4">
+        <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 class="text-lg font-semibold">{{ selectedFundCard.fund_name || `Fund ${selectedFundCard.fund_number || 1}` }}</h3>
+              <span class="badge badge-secondary badge-sm">Fund {{ selectedFundCard.fund_number || 1 }}</span>
+            </div>
+            <p class="mt-1 text-sm text-base-content/60">{{ selectedFundCard.fund_thesis || 'Group fund' }}</p>
+          </div>
+          <div class="grid grid-cols-2 gap-3 text-sm lg:min-w-[320px]">
+            <div class="rounded-xl border border-base-300 bg-base-200/40 p-3">
+              <div class="text-xs uppercase tracking-wide text-base-content/45">Current Value</div>
+              <div class="mt-1 font-mono text-lg font-semibold">${{ selectedFundCard._totalValue.toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</div>
+            </div>
+            <div class="rounded-xl border border-base-300 bg-base-200/40 p-3">
+              <div class="text-xs uppercase tracking-wide text-base-content/45">Return</div>
+              <div class="mt-1 font-mono text-lg font-semibold" :class="selectedFundCard._returnPct >= 0 ? 'text-success' : 'text-error'">
+                {{ selectedFundCard._returnPct >= 0 ? '+' : '' }}{{ selectedFundCard._returnPct.toFixed(2) }}%
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap gap-2">
+          <RouterLink :to="{ path: '/stocks', query: { fund: selectedFundCard.id } }" class="btn btn-primary btn-sm">Browse Stocks For This Fund</RouterLink>
+          <RouterLink :to="{ path: '/screener', query: { fund: selectedFundCard.id } }" class="btn btn-outline btn-sm">Advanced Screener</RouterLink>
+        </div>
+
+        <div v-if="selectedFundLoading" class="flex justify-center py-6">
+          <span class="loading loading-spinner loading-md"></span>
+        </div>
+
+        <div v-else-if="selectedFundDetails">
+          <div v-if="selectedFundDetails.holdings.length === 0" class="rounded-xl border border-dashed border-base-300 p-6 text-center text-base-content/55">
+            <p class="font-medium">No holdings in this fund yet.</p>
+            <p class="mt-1 text-sm">Use the buttons above to buy the first investment for this specific fund.</p>
+          </div>
+
+          <div v-else class="space-y-3">
+            <div class="flex items-center justify-between">
+              <h4 class="font-semibold">Current Holdings</h4>
+              <div class="text-xs text-base-content/50">Buy and sell below stay inside this fund.</div>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="table table-sm table-zebra">
+                <thead>
+                  <tr>
+                    <th>Stock</th>
+                    <th>Sector</th>
+                    <th class="text-right">Shares</th>
+                    <th class="text-right">Price</th>
+                    <th class="text-right">Value</th>
+                    <th class="text-right">Gain/Loss</th>
+                    <th class="text-center">Trade</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="holding in selectedFundDetails.holdings" :key="holding.ticker">
+                    <td>
+                      <RouterLink :to="stockDetailLocation(holding.ticker, { fund: selectedFundCard.id })" class="flex items-center gap-3 group">
+                        <div class="avatar">
+                          <div class="w-9 rounded bg-base-200 flex items-center justify-center overflow-hidden border border-base-300">
+                            <img v-if="holding.image" :src="holding.image" :alt="holding.ticker" />
+                            <span v-else class="text-[10px] font-bold text-base-content/40">{{ holding.ticker }}</span>
+                          </div>
+                        </div>
+                        <div>
+                          <div class="font-mono font-bold group-hover:text-primary transition-colors">{{ holding.ticker }}</div>
+                          <div class="text-xs text-base-content/50">{{ holding.companyName || '' }}</div>
+                        </div>
+                      </RouterLink>
+                    </td>
+                    <td class="text-xs text-base-content/70">
+                      <SectorLabel :sector="holding.sector" size="xs" />
+                    </td>
+                    <td class="text-right font-mono">{{ Number(holding.shares).toFixed(2) }}</td>
+                    <td class="text-right font-mono">${{ holding.currentPrice.toFixed(2) }}</td>
+                    <td class="text-right font-mono font-semibold">${{ holding.marketValue.toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</td>
+                    <td class="text-right font-mono" :class="holding.gainLoss >= 0 ? 'text-success' : 'text-error'">
+                      {{ holding.gainLoss >= 0 ? '+' : '' }}{{ holding.gainLossPct.toFixed(2) }}%
+                    </td>
+                    <td class="text-center">
+                      <div class="flex items-center justify-center gap-1">
+                        <RouterLink :to="stockDetailLocation(holding.ticker, { fund: selectedFundCard.id, mode: 'buy' })" class="btn btn-ghost btn-xs text-success px-1 hover:bg-success/10" title="Buy more">
+                          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" /></svg>
+                        </RouterLink>
+                        <RouterLink :to="stockDetailLocation(holding.ticker, { fund: selectedFundCard.id, mode: 'sell' })" class="btn btn-ghost btn-xs text-error px-1 hover:bg-error/10" title="Sell shares">
+                          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd" /></svg>
+                        </RouterLink>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -140,10 +268,12 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { RouterLink } from 'vue-router'
 import { usePortfolioStore } from '../../stores/portfolio'
 import { useAuthStore } from '../../stores/auth'
 import { useMarketDataStore } from '../../stores/marketData'
 import PortfolioLineChart from '../../components/charts/PortfolioLineChart.vue'
+import SectorLabel from '../../components/SectorLabel.vue'
 import { supabase } from '../../lib/supabase'
 import { getHistoricalDaily } from '../../services/fmpApi'
 import { reconstructHoldingsAsOf, reconstructCashAsOf } from '../../utils/leaderboardMetrics'
@@ -159,6 +289,9 @@ const groupEnriched = ref([])
 const comparisonDatasets = ref([])
 const comparisonBenchmarkLabel = ref('SPY')
 const groupName = ref('')
+const selectedFundId = ref(null)
+const selectedFundLoading = ref(false)
+const selectedFundDetails = ref(null)
 
 const allFundsEnriched = computed(() => {
   const items = []
@@ -166,6 +299,10 @@ const allFundsEnriched = computed(() => {
   items.push(...groupEnriched.value)
   return items
 })
+
+const selectedFundCard = computed(() =>
+  groupEnriched.value.find(fund => fund.id === selectedFundId.value) || null
+)
 
 async function enrichFund(fund) {
   const valueData = await portfolioStore.getPortfolioValueById(fund.id)
@@ -206,6 +343,70 @@ async function enrichFund(fund) {
   }
 }
 
+function stockDetailLocation(ticker, query = {}) {
+  return { path: `/stocks/${ticker}`, query }
+}
+
+function toggleFund(fund) {
+  if (selectedFundId.value === fund.id) {
+    selectedFundId.value = null
+    selectedFundDetails.value = null
+    return
+  }
+
+  selectedFundId.value = fund.id
+  loadSelectedFundDetails(fund)
+}
+
+async function loadSelectedFundDetails(fund) {
+  selectedFundLoading.value = true
+  selectedFundDetails.value = null
+
+  try {
+    const { data: holdingsData } = await supabase
+      .from('holdings')
+      .select('ticker, shares, avg_cost')
+      .eq('portfolio_id', fund.id)
+
+    const tickers = [...new Set((holdingsData || []).map(h => h.ticker).filter(Boolean))]
+    if (tickers.length > 0) {
+      await market.fetchBatchQuotes(tickers)
+      try {
+        await market.fetchBatchProfiles(tickers)
+      } catch (e) {
+        console.warn('Failed to fetch selected fund profiles', e)
+      }
+    }
+
+    const holdings = (holdingsData || []).map(h => {
+      const shares = Number(h.shares) || 0
+      const avgCost = Number(h.avg_cost) || 0
+      const currentPrice = market.getCachedPrice(h.ticker) || avgCost || 0
+      const marketValue = shares * currentPrice
+      const costBasis = shares * avgCost
+      const gainLoss = marketValue - costBasis
+      const gainLossPct = costBasis > 0 ? (gainLoss / costBasis) * 100 : 0
+      const profile = market.profilesCache?.[h.ticker]?.data
+
+      return {
+        ...h,
+        shares,
+        currentPrice,
+        marketValue,
+        gainLoss,
+        gainLossPct,
+        companyName: profile?.companyName || profile?.name || null,
+        image: profile?.image || null,
+        sector: profile?.sector || 'Unknown'
+      }
+    }).sort((a, b) => b.marketValue - a.marketValue)
+
+    selectedFundDetails.value = { holdings }
+  } finally {
+    selectedFundLoading.value = false
+  }
+}
+
 onMounted(async () => {
   try {
     // Load single personal portfolio
@@ -235,6 +436,10 @@ onMounted(async () => {
         enriched.push({ ...fund, _ownerType: 'group', ...data })
       }
       groupEnriched.value = enriched
+      if (enriched.length === 1) {
+        selectedFundId.value = enriched[0].id
+        await loadSelectedFundDetails(enriched[0])
+      }
     }
 
     // Build comparison chart

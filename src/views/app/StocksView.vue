@@ -564,6 +564,7 @@ const filteredStocks = ref([])
 const hasActiveFilters = computed(() => !!(activeFilters.sector || activeFilters.size || activeFilters.style || activeFilters.assetType || activeFilters.region || activeFilters.riskExposure))
 const isTeacherRoute = computed(() => route.path.startsWith('/teacher'))
 const screenerLocation = computed(() => isTeacherRoute.value ? '/teacher/screener' : '/screener')
+const selectedFundId = computed(() => typeof route.query.fund === 'string' ? route.query.fund : null)
 
 const canSaveBasket = computed(() => newBasket.name.trim() && newBasket.tickers.length > 0)
 const canBuyBasket = computed(() => {
@@ -584,10 +585,11 @@ const basketPreview = computed(() => {
 })
 
 function stockDetailLocation(ticker) {
+  const query = selectedFundId.value ? { fund: selectedFundId.value } : {}
   if (isTeacherRoute.value) {
-    return { name: 'teacher-stock-detail', params: { ticker } }
+    return { name: 'teacher-stock-detail', params: { ticker }, query }
   }
-  return { path: `/stocks/${ticker}` }
+  return { path: `/stocks/${ticker}`, query }
 }
 
 onMounted(async () => {
