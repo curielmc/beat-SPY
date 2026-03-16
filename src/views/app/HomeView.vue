@@ -63,6 +63,23 @@
   </dialog>
 
   <div v-if="!loading && membership?.group_id" class="space-y-4">
+    <div v-if="isTeacherRoute" class="card border border-primary/20 bg-primary/5 shadow-sm">
+      <div class="card-body p-4">
+        <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h2 class="font-semibold text-base">Investing Workspace</h2>
+            <p class="text-sm text-base-content/65">
+              Buy investments from the stock browser or screener, then return here to review holdings, fund positions, and trades.
+            </p>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <RouterLink :to="stocksListLocation" class="btn btn-primary btn-sm">Browse Stocks</RouterLink>
+            <RouterLink :to="teacherScreenerLocation" class="btn btn-outline btn-sm">Advanced Screener</RouterLink>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Level 1: Personal / Group tabs -->
     <div v-if="hasGroupPortfolio" class="flex gap-2">
       <button
@@ -863,6 +880,7 @@ const activeFund = computed(() =>
 )
 const isTeacherRoute = computed(() => route.path.startsWith('/teacher'))
 const stocksListLocation = computed(() => isTeacherRoute.value ? '/teacher/stocks' : '/stocks')
+const teacherScreenerLocation = computed(() => isTeacherRoute.value ? '/teacher/screener' : '/screener')
 const activeFundName = computed(() => {
   if (activeTab.value === 'personal') return auth.profile?.full_name || 'My Investments'
   const f = activeFund.value

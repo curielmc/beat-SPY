@@ -5,7 +5,7 @@
         <h1 class="text-xl font-bold">Advanced Investment Screener</h1>
         <p class="text-sm text-base-content/60">Filter securities using professional-grade criteria</p>
       </div>
-      <RouterLink to="/stocks" class="btn btn-ghost btn-sm gap-1">
+      <RouterLink :to="stocksListLocation" class="btn btn-ghost btn-sm gap-1">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
         Back to Stocks
       </RouterLink>
@@ -196,7 +196,7 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="stock in displayResults" :key="stock.symbol" class="hover cursor-pointer" @click="router.push(`/stocks/${stock.symbol}`)">
+                <tr v-for="stock in displayResults" :key="stock.symbol" class="hover cursor-pointer" @click="router.push(stockDetailLocation(stock.symbol))">
                   <td>
                     <div class="avatar">
                       <div class="w-6 h-6 rounded bg-base-200 flex items-center justify-center overflow-hidden border border-base-300">
@@ -232,11 +232,12 @@
 
 <script setup>
 import { ref, reactive, computed } from 'vue'
-import { RouterLink, useRouter } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useMarketDataStore } from '../../stores/marketData'
 import SectorLabel from '../../components/SectorLabel.vue'
 
 const router = useRouter()
+const route = useRoute()
 const market = useMarketDataStore()
 
 const loading = ref(false)
@@ -248,6 +249,8 @@ const clientFiltered = ref(false)
 
 const sortKey = ref('marketCap')
 const sortDir = ref('desc')
+const isTeacherRoute = computed(() => route.path.startsWith('/teacher'))
+const stocksListLocation = computed(() => isTeacherRoute.value ? '/teacher/stocks' : '/stocks')
 
 const mcapPreset = ref(null)
 
@@ -269,6 +272,13 @@ const filters = reactive({
   country: '',
   isEtf: null
 })
+
+function stockDetailLocation(ticker) {
+  if (isTeacherRoute.value) {
+    return { name: 'teacher-stock-detail', params: { ticker } }
+  }
+  return { path: `/stocks/${ticker}` }
+}
 
 const sectorOptions = [
   'Technology', 'Healthcare', 'Financial Services', 'Energy',

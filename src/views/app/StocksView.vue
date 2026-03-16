@@ -77,7 +77,7 @@
       </div>
 
       <button v-if="hasActiveFilters" class="btn btn-sm btn-ghost text-error" @click="clearFilters">Clear all</button>
-      <RouterLink to="/screener" class="btn btn-sm btn-outline gap-1 ml-auto">
+      <RouterLink :to="screenerLocation" class="btn btn-sm btn-outline gap-1 ml-auto">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
         Advanced Investment Screener
       </RouterLink>
@@ -117,7 +117,7 @@
 
     <!-- Search Results (override filters when search is active) -->
     <div v-if="searchQuery && !loading" class="space-y-2">
-      <RouterLink v-for="stock in displayStocks" :key="stock.symbol || stock.ticker" :to="`/stocks/${stock.symbol || stock.ticker}`" class="card bg-base-100 shadow hover:shadow-md transition-shadow cursor-pointer block">
+      <RouterLink v-for="stock in displayStocks" :key="stock.symbol || stock.ticker" :to="stockDetailLocation(stock.symbol || stock.ticker)" class="card bg-base-100 shadow hover:shadow-md transition-shadow cursor-pointer block">
         <div class="card-body p-4 flex-row justify-between items-center">
           <div class="flex items-center gap-3">
             <div class="avatar">
@@ -146,7 +146,7 @@
     <!-- Filtered Results -->
     <div v-if="!searchQuery && hasActiveFilters && !loading" class="space-y-2">
       <p class="text-sm text-base-content/60">{{ filteredStocks.length }} results</p>
-      <RouterLink v-for="stock in filteredStocks" :key="stock.symbol" :to="`/stocks/${stock.symbol}`" class="card bg-base-100 shadow hover:shadow-md transition-shadow cursor-pointer block">
+      <RouterLink v-for="stock in filteredStocks" :key="stock.symbol" :to="stockDetailLocation(stock.symbol)" class="card bg-base-100 shadow hover:shadow-md transition-shadow cursor-pointer block">
         <div class="card-body p-4 flex-row justify-between items-center">
           <div class="flex items-center gap-3">
             <div class="avatar">
@@ -310,7 +310,7 @@
         <div v-else class="space-y-4">
           <!-- Stock list -->
           <div class="space-y-2">
-            <RouterLink v-for="stock in basketStocks" :key="stock.symbol" :to="`/stocks/${stock.symbol}`" class="card bg-base-100 shadow hover:shadow-md transition-shadow cursor-pointer block">
+            <RouterLink v-for="stock in basketStocks" :key="stock.symbol" :to="stockDetailLocation(stock.symbol)" class="card bg-base-100 shadow hover:shadow-md transition-shadow cursor-pointer block">
               <div class="card-body p-4 flex-row justify-between items-center">
                 <div class="flex items-center gap-3">
                   <div class="avatar">
@@ -497,7 +497,7 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import { useMarketDataStore } from '../../stores/marketData'
 import { usePortfolioStore } from '../../stores/portfolio'
 import { useAuthStore } from '../../stores/auth'
@@ -510,6 +510,7 @@ const portfolioStore = usePortfolioStore()
 const auth = useAuthStore()
 const basketsStore = useBasketsStore()
 const competitionsStore = useCompetitionsStore()
+const route = useRoute()
 
 const searchQuery = ref('')
 const displayStocks = ref([])
@@ -561,6 +562,8 @@ const quickRationales = [
 const activeFilters = reactive({ sector: null, size: null, style: null, assetType: null, region: null, riskExposure: null })
 const filteredStocks = ref([])
 const hasActiveFilters = computed(() => !!(activeFilters.sector || activeFilters.size || activeFilters.style || activeFilters.assetType || activeFilters.region || activeFilters.riskExposure))
+const isTeacherRoute = computed(() => route.path.startsWith('/teacher'))
+const screenerLocation = computed(() => isTeacherRoute.value ? '/teacher/screener' : '/screener')
 
 const canSaveBasket = computed(() => newBasket.name.trim() && newBasket.tickers.length > 0)
 const canBuyBasket = computed(() => {
@@ -579,6 +582,13 @@ const basketPreview = computed(() => {
     shares: s.price ? perStock / s.price : 0
   }))
 })
+
+function stockDetailLocation(ticker) {
+  if (isTeacherRoute.value) {
+    return { name: 'teacher-stock-detail', params: { ticker } }
+  }
+  return { path: `/stocks/${ticker}` }
+}
 
 onMounted(async () => {
   basketsStore.loadMyBaskets()

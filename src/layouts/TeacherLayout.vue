@@ -18,14 +18,24 @@
           </span>
         </div>
         <div class="flex min-w-0 flex-1 flex-wrap justify-center gap-1">
-          <RouterLink to="/teacher" class="btn btn-ghost btn-sm" :class="{ 'btn-active': route.path === '/teacher' }">Dashboard</RouterLink>
-          <RouterLink to="/teacher/students" class="btn btn-ghost btn-sm" :class="{ 'btn-active': route.path === '/teacher/students' }">Students</RouterLink>
-          <RouterLink to="/teacher/restrictions" class="btn btn-ghost btn-sm" :class="{ 'btn-active': route.path === '/teacher/restrictions' }">Settings</RouterLink>
-          <RouterLink to="/teacher/classes" class="btn btn-ghost btn-sm" :class="{ 'btn-active': route.path === '/teacher/classes' }">Classes</RouterLink>
-          <RouterLink to="/teacher/tutorials" class="btn btn-ghost btn-sm" :class="{ 'btn-active': route.path === '/teacher/tutorials' }">📚 Tutorials</RouterLink>
-          <RouterLink to="/teacher/portfolio" class="btn btn-ghost btn-sm" :class="{ 'btn-active': route.path === '/teacher/portfolio' }">📈 My Investments</RouterLink>
-          <RouterLink to="/teacher/fund-analytics" class="btn btn-ghost btn-sm" :class="{ 'btn-active': route.path === '/teacher/fund-analytics' }">📊 Analytics</RouterLink>
-          <RouterLink to="/teacher/messages" class="btn btn-ghost btn-sm" :class="{ 'btn-active': route.path === '/teacher/messages' }">💬 Messages</RouterLink>
+          <RouterLink to="/teacher" class="btn btn-ghost btn-sm" :class="{ 'btn-active': currentPrimarySection === 'overview' }">Overview</RouterLink>
+          <RouterLink to="/teacher/students" class="btn btn-ghost btn-sm" :class="{ 'btn-active': currentPrimarySection === 'students' }">Students</RouterLink>
+          <RouterLink to="/teacher/classes" class="btn btn-ghost btn-sm" :class="{ 'btn-active': currentPrimarySection === 'classes' }">Classes</RouterLink>
+          <RouterLink to="/teacher/portfolio" class="btn btn-ghost btn-sm" :class="{ 'btn-active': currentPrimarySection === 'investing' }">Investing</RouterLink>
+          <RouterLink to="/teacher/messages" class="btn btn-ghost btn-sm" :class="{ 'btn-active': currentPrimarySection === 'messages' }">Messages</RouterLink>
+          <div class="dropdown dropdown-end">
+            <label tabindex="0" class="btn btn-ghost btn-sm gap-1" :class="{ 'btn-active': isMoreActive }">
+              More
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+              </svg>
+            </label>
+            <ul tabindex="0" class="dropdown-content z-50 menu mt-2 w-56 rounded-box bg-base-100 p-2 shadow-lg">
+              <li><RouterLink to="/teacher/restrictions">Rules & Settings</RouterLink></li>
+              <li><RouterLink to="/teacher/fund-analytics">Fund Analytics</RouterLink></li>
+              <li><RouterLink to="/teacher/tutorials">Tutorials</RouterLink></li>
+            </ul>
+          </div>
         </div>
         <div class="ml-auto flex-none">
           <button class="btn btn-ghost btn-sm" @click="logout">Logout</button>
@@ -39,6 +49,7 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { RouterView, RouterLink, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import LogoIcon from '../components/LogoIcon.vue'
@@ -46,6 +57,25 @@ import LogoIcon from '../components/LogoIcon.vue'
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
+
+const currentPrimarySection = computed(() => {
+  if (route.path === '/teacher') return 'overview'
+  if (route.path.startsWith('/teacher/students')) return 'students'
+  if (route.path.startsWith('/teacher/classes')) return 'classes'
+  if (
+    route.path.startsWith('/teacher/portfolio') ||
+    route.path.startsWith('/teacher/stocks') ||
+    route.path.startsWith('/teacher/screener')
+  ) return 'investing'
+  if (route.path.startsWith('/teacher/messages')) return 'messages'
+  return null
+})
+
+const isMoreActive = computed(() =>
+  route.path.startsWith('/teacher/restrictions') ||
+  route.path.startsWith('/teacher/fund-analytics') ||
+  route.path.startsWith('/teacher/tutorials')
+)
 
 function logout() {
   auth.logout()
