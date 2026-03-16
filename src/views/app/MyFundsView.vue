@@ -25,13 +25,13 @@
       </div>
     </div>
 
-    <div v-if="!personalPortfolio && groupEnriched.length === 0" class="text-center py-10 text-base-content/50">
+    <div v-if="groupEnriched.length === 0" class="text-center py-10 text-base-content/50">
       <p class="text-lg">No funds yet.</p>
       <p class="text-sm mt-1">Start investing from the home page!</p>
     </div>
 
     <!-- Funds overview table -->
-    <div v-if="allFundsEnriched.length > 0" class="card bg-base-100 shadow">
+    <div v-if="groupEnriched.length > 0" class="card bg-base-100 shadow">
       <div class="card-body p-4">
         <div class="flex items-center justify-between mb-2">
           <h3 class="font-semibold flex items-center gap-2">
@@ -54,24 +54,6 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-if="personalPortfolio">
-                <td class="font-semibold">
-                  <div>{{ auth.profile?.full_name || 'My Investments' }}</div>
-                  <div class="text-xs text-base-content/45">{{ personalPortfolio.visibility || 'private' }}</div>
-                </td>
-                <td><span class="badge badge-xs badge-primary">Personal</span></td>
-                <td class="text-right font-mono">${{ Number(personalPortfolio.starting_cash || 100000).toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</td>
-                <td class="text-right font-mono">${{ personalData._totalValue.toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</td>
-                <td class="text-right font-mono" :class="personalData._returnPct >= 0 ? 'text-success' : 'text-error'">
-                  {{ personalData._returnPct >= 0 ? '+' : '' }}{{ personalData._returnPct.toFixed(2) }}%
-                </td>
-                <td class="text-right font-mono" :class="personalData._vsSpy >= 0 ? 'text-success' : 'text-error'">
-                  {{ personalData._vsSpy >= 0 ? '+' : '' }}{{ personalData._vsSpy.toFixed(2) }}%
-                </td>
-                <td class="text-right">
-                  <RouterLink to="/home" class="btn btn-xs btn-outline">Open</RouterLink>
-                </td>
-              </tr>
               <tr v-for="fund in groupEnriched" :key="fund.id">
                 <td class="font-semibold">
                   <div>{{ fund.fund_name || 'Fund ' + (fund.fund_number || 1) }}</div>
@@ -283,8 +265,6 @@ const auth = useAuthStore()
 const market = useMarketDataStore()
 
 const loading = ref(true)
-const personalPortfolio = ref(null)
-const personalData = ref({ _totalValue: 0, _returnPct: 0, _bmReturnPct: 0, _vsSpy: 0 })
 const groupEnriched = ref([])
 const comparisonDatasets = ref([])
 const comparisonBenchmarkLabel = ref('SPY')
@@ -292,13 +272,6 @@ const groupName = ref('')
 const selectedFundId = ref(null)
 const selectedFundLoading = ref(false)
 const selectedFundDetails = ref(null)
-
-const allFundsEnriched = computed(() => {
-  const items = []
-  if (personalPortfolio.value) items.push({ ...personalPortfolio.value, ...personalData.value, _ownerType: 'user' })
-  items.push(...groupEnriched.value)
-  return items
-})
 
 const selectedFundCard = computed(() =>
   groupEnriched.value.find(fund => fund.id === selectedFundId.value) || null
@@ -409,22 +382,6 @@ async function loadSelectedFundDetails(fund) {
 
 onMounted(async () => {
   try {
-    // Load single personal portfolio
-    const { data: pPortfolio } = await supabase
-      .from('portfolios')
-      .select('*')
-      .eq('owner_type', 'user')
-      .eq('owner_id', auth.effectiveUserId)
-      .or('status.eq.active,status.is.null')
-      .order('created_at', { ascending: true })
-      .limit(1)
-      .maybeSingle()
-
-    if (pPortfolio) {
-      personalPortfolio.value = pPortfolio
-      personalData.value = await enrichFund(pPortfolio)
-    }
-
     // Load group funds if user is in a class with a group
     const membership = await auth.getCurrentMembership()
     if (membership?.group_id) {
@@ -459,19 +416,6 @@ async function buildComparisonChart() {
   const benchmarkTickers = new Set()
   let colorIdx = 0
 
-  // Add personal portfolio
-  if (personalPortfolio.value) {
-    const startCash = Number(personalPortfolio.value.starting_cash || 100000)
-    const synth = generateSyntheticHistory(personalPortfolio.value.created_at, null, startCash, personalData.value._totalValue, personalPortfolio.value.id)
-    datasets.push({
-      label: auth.profile?.full_name || 'My Investments',
-      data: synth,
-      color: FUND_COLORS[colorIdx++ % FUND_COLORS.length],
-      baseline: startCash
-    })
-    benchmarkTickers.add(personalData.value._benchmarkLabel || 'SPY')
-  }
-
   // Add group funds
   for (const fund of groupEnriched.value) {
     const startCash = Number(fund.starting_cash || 100000)
@@ -492,10 +436,7 @@ async function buildComparisonChart() {
     return
   }
 
-  const funds = [
-    ...(personalPortfolio.value ? [{ ...personalPortfolio.value, ...personalData.value }] : []),
-    ...groupEnriched.value
-  ]
+  const funds = [...groupEnriched.value]
   const firstItem = funds[0]
   const fromStr = new Date(firstItem.created_at).toISOString().slice(0, 10)
   const toStr = new Date().toISOString().slice(0, 10)
@@ -557,9 +498,6 @@ function getYTDStart() {
 async function loadPeriodPerformance() {
   // Collect all fund IDs and their data
   const fundList = []
-  if (personalPortfolio.value) {
-    fundList.push({ id: personalPortfolio.value.id, name: auth.profile?.full_name || 'My Investments', createdAt: personalPortfolio.value.created_at })
-  }
   for (const fund of groupEnriched.value) {
     fundList.push({ id: fund.id, name: fund.fund_name || `Fund ${fund.fund_number || 1}`, createdAt: fund.created_at })
   }
