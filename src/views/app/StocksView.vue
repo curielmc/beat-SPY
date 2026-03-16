@@ -178,7 +178,7 @@
     <!-- Baskets (shown when no search AND no filters) -->
     <div v-if="!searchQuery && !hasActiveFilters && !loading">
       <!-- Create Basket Form (inline) -->
-      <div v-if="showCreateForm" class="card bg-base-100 shadow mb-4">
+      <div v-if="showBasketTools && showCreateForm" class="card bg-base-100 shadow mb-4">
         <div class="card-body p-4 space-y-3">
           <h3 class="font-bold">Create Custom Basket</h3>
           <div class="form-control">
@@ -238,7 +238,7 @@
       </div>
 
       <!-- Edit Basket Form (inline) -->
-      <div v-if="editingBasket" class="card bg-base-100 shadow mb-4">
+      <div v-if="showBasketTools && editingBasket" class="card bg-base-100 shadow mb-4">
         <div class="card-body p-4 space-y-3">
           <h3 class="font-bold">Edit Basket</h3>
           <div class="form-control">
@@ -296,7 +296,7 @@
       </div>
 
       <!-- Expanded basket view -->
-      <div v-if="expandedBasket" class="space-y-3">
+      <div v-if="showBasketTools && expandedBasket" class="space-y-3">
         <button class="btn btn-ghost btn-sm gap-1" @click="collapseBasket">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
           Back to Baskets
@@ -444,7 +444,7 @@
       </div>
 
       <!-- Baskets grid -->
-      <div v-if="!expandedBasket && !showCreateForm && !editingBasket" class="grid grid-cols-2 md:grid-cols-3 gap-3">
+      <div v-if="showBasketTools && !expandedBasket && !showCreateForm && !editingBasket" class="grid grid-cols-2 md:grid-cols-3 gap-3">
         <!-- Create basket card -->
         <button class="card border-2 border-dashed border-base-300 hover:border-primary transition-colors text-left" @click="showCreateForm = true">
           <div class="card-body p-4 flex flex-col items-center justify-center text-center">
@@ -516,6 +516,7 @@ const searchQuery = ref('')
 const displayStocks = ref([])
 const loading = ref(false)
 let searchTimeout = null
+const showBasketTools = false
 
 const expandedBasket = ref(null)
 const basketStocks = ref([])
