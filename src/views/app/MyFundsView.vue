@@ -30,7 +30,7 @@
       <p class="text-sm mt-1">Start investing from the home page!</p>
     </div>
 
-    <!-- Funds Overview Table -->
+    <!-- Funds overview table -->
     <div v-if="allFundsEnriched.length > 0" class="card bg-base-100 shadow">
       <div class="card-body p-4">
         <div class="flex items-center justify-between mb-2">
