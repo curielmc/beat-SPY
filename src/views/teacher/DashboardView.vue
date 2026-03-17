@@ -209,6 +209,15 @@
                         </svg>
                       </button>
                       <button
+                        class="btn btn-square btn-sm btn-outline btn-primary tooltip tooltip-left"
+                        data-tip="Performance attribution"
+                        @click="openAttributionModal(group)"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                      </button>
+                      <button
                         class="btn btn-square btn-sm btn-outline btn-info tooltip tooltip-left"
                         data-tip="Send lesson"
                         :disabled="sendingLessonId === group.id"
@@ -597,6 +606,11 @@
       </div>
       <form method="dialog" class="modal-backdrop" @click="showQuickMessageModal = false"><button>close</button></form>
     </dialog>
+    <GroupAttributionModal
+      :group="selectedGroup"
+      :isOpen="showAttributionModal"
+      @close="showAttributionModal = false"
+    />
   </div>
 </template>
 
@@ -606,6 +620,7 @@ import { RouterLink, useRoute } from 'vue-router'
 import { useTeacherStore } from '../../stores/teacher'
 import { supabase } from '../../lib/supabase'
 import { downloadPDF, downloadDOCX } from '../../lib/notesExport'
+import GroupAttributionModal from '../../components/GroupAttributionModal.vue'
 
 const route = useRoute()
 const teacher = useTeacherStore()
@@ -616,6 +631,7 @@ const sortDirection = ref('desc')
 const showMembersModal = ref(false)
 const showFundsModal = ref(false)
 const showClassContactsModal = ref(false)
+const showAttributionModal = ref(false)
 const selectedGroup = ref(null)
 const copiedMemberEmails = ref(false)
 const copiedClassEmails = ref(false)
@@ -628,6 +644,11 @@ const currentClass = computed(() => {
   }
   return teacher.classes[0] || null
 })
+
+function openAttributionModal(group) {
+  selectedGroup.value = group
+  showAttributionModal.value = true
+}
 
 const classGroups = computed(() =>
   teacher.groups.filter(group => group.class_id === currentClass.value?.id)
