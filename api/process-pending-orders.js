@@ -93,9 +93,35 @@ async function fetchQuotes(tickers) {
   return quoteMap
 }
 
+async function notifyAdmin(subject, body) {
+  const AGENTMAIL_KEY = process.env.AGENTMAIL_API_KEY
+  const INBOX_ID = 'beat-snp@agentmail.to'
+  const ADMIN_EMAIL = 'martin@myecfo.com'
+  if (!AGENTMAIL_KEY) return
+  try {
+    await fetch(`https://api.agentmail.to/v0/inboxes/${INBOX_ID}/messages/send`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${AGENTMAIL_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to: [ADMIN_EMAIL],
+        subject,
+        html: `<div style="font-family:sans-serif;padding:20px;">
+          <h2 style="color:#dc2626;">${subject}</h2>
+          <pre style="background:#f3f4f6;padding:16px;border-radius:8px;overflow:auto;">${body}</pre>
+          <p style="color:#9ca3af;font-size:12px;margin-top:16px;">Automated alert from Beat the S&amp;P 500 pending orders cron.</p>
+        </div>`
+      })
+    })
+  } catch (e) { /* best effort */ }
+}
+
 export default async function handler(req) {
-  const secret = req.headers.get('x-cron-secret')
-  if (secret !== process.env.CRON_SECRET) {
+  const auth = req.headers.get('authorization')
+  const cronSecret = req.headers.get('x-cron-secret')
+  const vercelSecret = auth?.startsWith('Bearer ') ? auth.slice(7) : null
+
+  // Support both standard Vercel auth and custom header
+  if (cronSecret !== process.env.CRON_SECRET && vercelSecret !== process.env.CRON_SECRET) {
     return new Response('Unauthorized', { status: 401 })
   }
 
@@ -106,7 +132,8 @@ export default async function handler(req) {
   }
 
   const nowIso = new Date().toISOString()
-  const path = `/pending_trade_orders?status=in.(queued,processing)&execute_after=lte.${encodeURIComponent(nowIso)}&select=id,ticker,portfolio_id,user_id,placed_by_user_id,placed_by_role,portfolios(benchmark_ticker)&order=requested_at.asc&limit=100`
+  // Select orders where attempts < 10 to prevent infinite retries of broken tickers
+  const path = `/pending_trade_orders?status=in.(queued,processing)&execute_after=lte.${encodeURIComponent(nowIso)}&attempts=lt.10&select=id,ticker,portfolio_id,user_id,placed_by_user_id,placed_by_role,attempts,portfolios(benchmark_ticker)&order=requested_at.asc&limit=100`
   const orders = await sbFetch(path).catch(() => [])
 
   if (!orders.length) {
@@ -132,11 +159,30 @@ export default async function handler(req) {
 
     if (!executionPrice || !benchmarkExecutionPrice) {
       skipped += 1
+      
+      // Increment attempts and update execute_after by 5 minutes to move to back of queue
+      const nextExecution = new Date(Date.now() + 300000).toISOString()
+      const newAttempts = (order.attempts || 0) + 1
+      const isPermanentlyFailed = newAttempts >= 10
+
+      await sbFetch(`/pending_trade_orders?id=eq.${order.id}`, {
+        method: 'PATCH',
+        headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({
+          attempts: newAttempts,
+          execute_after: nextExecution,
+          error_message: 'opening_price_unavailable',
+          status: isPermanentlyFailed ? 'failed' : order.status
+        })
+      }).catch(() => {})
+
       results.push({
         id: order.id,
         success: false,
         skipped: true,
-        reason: 'opening_price_unavailable'
+        reason: 'opening_price_unavailable',
+        attempts: newAttempts,
+        permanently_failed: isPermanentlyFailed
       })
       continue
     }
@@ -163,13 +209,22 @@ export default async function handler(req) {
     }
   }
 
-  return new Response(JSON.stringify({
+  const summary = {
     processed: results.length,
     succeeded: results.filter(r => r.success).length,
-    failed: results.filter(r => !r.success).length,
+    failed: results.filter(r => !r.success && !r.skipped).length,
     skipped,
     results
-  }), {
+  }
+
+  if (skipped > 5 || summary.failed > 0) {
+    await notifyAdmin(
+      `⚠️ Pending Orders: ${summary.failed} failure(s), ${skipped} skip(s)`,
+      JSON.stringify(summary, null, 2)
+    )
+  }
+
+  return new Response(JSON.stringify(summary), {
     headers: { 'Content-Type': 'application/json' }
   })
 }

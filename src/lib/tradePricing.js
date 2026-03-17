@@ -8,7 +8,7 @@ export function getImmediateExecutionPrice(quote) {
 }
 
 export function getQueuedExecutionPrice(quote) {
-  return toPositiveNumber(quote?.open)
+  return toPositiveNumber(quote?.open) ?? toPositiveNumber(quote?.price) ?? toPositiveNumber(quote?.previousClose)
 }
 
 export function getAvailableCashForQueuedBuys(cashBalance, pendingOrders = []) {
