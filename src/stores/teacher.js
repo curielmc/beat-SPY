@@ -83,26 +83,47 @@ export const useTeacherStore = defineStore('teacher', () => {
     const scopedGroups = classId
       ? groups.value.filter(group => group.class_id === classId)
       : groups.value
+    const scopedStudents = classId
+      ? students.value.filter(student => student.class_id === classId)
+      : students.value
 
     if (!scopedGroups.length) return []
 
     try {
       const ranked = []
       const groupIds = scopedGroups.map(g => g.id)
+      const studentUserIds = [...new Set(scopedStudents.map(student => student.userId).filter(Boolean))]
 
-      // Batch fetch all active portfolios for these groups
-      const { data: pData, error: portfoliosError } = await supabase
+      // Batch fetch active group portfolios for these groups
+      const { data: groupPortfolioData, error: groupPortfoliosError } = await supabase
         .from('portfolios')
         .select('*')
         .eq('owner_type', 'group')
         .in('owner_id', groupIds)
         .or('status.eq.active,status.is.null')
 
-      if (portfoliosError) {
-        throw portfoliosError
+      if (groupPortfoliosError) {
+        throw groupPortfoliosError
       }
 
-      const allPortfolios = pData || []
+      // Also fetch active student-owned portfolios so grouped classes without
+      // explicit group funds still show the members' live investing data.
+      let userPortfolioData = []
+      if (studentUserIds.length) {
+        const { data, error } = await supabase
+          .from('portfolios')
+          .select('*')
+          .eq('owner_type', 'user')
+          .in('owner_id', studentUserIds)
+          .or('status.eq.active,status.is.null')
+
+        if (error) {
+          throw error
+        }
+        userPortfolioData = data || []
+      }
+
+      const allPortfolios = [...(groupPortfolioData || []), ...userPortfolioData]
 
       if (allPortfolios.length === 0) {
         return scopedGroups
@@ -181,6 +202,12 @@ export const useTeacherStore = defineStore('teacher', () => {
         })
       }
 
+      const userPortfoliosByOwner = {}
+      for (const portfolio of userPortfolioData) {
+        if (!userPortfoliosByOwner[portfolio.owner_id]) userPortfoliosByOwner[portfolio.owner_id] = []
+        userPortfoliosByOwner[portfolio.owner_id].push(portfolio)
+      }
+
       const tradesByPort = {}
       for (const t of allTrades) {
         if (!tradesByPort[t.portfolio_id]) tradesByPort[t.portfolio_id] = []
@@ -189,7 +216,12 @@ export const useTeacherStore = defineStore('teacher', () => {
 
       // Build the results
       for (const group of scopedGroups) {
-        const groupPortfolios = allPortfolios.filter(p => p.owner_id === group.id)
+        const ownedGroupPortfolios = (groupPortfolioData || []).filter(p => p.owner_id === group.id)
+        const memberUserPortfolios = scopedStudents
+          .filter(student => student.group_id === group.id)
+          .flatMap(student => userPortfoliosByOwner[student.userId] || [])
+
+        const groupPortfolios = ownedGroupPortfolios.length ? ownedGroupPortfolios : memberUserPortfolios
 
         let funds = []
         let groupTotalValue = 0
