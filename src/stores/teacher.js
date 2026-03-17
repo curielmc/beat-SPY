@@ -98,7 +98,10 @@ export const useTeacherStore = defineStore('teacher', () => {
 
         const tickers = (hData || []).map(h => h.ticker)
         if (tickers.length > 0) {
-          await market.fetchBatchQuotes(tickers)
+          await Promise.all([
+            market.fetchBatchQuotes(tickers),
+            market.fetchBatchProfiles(tickers)
+          ])
         }
 
         const holdingsByPortfolioId = new Map()
@@ -106,8 +109,11 @@ export const useTeacherStore = defineStore('teacher', () => {
           const currentPrice = market.getCachedPrice(holding.ticker) || holding.avg_cost
           const marketValue = Number(holding.shares || 0) * Number(currentPrice || 0)
           const costBasis = Number(holding.shares || 0) * Number(holding.avg_cost || 0)
+          const profile = market.profilesCache[holding.ticker]?.data
           const enrichedHolding = {
             ...holding,
+            companyName: profile?.companyName || holding.ticker,
+            sector: profile?.sector || '',
             currentPrice,
             marketValue,
             gainLoss: marketValue - costBasis
@@ -415,6 +421,7 @@ export const useTeacherStore = defineStore('teacher', () => {
       return {
         ...h,
         companyName: profile?.companyName || h.ticker,
+        sector: profile?.sector || '',
         currentPrice,
         marketValue,
         gainLoss: marketValue - costBasis

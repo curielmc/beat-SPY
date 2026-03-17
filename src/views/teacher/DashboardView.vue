@@ -458,11 +458,26 @@
                 </thead>
                 <tbody>
                   <tr v-for="holding in fund.holdings" :key="`${fund.id}-${holding.ticker}`">
-                    <td class="font-mono font-semibold">{{ holding.ticker }}</td>
-                    <td class="text-right font-mono">{{ Number(holding.shares || 0).toLocaleString('en-US', { maximumFractionDigits: 4 }) }}</td>
-                    <td class="text-right font-mono">${{ Number(holding.currentPrice || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</td>
-                    <td class="text-right font-mono">${{ Number(holding.marketValue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</td>
-                    <td class="text-right font-mono" :class="holding.gainLoss >= 0 ? 'text-success' : 'text-error'">
+                    <td class="py-3">
+                      <div class="flex items-center gap-2.5">
+                        <div class="avatar placeholder">
+                          <div class="bg-base-300 text-base-content/40 rounded w-8 h-8 font-mono text-[10px] font-bold border border-base-300">
+                            <span>{{ holding.ticker }}</span>
+                          </div>
+                        </div>
+                        <div>
+                          <div class="font-bold text-sm leading-tight">{{ holding.ticker }}</div>
+                          <div class="text-[11px] text-base-content/60 leading-tight mt-0.5 line-clamp-1">{{ holding.companyName || '—' }}</div>
+                          <div v-if="holding.sector" class="mt-1">
+                            <SectorLabel :sector="holding.sector" size="xs" />
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td class="text-right font-mono text-xs">{{ Number(holding.shares || 0).toLocaleString('en-US', { maximumFractionDigits: 4 }) }}</td>
+                    <td class="text-right font-mono text-xs">${{ Number(holding.currentPrice || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</td>
+                    <td class="text-right font-mono text-xs font-semibold">${{ Number(holding.marketValue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</td>
+                    <td class="text-right font-mono text-xs" :class="holding.gainLoss >= 0 ? 'text-success' : 'text-error'">
                       {{ holding.gainLoss >= 0 ? '+' : '-' }}${{ Math.abs(Number(holding.gainLoss || 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
                     </td>
                   </tr>
@@ -621,6 +636,7 @@ import { useTeacherStore } from '../../stores/teacher'
 import { supabase } from '../../lib/supabase'
 import { downloadPDF, downloadDOCX } from '../../lib/notesExport'
 import GroupAttributionModal from '../../components/GroupAttributionModal.vue'
+import SectorLabel from '../../components/SectorLabel.vue'
 
 const route = useRoute()
 const teacher = useTeacherStore()
