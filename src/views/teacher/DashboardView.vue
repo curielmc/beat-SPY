@@ -1080,8 +1080,13 @@ async function loadDashboard() {
   }
 
   loading.value = true
-  rankedGroups.value = await teacher.getRankedGroups(currentClass.value?.id || null)
-  loading.value = false
+  try {
+    rankedGroups.value = await teacher.getRankedGroups(currentClass.value?.id || null)
+  } catch (err) {
+    console.error('Failed to load dashboard:', err)
+  } finally {
+    loading.value = false
+  }
 }
 
 onMounted(async () => {
