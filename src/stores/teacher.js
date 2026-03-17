@@ -13,16 +13,16 @@ export const useTeacherStore = defineStore('teacher', () => {
   const unassignedStudents = ref([])
   const loading = ref(false)
 
-  function buildGroupFallback(group, classStartingCash = 100000) {
+  function buildGroupFallback(group) {
     const members = students.value.filter(s => s.group_id === group.id)
     return {
       ...group,
-      totalValue: classStartingCash,
+      totalValue: 0,
       returnPct: 0,
       benchmarkReturnPct: 0,
       isBeatingSP500: false,
-      cash: classStartingCash,
-      startingCash: classStartingCash,
+      cash: 0,
+      startingCash: 0,
       lastTradeAt: null,
       fundCount: 0,
       funds: [],
@@ -89,7 +89,6 @@ export const useTeacherStore = defineStore('teacher', () => {
     try {
       const ranked = []
       const groupIds = scopedGroups.map(g => g.id)
-      const classStartingCash = Number(classes.value.find(c => c.id === classId)?.starting_cash || 100000)
 
       // Batch fetch all active portfolios for these groups
       const { data: pData, error: portfoliosError } = await supabase
@@ -107,7 +106,7 @@ export const useTeacherStore = defineStore('teacher', () => {
 
       if (allPortfolios.length === 0) {
         return scopedGroups
-          .map(group => buildGroupFallback(group, classStartingCash))
+          .map(group => buildGroupFallback(group))
           .sort((a, b) => b.returnPct - a.returnPct)
       }
 
@@ -237,9 +236,9 @@ export const useTeacherStore = defineStore('teacher', () => {
             }
           }).sort((a, b) => (a.fund_number || 1) - (b.fund_number || 1))
         } else {
-          groupTotalValue = classStartingCash
-          groupStartingCash = classStartingCash
-          groupCash = classStartingCash
+          groupTotalValue = 0
+          groupStartingCash = 0
+          groupCash = 0
         }
 
         const returnPct = groupStartingCash > 0 ? ((groupTotalValue - groupStartingCash) / groupStartingCash) * 100 : 0
@@ -272,9 +271,8 @@ export const useTeacherStore = defineStore('teacher', () => {
       return ranked.sort((a, b) => b.returnPct - a.returnPct)
     } catch (err) {
       console.error('Failed to rank teacher groups:', err)
-      const classStartingCash = Number(classes.value.find(c => c.id === classId)?.starting_cash || 100000)
       return scopedGroups
-        .map(group => buildGroupFallback(group, classStartingCash))
+        .map(group => buildGroupFallback(group))
         .sort((a, b) => b.returnPct - a.returnPct)
     }
   }
