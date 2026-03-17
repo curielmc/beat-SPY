@@ -191,6 +191,27 @@ export const useAuthStore = defineStore('auth', () => {
     return { error: message }
   }
 
+  async function _handleAutoJoin(session) {
+    if (profile.value?.role === 'student' && session.user.email) {
+      const { data: existing } = await supabase
+        .from('class_memberships')
+        .select('id')
+        .eq('user_id', session.user.id)
+        .limit(1)
+      if (!existing || existing.length === 0) {
+        const invite = await checkEmailInvite(session.user.email)
+        if (invite) {
+          console.log('[AUTH] auto-joining class from invite:', invite.class_code)
+          // Update name from invite if it's just the email prefix
+          if (profile.value.full_name === session.user.email.split('@')[0]) {
+            await updateProfile({ full_name: invite.full_name })
+          }
+          await joinClass(invite.class_code, null, null, invite.id)
+        }
+      }
+    }
+  }
+
   // Initialize auth state from session
   async function init() {
     if (initialized.value) return
@@ -209,6 +230,9 @@ export const useAuthStore = defineStore('auth', () => {
         if (profileResult.error) return
         if (await handleDisabledProfile(profileResult.profile)) return
         await ensureOwnerAdminProfile()
+        
+        // Handle auto-join on initial load
+        await _handleAutoJoin(session)
       }
     } finally {
       loading.value = false
@@ -232,22 +256,8 @@ export const useAuthStore = defineStore('auth', () => {
         await ensureOwnerAdminProfile()
 
         // Auto-join class if student has a pending invite and no memberships
-        if (event === 'SIGNED_IN' && profile.value?.role === 'student' && session.user.email) {
-          const { data: existing } = await supabase
-            .from('class_memberships')
-            .select('id')
-            .eq('user_id', session.user.id)
-            .limit(1)
-          if (!existing || existing.length === 0) {
-            const invite = await checkEmailInvite(session.user.email)
-            if (invite) {
-              // Update name from invite if it's just the email prefix
-              if (profile.value.full_name === session.user.email.split('@')[0]) {
-                await updateProfile({ full_name: invite.full_name })
-              }
-              await joinClass(invite.class_code, null, null, invite.id)
-            }
-          }
+        if (event === 'SIGNED_IN') {
+          await _handleAutoJoin(session)
         }
       } else if (event === 'SIGNED_OUT') {
         currentUser.value = null
@@ -287,14 +297,36 @@ export const useAuthStore = defineStore('auth', () => {
     return null
   }
 
-  async function requireProfile(userId, fallbackMessage = 'We could not load your account profile. Please try again.') {
-    const profileData = await waitForProfile(userId)
-    if (profileData) return { profile: profileData }
+  const _profileRequests = new Map()
 
-    await supabase.auth.signOut()
-    currentUser.value = null
-    profile.value = null
-    return { error: fallbackMessage }
+  async function requireProfile(userId, fallbackMessage = 'We could not load your account profile. Please try again.') {
+    if (!userId) return { error: 'No user ID provided' }
+    
+    // Deduplicate in-flight profile requests for the same user
+    if (_profileRequests.has(userId)) {
+      console.log('[AUTH] requireProfile: using existing request for', userId)
+      return _profileRequests.get(userId)
+    }
+
+    const promise = (async () => {
+      console.log('[AUTH] requireProfile: starting wait for', userId)
+      const profileData = await waitForProfile(userId, { timeoutMs: 8000 })
+      if (profileData) {
+        console.log('[AUTH] requireProfile: SUCCESS for', userId)
+        return { profile: profileData }
+      }
+
+      console.warn('[AUTH] requireProfile: TIMEOUT for', userId, 'signing out...')
+      await supabase.auth.signOut()
+      currentUser.value = null
+      profile.value = null
+      return { error: fallbackMessage }
+    })().finally(() => {
+      _profileRequests.delete(userId)
+    })
+
+    _profileRequests.set(userId, promise)
+    return promise
   }
 
   // Email/Password signup
@@ -339,10 +371,17 @@ export const useAuthStore = defineStore('auth', () => {
 
   // OAuth (Google/Apple)
   async function signInWithOAuth(provider) {
+    // Force redirect to the apex domain if on production/vercel
+    let redirectBase = window.location.origin
+    const host = window.location.hostname.toLowerCase()
+    if (host.includes('beat-spy.vercel.app') || host.includes('beat-snp.com')) {
+      redirectBase = 'https://beat-snp.com'
+    }
+
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: window.location.origin + '/leaderboard'
+        redirectTo: redirectBase + '/leaderboard'
       }
     })
     if (error) return { error: error.message }

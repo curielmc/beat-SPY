@@ -105,7 +105,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { RouterView, RouterLink, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { supabase } from '../lib/supabase'
@@ -114,6 +114,14 @@ import LogoIcon from '../components/LogoIcon.vue'
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
+
+// Redirect if logged out while on protected route
+watch(() => auth.isLoggedIn, (loggedIn) => {
+  if (!loggedIn) {
+    console.log('[AppLayout] User logged out, redirecting to login...')
+    router.push('/')
+  }
+})
 const sidebarOpen = ref(false)
 const hasActiveClass = ref(false)
 const unreadMessages = ref(0)
@@ -140,32 +148,36 @@ onMounted(async () => {
     const membership = await auth.getCurrentMembership()
     const classId = membership?.class_id
     const groupId = membership?.group_id
-    const userId = auth.currentUser.id
+    
+    // Guard against user being signed out during the await above
+    if (auth.currentUser) {
+      const userId = auth.currentUser.id
 
-    if (classId) {
-      // Fetch messages relevant to this user's class context
-      const { data: msgs } = await supabase.from('messages')
-        .select('id, recipient_type, recipient_id, sender_id')
-        .eq('class_id', classId)
+      if (classId) {
+        // Fetch messages relevant to this user's class context
+        const { data: msgs } = await supabase.from('messages')
+          .select('id, recipient_type, recipient_id, sender_id')
+          .eq('class_id', classId)
 
-      // Filter messages intended for this specific user/group/class
-      const myMsgs = (msgs || []).filter(m => 
-        (m.recipient_type === 'class') ||
-        (m.recipient_type === 'group' && m.recipient_id === groupId) ||
-        (m.recipient_type === 'user' && m.recipient_id === userId) ||
-        (m.sender_id === userId) // Messages I sent
-      )
+        // Filter messages intended for this specific user/group/class
+        const myMsgs = (msgs || []).filter(m => 
+          (m.recipient_type === 'class') ||
+          (m.recipient_type === 'group' && m.recipient_id === groupId) ||
+          (m.recipient_type === 'user' && m.recipient_id === userId) ||
+          (m.sender_id === userId) // Messages I sent
+        )
 
-      const { data: reads } = await supabase.from('message_reads')
-        .select('message_id')
-        .eq('user_id', userId)
-      
-      const readSet = new Set((reads || []).map(r => r.message_id))
-      
-      // Count as unread if not in readSet AND I am not the sender
-      unreadMessages.value = myMsgs.filter(m => 
-        !readSet.has(m.id) && m.sender_id !== userId
-      ).length
+        const { data: reads } = await supabase.from('message_reads')
+          .select('message_id')
+          .eq('user_id', userId)
+        
+        const readSet = new Set((reads || []).map(r => r.message_id))
+        
+        // Count as unread if not in readSet AND I am not the sender
+        unreadMessages.value = myMsgs.filter(m => 
+          !readSet.has(m.id) && m.sender_id !== userId
+        ).length
+      }
     }
   }
 })

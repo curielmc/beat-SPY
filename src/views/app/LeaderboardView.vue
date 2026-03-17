@@ -123,7 +123,13 @@
         />
       </div>
 
-      <p v-if="sortedEntries.length === 0" class="text-center text-base-content/50 py-8">No groups found in your class.</p>
+      <div v-if="sortedEntries.length === 0" class="text-center py-12 space-y-4">
+        <div v-if="!auth.activeClassId" class="space-y-4">
+          <p class="text-base-content/50">You haven't joined a class yet.</p>
+          <RouterLink to="/join" class="btn btn-primary">Join a Class</RouterLink>
+        </div>
+        <p v-else class="text-base-content/50">No groups found in your class.</p>
+      </div>
 
       <!-- Comparison Chart (disabled for now — will revisit later)
       <div v-if="!loading" class="card bg-base-100 shadow-sm mt-8">
@@ -319,6 +325,7 @@ async function loadLeaderboard() {
     myGroupId.value = membership?.group_id
 
     if (!membership?.class_id) {
+      loading.value = false
       return
     }
 
