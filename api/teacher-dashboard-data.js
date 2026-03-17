@@ -23,7 +23,7 @@ async function sbFetch(path, options = {}) {
 }
 
 function encodeIn(values) {
-  return values.map(v => `"${String(v).replace(/"/g, '\\"')}"`).join(',')
+  return values.map(v => encodeURIComponent(String(v))).join(',')
 }
 
 export default async function handler(req) {
