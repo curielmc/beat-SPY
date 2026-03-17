@@ -130,6 +130,7 @@
                       Return % {{ sortIndicator('returnPct') }}
                     </button>
                   </th>
+                  <th class="text-right min-w-[7rem]">vs S&P 500</th>
                   <th class="text-right min-w-[10rem]">
                     <button class="btn btn-ghost btn-xs px-0 normal-case" @click="setSort('totalValue')">
                       All Funds {{ sortIndicator('totalValue') }}
@@ -177,6 +178,13 @@
                   </td>
                   <td class="py-4 text-right font-mono text-sm font-semibold" :class="group.returnPct >= 0 ? 'text-success' : 'text-error'">
                     {{ group.returnPct >= 0 ? '+' : '' }}{{ group.returnPct.toFixed(2) }}%
+                  </td>
+                  <td class="py-4 text-right">
+                    <div class="flex items-center justify-end gap-1.5 tooltip tooltip-left" :data-tip="`S&P 500 Benchmark: ${group.benchmarkReturnPct.toFixed(2)}%`">
+                      <span class="text-[10px] text-base-content/40 font-mono">{{ group.benchmarkReturnPct.toFixed(1) }}%</span>
+                      <span v-if="group.isBeatingSP500" class="text-success font-bold" title="Beating S&P 500">✓</span>
+                      <span v-else class="text-error font-bold" title="Trailing S&P 500">✕</span>
+                    </div>
                   </td>
                   <td class="py-4 text-right">
                     <div class="flex items-start justify-end gap-2">
@@ -410,6 +418,7 @@
                   <th class="text-right">Cash</th>
                   <th class="text-right">Value</th>
                   <th class="text-right">Return</th>
+                  <th class="text-right">vs S&P 500</th>
                 </tr>
               </thead>
               <tbody>
@@ -424,6 +433,14 @@
                   <td class="text-right font-mono font-semibold">${{ fund.totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</td>
                   <td class="text-right font-mono" :class="fund.returnPct >= 0 ? 'text-success' : 'text-error'">
                     {{ fund.returnPct >= 0 ? '+' : '' }}{{ fund.returnPct.toFixed(2) }}%
+                  </td>
+                  <td class="text-right">
+                    <div v-if="fund.benchmarkReturnPct !== undefined" class="flex items-center justify-end gap-1.5 tooltip tooltip-left" :data-tip="`S&P 500 Return: ${fund.benchmarkReturnPct.toFixed(2)}%`">
+                      <span class="text-[10px] text-base-content/40 font-mono">{{ fund.benchmarkReturnPct.toFixed(1) }}%</span>
+                      <span v-if="fund.isBeatingSP500" class="text-success font-bold" title="Beating S&P 500">✓</span>
+                      <span v-else class="text-error font-bold" title="Trailing S&P 500">✕</span>
+                    </div>
+                    <div v-else class="text-xs text-base-content/20">—</div>
                   </td>
                 </tr>
               </tbody>
@@ -478,7 +495,8 @@
                     <td class="text-right font-mono text-xs">${{ Number(holding.currentPrice || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</td>
                     <td class="text-right font-mono text-xs font-semibold">${{ Number(holding.marketValue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</td>
                     <td class="text-right font-mono text-xs" :class="holding.gainLoss >= 0 ? 'text-success' : 'text-error'">
-                      {{ holding.gainLoss >= 0 ? '+' : '-' }}${{ Math.abs(Number(holding.gainLoss || 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
+                      <div class="font-semibold">{{ holding.gainLoss >= 0 ? '+' : '-' }}${{ Math.abs(Number(holding.gainLoss || 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</div>
+                      <div class="text-[10px] opacity-60">{{ (holding.gainLossPct || 0) >= 0 ? '+' : '' }}{{ (holding.gainLossPct || 0).toFixed(2) }}%</div>
                     </td>
                   </tr>
                 </tbody>

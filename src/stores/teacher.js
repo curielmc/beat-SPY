@@ -97,6 +97,11 @@ export const useTeacherStore = defineStore('teacher', () => {
         ])
 
         const tickers = (hData || []).map(h => h.ticker)
+        const benchmarkTickers = [...new Set(portfolioData.map(p => p.benchmark_ticker || 'SPY'))]
+        for (const bt of benchmarkTickers) {
+          if (!tickers.includes(bt)) tickers.push(bt)
+        }
+
         if (tickers.length > 0) {
           await Promise.all([
             market.fetchBatchQuotes(tickers),
@@ -104,19 +109,31 @@ export const useTeacherStore = defineStore('teacher', () => {
           ])
         }
 
+        // Fetch historical benchmark prices for each fund's inception
+        const inceptionPricesNeeded = []
+        for (const p of portfolioData) {
+          const bt = p.benchmark_ticker || 'SPY'
+          const date = p.created_at.split('T')[0]
+          inceptionPricesNeeded.push(market.fetchHistoricalCloseForTickers([bt], date))
+        }
+        await Promise.all(inceptionPricesNeeded)
+
         const holdingsByPortfolioId = new Map()
         for (const holding of (hData || [])) {
           const currentPrice = market.getCachedPrice(holding.ticker) || holding.avg_cost
           const marketValue = Number(holding.shares || 0) * Number(currentPrice || 0)
           const costBasis = Number(holding.shares || 0) * Number(holding.avg_cost || 0)
           const profile = market.profilesCache[holding.ticker]?.data
+          const gainLoss = marketValue - costBasis
+          const gainLossPct = costBasis > 0 ? (gainLoss / costBasis) * 100 : 0
           const enrichedHolding = {
             ...holding,
             companyName: profile?.companyName || holding.ticker,
             sector: profile?.sector || '',
             currentPrice,
             marketValue,
-            gainLoss: marketValue - costBasis
+            gainLoss,
+            gainLossPct
           }
 
           if (!holdingsByPortfolioId.has(holding.portfolio_id)) {
@@ -137,12 +154,23 @@ export const useTeacherStore = defineStore('teacher', () => {
               ? ((fundTotalValue - fundStartingCash) / fundStartingCash) * 100
               : 0
 
+            // Benchmark comparison
+            const bt = portfolio.benchmark_ticker || 'SPY'
+            const currentBenchmarkPrice = market.getCachedPrice(bt)
+            const startBenchmarkPrice = market.historicalPricesCache[`${bt}:${portfolio.created_at.split('T')[0]}`]
+            let benchmarkReturnPct = 0
+            if (currentBenchmarkPrice && startBenchmarkPrice) {
+              benchmarkReturnPct = ((currentBenchmarkPrice - startBenchmarkPrice) / startBenchmarkPrice) * 100
+            }
+
             return {
               ...portfolio,
               holdings,
               investedValue,
               totalValue: fundTotalValue,
               returnPct: fundReturnPct,
+              benchmarkReturnPct,
+              isBeatingSP500: fundReturnPct > benchmarkReturnPct,
               positionsCount: holdings.length
             }
           })
@@ -152,6 +180,14 @@ export const useTeacherStore = defineStore('teacher', () => {
         startingCash = portfolioData.reduce((sum, p) => sum + Number(p.starting_cash || 100000), 0)
         totalValue = funds.reduce((sum, fund) => sum + Number(fund.totalValue || 0), 0)
         returnPct = startingCash > 0 ? ((totalValue - startingCash) / startingCash) * 100 : 0
+        
+        // Aggregate benchmark performance across all funds
+        const aggregateBenchmarkValue = funds.reduce((sum, fund) => {
+          const fundStartingCash = Number(fund.starting_cash || fund.fund_starting_cash || 100000)
+          return sum + (fundStartingCash * (1 + (fund.benchmarkReturnPct / 100)))
+        }, 0)
+        const benchmarkReturnPct = startingCash > 0 ? ((aggregateBenchmarkValue - startingCash) / startingCash) * 100 : 0
+
         lastTradeAt = tradeData?.[0]?.executed_at || null
       }
 
@@ -161,6 +197,8 @@ export const useTeacherStore = defineStore('teacher', () => {
         ...group,
         totalValue,
         returnPct,
+        benchmarkReturnPct: benchmarkReturnPct || 0,
+        isBeatingSP500: returnPct > benchmarkReturnPct,
         cash,
         startingCash,
         lastTradeAt,
