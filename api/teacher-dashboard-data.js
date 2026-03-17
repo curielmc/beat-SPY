@@ -71,7 +71,7 @@ export default async function handler(req) {
   try {
     const groupIdFilter = encodeIn(groupIds)
     const portfolios = await sbFetch(
-      `/portfolios?owner_type=eq.group&owner_id=in.(${groupIdFilter})&or=(status.eq.active,status.is.null)&select=*`
+      `/portfolios?owner_type=eq.group&owner_id=in.(${groupIdFilter})&or=(hidden.eq.false,hidden.is.null)&select=*`
     )
 
     const portfolioIds = (portfolios || []).map(p => p.id).filter(Boolean)
@@ -85,7 +85,7 @@ export default async function handler(req) {
     if (userIds.length) {
       const userIdFilter = encodeIn(userIds)
       userPortfolios = await sbFetch(
-        `/portfolios?owner_type=eq.user&owner_id=in.(${userIdFilter})&or=(status.eq.active,status.is.null)&select=*`
+        `/portfolios?owner_type=eq.user&owner_id=in.(${userIdFilter})&select=*`
       )
     }
 
