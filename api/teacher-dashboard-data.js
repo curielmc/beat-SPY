@@ -74,8 +74,6 @@ export default async function handler(req) {
       `/portfolios?owner_type=eq.group&owner_id=in.(${groupIdFilter})&or=(hidden.eq.false,hidden.is.null)&select=*`
     )
 
-    const portfolioIds = (portfolios || []).map(p => p.id).filter(Boolean)
-    if (!portfolioIds.length) {
     const memberships = await sbFetch(
       `/class_memberships?class_id=eq.${classId}&select=user_id,group_id`
     )
