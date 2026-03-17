@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from './auth'
 import { useMarketDataStore } from './marketData'
+import { usePortfolioStore } from './portfolio'
 
 export const useTeacherStore = defineStore('teacher', () => {
   const auth = useAuthStore()
@@ -80,50 +81,18 @@ export const useTeacherStore = defineStore('teacher', () => {
   // Get ranked groups with portfolio data
   async function getRankedGroups(classId = null) {
     const market = useMarketDataStore()
+    const portfolioStore = usePortfolioStore()
     const scopedGroups = classId
       ? groups.value.filter(group => group.class_id === classId)
       : groups.value
-    const scopedStudents = classId
-      ? students.value.filter(student => student.class_id === classId)
-      : students.value
 
     if (!scopedGroups.length) return []
 
     try {
       const ranked = []
       const groupIds = scopedGroups.map(g => g.id)
-      const studentUserIds = [...new Set(scopedStudents.map(student => student.userId).filter(Boolean))]
-
-      // Batch fetch active group portfolios for these groups
-      const { data: groupPortfolioData, error: groupPortfoliosError } = await supabase
-        .from('portfolios')
-        .select('*')
-        .eq('owner_type', 'group')
-        .in('owner_id', groupIds)
-        .or('status.eq.active,status.is.null')
-
-      if (groupPortfoliosError) {
-        throw groupPortfoliosError
-      }
-
-      // Also fetch active student-owned portfolios so grouped classes without
-      // explicit group funds still show the members' live investing data.
-      let userPortfolioData = []
-      if (studentUserIds.length) {
-        const { data, error } = await supabase
-          .from('portfolios')
-          .select('*')
-          .eq('owner_type', 'user')
-          .in('owner_id', studentUserIds)
-          .or('status.eq.active,status.is.null')
-
-        if (error) {
-          throw error
-        }
-        userPortfolioData = data || []
-      }
-
-      const allPortfolios = [...(groupPortfolioData || []), ...userPortfolioData]
+      const { portfolios: allPortfolios, holdingsMap: holdingsByPort, tradesMap: tradesByPort } =
+        await portfolioStore.getLeaderboardData(groupIds)
 
       if (allPortfolios.length === 0) {
         return scopedGroups
@@ -133,17 +102,7 @@ export const useTeacherStore = defineStore('teacher', () => {
 
       const portfolioIds = allPortfolios.map(p => p.id)
 
-      // Batch fetch all holdings and trades for these portfolios
-      const [holdingsRes, tradesRes] = await Promise.all([
-        supabase.from('holdings').select('*').in('portfolio_id', portfolioIds),
-        supabase.from('trades').select('portfolio_id, ticker, side, dollars, shares, price, executed_at').in('portfolio_id', portfolioIds).order('executed_at', { ascending: false })
-      ])
-
-      if (holdingsRes.error) throw holdingsRes.error
-      if (tradesRes.error) throw tradesRes.error
-
-      const allHoldings = holdingsRes.data || []
-      const allTrades = tradesRes.data || []
+      const allHoldings = portfolioIds.flatMap(portfolioId => holdingsByPort[portfolioId] || [])
 
       // Collect all unique tickers for current quotes
       const allTickers = [...new Set([
@@ -179,11 +138,8 @@ export const useTeacherStore = defineStore('teacher', () => {
         console.warn('Market data batch fetch error:', err)
       }
 
-      // Index data by portfolio ID for fast lookup
-      const holdingsByPort = {}
+      const enrichedHoldingsByPort = {}
       for (const h of allHoldings) {
-        if (!holdingsByPort[h.portfolio_id]) holdingsByPort[h.portfolio_id] = []
-
         const currentPrice = market.getCachedPrice(h.ticker) || h.avg_cost
         const marketValue = Number(h.shares || 0) * Number(currentPrice || 0)
         const costBasis = Number(h.shares || 0) * Number(h.avg_cost || 0)
@@ -191,7 +147,7 @@ export const useTeacherStore = defineStore('teacher', () => {
         const gainLoss = marketValue - costBasis
         const gainLossPct = costBasis > 0 ? (gainLoss / costBasis) * 100 : 0
 
-        holdingsByPort[h.portfolio_id].push({
+        const enrichedHolding = {
           ...h,
           companyName: profile?.companyName || h.ticker,
           sector: profile?.sector || '',
@@ -199,29 +155,15 @@ export const useTeacherStore = defineStore('teacher', () => {
           marketValue,
           gainLoss,
           gainLossPct
-        })
-      }
+        }
 
-      const userPortfoliosByOwner = {}
-      for (const portfolio of userPortfolioData) {
-        if (!userPortfoliosByOwner[portfolio.owner_id]) userPortfoliosByOwner[portfolio.owner_id] = []
-        userPortfoliosByOwner[portfolio.owner_id].push(portfolio)
-      }
-
-      const tradesByPort = {}
-      for (const t of allTrades) {
-        if (!tradesByPort[t.portfolio_id]) tradesByPort[t.portfolio_id] = []
-        tradesByPort[t.portfolio_id].push(t)
+        if (!enrichedHoldingsByPort[h.portfolio_id]) enrichedHoldingsByPort[h.portfolio_id] = []
+        enrichedHoldingsByPort[h.portfolio_id].push(enrichedHolding)
       }
 
       // Build the results
       for (const group of scopedGroups) {
-        const ownedGroupPortfolios = (groupPortfolioData || []).filter(p => p.owner_id === group.id)
-        const memberUserPortfolios = scopedStudents
-          .filter(student => student.group_id === group.id)
-          .flatMap(student => userPortfoliosByOwner[student.userId] || [])
-
-        const groupPortfolios = ownedGroupPortfolios.length ? ownedGroupPortfolios : memberUserPortfolios
+        const groupPortfolios = allPortfolios.filter(p => p.owner_id === group.id)
 
         let funds = []
         let groupTotalValue = 0
@@ -231,7 +173,7 @@ export const useTeacherStore = defineStore('teacher', () => {
 
         if (groupPortfolios.length) {
           funds = groupPortfolios.map(portfolio => {
-            const holdings = (holdingsByPort[portfolio.id] || []).sort((a, b) => b.marketValue - a.marketValue)
+            const holdings = (enrichedHoldingsByPort[portfolio.id] || []).sort((a, b) => b.marketValue - a.marketValue)
             const investedValue = holdings.reduce((sum, h) => sum + h.marketValue, 0)
             const fundCash = Number(portfolio.cash_balance || 0)
             const fundStartingCash = Number(portfolio.starting_cash || portfolio.fund_starting_cash || 100000)
