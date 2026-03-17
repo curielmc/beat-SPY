@@ -50,16 +50,18 @@ export default async function handler(req) {
     return new Response('Forbidden', { status: 403 })
   }
 
-  const { group_ids: rawGroupIds } = await req.json().catch(() => ({}))
+  const { group_ids: rawGroupIds, class_id: classId } = await req.json().catch(() => ({}))
   const groupIds = Array.isArray(rawGroupIds)
     ? rawGroupIds.map(String).filter(Boolean)
     : []
 
-  if (!groupIds.length) {
+  if (!groupIds.length || !classId) {
     return new Response(JSON.stringify({
       portfolios: [],
+      user_portfolios: [],
       holdings: [],
-      trades: []
+      trades: [],
+      memberships: []
     }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
@@ -74,26 +76,40 @@ export default async function handler(req) {
 
     const portfolioIds = (portfolios || []).map(p => p.id).filter(Boolean)
     if (!portfolioIds.length) {
-      return new Response(JSON.stringify({
-        portfolios: [],
-        holdings: [],
-        trades: []
-      }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      })
+    const memberships = await sbFetch(
+      `/class_memberships?class_id=eq.${classId}&select=user_id,group_id`
+    )
+    const userIds = [...new Set((memberships || []).map(m => m.user_id).filter(Boolean))]
+
+    let userPortfolios = []
+    if (userIds.length) {
+      const userIdFilter = encodeIn(userIds)
+      userPortfolios = await sbFetch(
+        `/portfolios?owner_type=eq.user&owner_id=in.(${userIdFilter})&or=(status.eq.active,status.is.null)&select=*`
+      )
     }
 
-    const portfolioIdFilter = encodeIn(portfolioIds)
-    const [holdings, trades] = await Promise.all([
-      sbFetch(`/holdings?portfolio_id=in.(${portfolioIdFilter})&select=*`),
-      sbFetch(`/trades?portfolio_id=in.(${portfolioIdFilter})&select=portfolio_id,ticker,side,dollars,shares,price,executed_at&order=executed_at.desc`)
-    ])
+    const portfolioIds = [
+      ...(portfolios || []).map(p => p.id).filter(Boolean),
+      ...(userPortfolios || []).map(p => p.id).filter(Boolean)
+    ]
+
+    let holdings = []
+    let trades = []
+    if (portfolioIds.length) {
+      const portfolioIdFilter = encodeIn(portfolioIds)
+      ;[holdings, trades] = await Promise.all([
+        sbFetch(`/holdings?portfolio_id=in.(${portfolioIdFilter})&select=*`),
+        sbFetch(`/trades?portfolio_id=in.(${portfolioIdFilter})&select=portfolio_id,ticker,side,dollars,shares,price,executed_at&order=executed_at.desc`)
+      ])
+    }
 
     return new Response(JSON.stringify({
       portfolios: portfolios || [],
+      user_portfolios: userPortfolios || [],
       holdings: holdings || [],
-      trades: trades || []
+      trades: trades || [],
+      memberships: memberships || []
     }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }

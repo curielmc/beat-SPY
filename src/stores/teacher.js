@@ -100,7 +100,7 @@ export const useTeacherStore = defineStore('teacher', () => {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${session.access_token}`
         },
-        body: JSON.stringify({ group_ids: groupIds })
+        body: JSON.stringify({ group_ids: groupIds, class_id: classId })
       })
 
       const dashboardData = await dashboardRes.json().catch(() => ({}))
@@ -108,7 +108,10 @@ export const useTeacherStore = defineStore('teacher', () => {
         throw new Error(dashboardData.error || 'Failed to load teacher dashboard data')
       }
 
-      const allPortfolios = dashboardData.portfolios || []
+      const groupPortfoliosData = dashboardData.portfolios || []
+      const userPortfoliosData = dashboardData.user_portfolios || []
+      const membershipData = dashboardData.memberships || []
+      const allPortfolios = [...groupPortfoliosData, ...userPortfoliosData]
 
       if (allPortfolios.length === 0) {
         return scopedGroups
@@ -183,9 +186,20 @@ export const useTeacherStore = defineStore('teacher', () => {
         tradesByPort[t.portfolio_id].push(t)
       }
 
+      const userPortfoliosByOwner = {}
+      for (const portfolio of userPortfoliosData) {
+        if (!userPortfoliosByOwner[portfolio.owner_id]) userPortfoliosByOwner[portfolio.owner_id] = []
+        userPortfoliosByOwner[portfolio.owner_id].push(portfolio)
+      }
+
       // Build the results
       for (const group of scopedGroups) {
-        const groupPortfolios = allPortfolios.filter(p => p.owner_id === group.id)
+        const ownedGroupPortfolios = groupPortfoliosData.filter(p => p.owner_id === group.id)
+        const memberUserPortfolios = membershipData
+          .filter(membership => membership.group_id === group.id)
+          .flatMap(membership => userPortfoliosByOwner[membership.user_id] || [])
+
+        const groupPortfolios = ownedGroupPortfolios.length ? ownedGroupPortfolios : memberUserPortfolios
 
         let funds = []
         let groupTotalValue = 0
