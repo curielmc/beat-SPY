@@ -13,6 +13,24 @@ export const useTeacherStore = defineStore('teacher', () => {
   const unassignedStudents = ref([])
   const loading = ref(false)
 
+  function buildGroupFallback(group, classStartingCash = 100000) {
+    const members = students.value.filter(s => s.group_id === group.id)
+    return {
+      ...group,
+      totalValue: classStartingCash,
+      returnPct: 0,
+      benchmarkReturnPct: 0,
+      isBeatingSP500: false,
+      cash: classStartingCash,
+      startingCash: classStartingCash,
+      lastTradeAt: null,
+      fundCount: 0,
+      funds: [],
+      members,
+      memberNames: members.map(m => m.name).filter(Boolean)
+    }
+  }
+
   // Load all teacher data
   async function loadTeacherData() {
     if (!auth.currentUser) return
@@ -62,196 +80,203 @@ export const useTeacherStore = defineStore('teacher', () => {
   // Get ranked groups with portfolio data
   async function getRankedGroups(classId = null) {
     const market = useMarketDataStore()
-    const ranked = []
     const scopedGroups = classId
       ? groups.value.filter(group => group.class_id === classId)
       : groups.value
 
     if (!scopedGroups.length) return []
 
-    const groupIds = scopedGroups.map(g => g.id)
-
-    // Batch fetch all active portfolios for these groups
-    const { data: pData } = await supabase
-      .from('portfolios')
-      .select('*')
-      .eq('owner_type', 'group')
-      .in('owner_id', groupIds)
-      .or('status.eq.active,status.is.null')
-    
-    const allPortfolios = pData || []
-
-    if (allPortfolios.length === 0) {
-      return scopedGroups.map(g => {
-        const members = students.value.filter(s => s.group_id === g.id)
-        return { 
-          ...g, 
-          totalValue: 100000, 
-          returnPct: 0, 
-          benchmarkReturnPct: 0,
-          isBeatingSP500: false,
-          cash: 100000, 
-          startingCash: 100000, 
-          funds: [], 
-          members, 
-          memberNames: members.map(m => m.name).filter(Boolean) 
-        }
-      })
-    }
-
-    const portfolioIds = allPortfolios.map(p => p.id)
-
-    // Batch fetch all holdings and trades for these portfolios
-    const [holdingsRes, tradesRes] = await Promise.all([
-      supabase.from('holdings').select('*').in('portfolio_id', portfolioIds),
-      supabase.from('trades').select('portfolio_id, ticker, side, dollars, shares, price, executed_at').in('portfolio_id', portfolioIds).order('executed_at', { ascending: false })
-    ])
-
-    const allHoldings = holdingsRes.data || []
-    const allTrades = tradesRes.data || []
-
-    // Collect all unique tickers for current quotes
-    const allTickers = [...new Set([
-      ...allHoldings.map(h => h.ticker),
-      ...allPortfolios.map(p => p.benchmark_ticker || 'SPY'),
-      'SPY'
-    ])]
-
-    // Collect all historical benchmark price requirements
-    const benchmarkNeeds = {} // { ticker: Set(dates) }
-    for (const p of allPortfolios) {
-      const bt = p.benchmark_ticker || 'SPY'
-      const date = p.created_at.split('T')[0]
-      if (!benchmarkNeeds[bt]) benchmarkNeeds[bt] = new Set()
-      benchmarkNeeds[bt].add(date)
-    }
-
-    // Parallelize market data fetches
     try {
-      const marketCalls = [
-        market.fetchBatchQuotes(allTickers),
-        market.fetchBatchProfiles(allTickers)
-      ]
-      
-      for (const [bt, dates] of Object.entries(benchmarkNeeds)) {
-        for (const date of dates) {
-          marketCalls.push(market.fetchHistoricalCloseForTickers([bt], date))
+      const ranked = []
+      const groupIds = scopedGroups.map(g => g.id)
+      const classStartingCash = Number(classes.value.find(c => c.id === classId)?.starting_cash || 100000)
+
+      // Batch fetch all active portfolios for these groups
+      const { data: pData, error: portfoliosError } = await supabase
+        .from('portfolios')
+        .select('*')
+        .eq('owner_type', 'group')
+        .in('owner_id', groupIds)
+        .or('status.eq.active,status.is.null')
+
+      if (portfoliosError) {
+        throw portfoliosError
+      }
+
+      const allPortfolios = pData || []
+
+      if (allPortfolios.length === 0) {
+        return scopedGroups
+          .map(group => buildGroupFallback(group, classStartingCash))
+          .sort((a, b) => b.returnPct - a.returnPct)
+      }
+
+      const portfolioIds = allPortfolios.map(p => p.id)
+
+      // Batch fetch all holdings and trades for these portfolios
+      const [holdingsRes, tradesRes] = await Promise.all([
+        supabase.from('holdings').select('*').in('portfolio_id', portfolioIds),
+        supabase.from('trades').select('portfolio_id, ticker, side, dollars, shares, price, executed_at').in('portfolio_id', portfolioIds).order('executed_at', { ascending: false })
+      ])
+
+      if (holdingsRes.error) throw holdingsRes.error
+      if (tradesRes.error) throw tradesRes.error
+
+      const allHoldings = holdingsRes.data || []
+      const allTrades = tradesRes.data || []
+
+      // Collect all unique tickers for current quotes
+      const allTickers = [...new Set([
+        ...allHoldings.map(h => h.ticker).filter(Boolean),
+        ...allPortfolios.map(p => p.benchmark_ticker || 'SPY'),
+        'SPY'
+      ])]
+
+      // Collect all historical benchmark price requirements
+      const benchmarkNeeds = {} // { ticker: Set(dates) }
+      for (const p of allPortfolios) {
+        const bt = p.benchmark_ticker || 'SPY'
+        const createdAt = p.created_at || new Date().toISOString()
+        const date = createdAt.includes('T') ? createdAt.split('T')[0] : createdAt
+        if (!benchmarkNeeds[bt]) benchmarkNeeds[bt] = new Set()
+        if (date) benchmarkNeeds[bt].add(date)
+      }
+
+      // Parallelize market data fetches
+      try {
+        const marketCalls = [
+          market.fetchBatchQuotes(allTickers),
+          market.fetchBatchProfiles(allTickers)
+        ]
+
+        for (const [bt, dates] of Object.entries(benchmarkNeeds)) {
+          for (const date of dates) {
+            marketCalls.push(market.fetchHistoricalCloseForTickers([bt], date))
+          }
         }
+        await Promise.all(marketCalls)
+      } catch (err) {
+        console.warn('Market data batch fetch error:', err)
       }
-      await Promise.all(marketCalls)
+
+      // Index data by portfolio ID for fast lookup
+      const holdingsByPort = {}
+      for (const h of allHoldings) {
+        if (!holdingsByPort[h.portfolio_id]) holdingsByPort[h.portfolio_id] = []
+
+        const currentPrice = market.getCachedPrice(h.ticker) || h.avg_cost
+        const marketValue = Number(h.shares || 0) * Number(currentPrice || 0)
+        const costBasis = Number(h.shares || 0) * Number(h.avg_cost || 0)
+        const profile = market.profilesCache[h.ticker]?.data
+        const gainLoss = marketValue - costBasis
+        const gainLossPct = costBasis > 0 ? (gainLoss / costBasis) * 100 : 0
+
+        holdingsByPort[h.portfolio_id].push({
+          ...h,
+          companyName: profile?.companyName || h.ticker,
+          sector: profile?.sector || '',
+          currentPrice,
+          marketValue,
+          gainLoss,
+          gainLossPct
+        })
+      }
+
+      const tradesByPort = {}
+      for (const t of allTrades) {
+        if (!tradesByPort[t.portfolio_id]) tradesByPort[t.portfolio_id] = []
+        tradesByPort[t.portfolio_id].push(t)
+      }
+
+      // Build the results
+      for (const group of scopedGroups) {
+        const groupPortfolios = allPortfolios.filter(p => p.owner_id === group.id)
+
+        let funds = []
+        let groupTotalValue = 0
+        let groupStartingCash = 0
+        let groupCash = 0
+        let lastTradeAt = null
+
+        if (groupPortfolios.length) {
+          funds = groupPortfolios.map(portfolio => {
+            const holdings = (holdingsByPort[portfolio.id] || []).sort((a, b) => b.marketValue - a.marketValue)
+            const investedValue = holdings.reduce((sum, h) => sum + h.marketValue, 0)
+            const fundCash = Number(portfolio.cash_balance || 0)
+            const fundStartingCash = Number(portfolio.starting_cash || portfolio.fund_starting_cash || 100000)
+            const fundTotalValue = investedValue + fundCash
+            const fundReturnPct = fundStartingCash > 0 ? ((fundTotalValue - fundStartingCash) / fundStartingCash) * 100 : 0
+
+            // Benchmark comparison
+            const bt = portfolio.benchmark_ticker || 'SPY'
+            const createdAt = portfolio.created_at || new Date().toISOString()
+            const benchmarkDate = createdAt.includes('T') ? createdAt.split('T')[0] : createdAt
+            const currentBenchmarkPrice = market.getCachedPrice(bt)
+            const startBenchmarkPrice = market.historicalPricesCache[`${bt}:${benchmarkDate}`]
+            let benchmarkReturnPct = 0
+            if (currentBenchmarkPrice && startBenchmarkPrice) {
+              benchmarkReturnPct = ((currentBenchmarkPrice - startBenchmarkPrice) / startBenchmarkPrice) * 100
+            }
+
+            groupTotalValue += fundTotalValue
+            groupStartingCash += fundStartingCash
+            groupCash += fundCash
+
+            const fundLastTrade = tradesByPort[portfolio.id]?.[0]?.executed_at
+            if (fundLastTrade && (!lastTradeAt || fundLastTrade > lastTradeAt)) lastTradeAt = fundLastTrade
+
+            return {
+              ...portfolio,
+              holdings,
+              investedValue,
+              totalValue: fundTotalValue,
+              returnPct: fundReturnPct,
+              benchmarkReturnPct,
+              isBeatingSP500: fundReturnPct > benchmarkReturnPct,
+              positionsCount: holdings.length
+            }
+          }).sort((a, b) => (a.fund_number || 1) - (b.fund_number || 1))
+        } else {
+          groupTotalValue = classStartingCash
+          groupStartingCash = classStartingCash
+          groupCash = classStartingCash
+        }
+
+        const returnPct = groupStartingCash > 0 ? ((groupTotalValue - groupStartingCash) / groupStartingCash) * 100 : 0
+
+        // Aggregate benchmark performance across all funds
+        const aggregateBenchmarkValue = funds.reduce((sum, fund) => {
+          const fundStartingCash = Number(fund.starting_cash || fund.fund_starting_cash || 100000)
+          return sum + (fundStartingCash * (1 + (fund.benchmarkReturnPct / 100)))
+        }, 0)
+        const groupBenchmarkReturnPct = groupStartingCash > 0 ? ((aggregateBenchmarkValue - groupStartingCash) / groupStartingCash) * 100 : 0
+
+        const members = students.value.filter(s => s.group_id === group.id)
+
+        ranked.push({
+          ...group,
+          totalValue: groupTotalValue,
+          returnPct,
+          benchmarkReturnPct: groupBenchmarkReturnPct || 0,
+          isBeatingSP500: returnPct > groupBenchmarkReturnPct,
+          cash: groupCash,
+          startingCash: groupStartingCash,
+          lastTradeAt,
+          fundCount: groupPortfolios.length,
+          funds,
+          members,
+          memberNames: members.map(m => m.name).filter(Boolean)
+        })
+      }
+
+      return ranked.sort((a, b) => b.returnPct - a.returnPct)
     } catch (err) {
-      console.warn('Market data batch fetch error:', err)
+      console.error('Failed to rank teacher groups:', err)
+      const classStartingCash = Number(classes.value.find(c => c.id === classId)?.starting_cash || 100000)
+      return scopedGroups
+        .map(group => buildGroupFallback(group, classStartingCash))
+        .sort((a, b) => b.returnPct - a.returnPct)
     }
-
-    // Index data by portfolio ID for fast lookup
-    const holdingsByPort = {}
-    for (const h of allHoldings) {
-      if (!holdingsByPort[h.portfolio_id]) holdingsByPort[h.portfolio_id] = []
-      
-      const currentPrice = market.getCachedPrice(h.ticker) || h.avg_cost
-      const marketValue = Number(h.shares || 0) * Number(currentPrice || 0)
-      const costBasis = Number(h.shares || 0) * Number(h.avg_cost || 0)
-      const profile = market.profilesCache[h.ticker]?.data
-      const gainLoss = marketValue - costBasis
-      const gainLossPct = costBasis > 0 ? (gainLoss / costBasis) * 100 : 0
-      
-      holdingsByPort[h.portfolio_id].push({
-        ...h,
-        companyName: profile?.companyName || h.ticker,
-        sector: profile?.sector || '',
-        currentPrice,
-        marketValue,
-        gainLoss,
-        gainLossPct
-      })
-    }
-
-    const tradesByPort = {}
-    for (const t of allTrades) {
-      if (!tradesByPort[t.portfolio_id]) tradesByPort[t.portfolio_id] = []
-      tradesByPort[t.portfolio_id].push(t)
-    }
-
-    // Build the results
-    for (const group of scopedGroups) {
-      const groupPortfolios = allPortfolios.filter(p => p.owner_id === group.id)
-      
-      let funds = []
-      let groupTotalValue = 0
-      let groupStartingCash = 0
-      let groupCash = 0
-      let lastTradeAt = null
-
-      if (groupPortfolios.length) {
-        funds = groupPortfolios.map(portfolio => {
-          const holdings = (holdingsByPort[portfolio.id] || []).sort((a, b) => b.marketValue - a.marketValue)
-          const investedValue = holdings.reduce((sum, h) => sum + h.marketValue, 0)
-          const fundCash = Number(portfolio.cash_balance || 0)
-          const fundStartingCash = Number(portfolio.starting_cash || portfolio.fund_starting_cash || 100000)
-          const fundTotalValue = investedValue + fundCash
-          const fundReturnPct = fundStartingCash > 0 ? ((fundTotalValue - fundStartingCash) / fundStartingCash) * 100 : 0
-
-          // Benchmark comparison
-          const bt = portfolio.benchmark_ticker || 'SPY'
-          const currentBenchmarkPrice = market.getCachedPrice(bt)
-          const startBenchmarkPrice = market.historicalPricesCache[`${bt}:${portfolio.created_at.split('T')[0]}`]
-          let benchmarkReturnPct = 0
-          if (currentBenchmarkPrice && startBenchmarkPrice) {
-            benchmarkReturnPct = ((currentBenchmarkPrice - startBenchmarkPrice) / startBenchmarkPrice) * 100
-          }
-
-          groupTotalValue += fundTotalValue
-          groupStartingCash += fundStartingCash
-          groupCash += fundCash
-          
-          const fundLastTrade = tradesByPort[portfolio.id]?.[0]?.executed_at
-          if (fundLastTrade && (!lastTradeAt || fundLastTrade > lastTradeAt)) lastTradeAt = fundLastTrade
-
-          return {
-            ...portfolio,
-            holdings,
-            investedValue,
-            totalValue: fundTotalValue,
-            returnPct: fundReturnPct,
-            benchmarkReturnPct,
-            isBeatingSP500: fundReturnPct > benchmarkReturnPct,
-            positionsCount: holdings.length
-          }
-        }).sort((a, b) => (a.fund_number || 1) - (b.fund_number || 1))
-      } else {
-        groupTotalValue = 100000
-        groupStartingCash = 100000
-        groupCash = 100000
-      }
-
-      const returnPct = groupStartingCash > 0 ? ((groupTotalValue - groupStartingCash) / groupStartingCash) * 100 : 0
-      
-      // Aggregate benchmark performance across all funds
-      const aggregateBenchmarkValue = funds.reduce((sum, fund) => {
-        const fundStartingCash = Number(fund.starting_cash || fund.fund_starting_cash || 100000)
-        return sum + (fundStartingCash * (1 + (fund.benchmarkReturnPct / 100)))
-      }, 0)
-      const groupBenchmarkReturnPct = groupStartingCash > 0 ? ((aggregateBenchmarkValue - groupStartingCash) / groupStartingCash) * 100 : 0
-
-      const members = students.value.filter(s => s.group_id === group.id)
-
-      ranked.push({
-        ...group,
-        totalValue: groupTotalValue,
-        returnPct,
-        benchmarkReturnPct: groupBenchmarkReturnPct || 0,
-        isBeatingSP500: returnPct > groupBenchmarkReturnPct,
-        cash: groupCash,
-        startingCash: groupStartingCash,
-        lastTradeAt,
-        fundCount: groupPortfolios.length,
-        funds,
-        members,
-        memberNames: members.map(m => m.name).filter(Boolean)
-      })
-    }
-
-    return ranked.sort((a, b) => b.returnPct - a.returnPct)
   }
 
   // Create a new class

@@ -249,7 +249,7 @@
                   </td>
                 </tr>
                 <tr v-if="sortedGroups.length === 0">
-                  <td colspan="8" class="text-center text-base-content/50">No groups yet</td>
+                  <td colspan="9" class="text-center text-base-content/50">No groups yet</td>
                 </tr>
               </tbody>
             </table>
