@@ -3,7 +3,6 @@ import { ref } from 'vue'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from './auth'
 import { useMarketDataStore } from './marketData'
-import { usePortfolioStore } from './portfolio'
 
 export const useTeacherStore = defineStore('teacher', () => {
   const auth = useAuthStore()
@@ -81,7 +80,6 @@ export const useTeacherStore = defineStore('teacher', () => {
   // Get ranked groups with portfolio data
   async function getRankedGroups(classId = null) {
     const market = useMarketDataStore()
-    const portfolioStore = usePortfolioStore()
     const scopedGroups = classId
       ? groups.value.filter(group => group.class_id === classId)
       : groups.value
@@ -91,8 +89,26 @@ export const useTeacherStore = defineStore('teacher', () => {
     try {
       const ranked = []
       const groupIds = scopedGroups.map(g => g.id)
-      const { portfolios: allPortfolios, holdingsMap: holdingsByPort, tradesMap: tradesByPort } =
-        await portfolioStore.getLeaderboardData(groupIds)
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) {
+        throw new Error('Not authenticated')
+      }
+
+      const dashboardRes = await fetch('/api/teacher-dashboard-data', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ group_ids: groupIds })
+      })
+
+      const dashboardData = await dashboardRes.json().catch(() => ({}))
+      if (!dashboardRes.ok) {
+        throw new Error(dashboardData.error || 'Failed to load teacher dashboard data')
+      }
+
+      const allPortfolios = dashboardData.portfolios || []
 
       if (allPortfolios.length === 0) {
         return scopedGroups
@@ -101,8 +117,8 @@ export const useTeacherStore = defineStore('teacher', () => {
       }
 
       const portfolioIds = allPortfolios.map(p => p.id)
-
-      const allHoldings = portfolioIds.flatMap(portfolioId => holdingsByPort[portfolioId] || [])
+      const allHoldings = dashboardData.holdings || []
+      const allTrades = dashboardData.trades || []
 
       // Collect all unique tickers for current quotes
       const allTickers = [...new Set([
@@ -159,6 +175,12 @@ export const useTeacherStore = defineStore('teacher', () => {
 
         if (!enrichedHoldingsByPort[h.portfolio_id]) enrichedHoldingsByPort[h.portfolio_id] = []
         enrichedHoldingsByPort[h.portfolio_id].push(enrichedHolding)
+      }
+
+      const tradesByPort = {}
+      for (const t of allTrades) {
+        if (!tradesByPort[t.portfolio_id]) tradesByPort[t.portfolio_id] = []
+        tradesByPort[t.portfolio_id].push(t)
       }
 
       // Build the results
