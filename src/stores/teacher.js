@@ -72,24 +72,43 @@ export const useTeacherStore = defineStore('teacher', () => {
     const groupIds = scopedGroups.map(g => g.id)
 
     // Batch fetch all active portfolios for these groups
-    const { data: allPortfolios } = await supabase
+    const { data: pData } = await supabase
       .from('portfolios')
       .select('*')
       .eq('owner_type', 'group')
       .in('owner_id', groupIds)
       .or('status.eq.active,status.is.null')
+    
+    const allPortfolios = pData || []
 
-    if (!allPortfolios?.length) {
-      return scopedGroups.map(g => ({ ...g, totalValue: 100000, returnPct: 0, cash: 100000, startingCash: 100000, funds: [], memberNames: [] }))
+    if (allPortfolios.length === 0) {
+      return scopedGroups.map(g => {
+        const members = students.value.filter(s => s.group_id === g.id)
+        return { 
+          ...g, 
+          totalValue: 100000, 
+          returnPct: 0, 
+          benchmarkReturnPct: 0,
+          isBeatingSP500: false,
+          cash: 100000, 
+          startingCash: 100000, 
+          funds: [], 
+          members, 
+          memberNames: members.map(m => m.name).filter(Boolean) 
+        }
+      })
     }
 
     const portfolioIds = allPortfolios.map(p => p.id)
 
     // Batch fetch all holdings and trades for these portfolios
-    const [{ data: allHoldings }, { data: allTrades }] = await Promise.all([
+    const [holdingsRes, tradesRes] = await Promise.all([
       supabase.from('holdings').select('*').in('portfolio_id', portfolioIds),
       supabase.from('trades').select('portfolio_id, ticker, side, dollars, shares, price, executed_at').in('portfolio_id', portfolioIds).order('executed_at', { ascending: false })
     ])
+
+    const allHoldings = holdingsRes.data || []
+    const allTrades = tradesRes.data || []
 
     // Collect all unique tickers for current quotes
     const allTickers = [...new Set([
