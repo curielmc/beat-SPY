@@ -66,6 +66,10 @@
           Messages
           <span v-if="unreadMessages > 0" class="badge badge-xs badge-primary ml-auto">{{ unreadMessages }}</span>
         </RouterLink>
+        <RouterLink to="/training" class="btn btn-sm justify-start w-full gap-2" :class="route.path === '/training' || route.path.startsWith('/training/') ? 'btn-primary' : 'btn-ghost'" @click="sidebarOpen = false">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5 5.284 5 3.323 5.762 2 6.938v12.124C3.323 17.886 5.284 17.124 7.5 17.124c1.746 0 3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c2.216 0 4.177.762 5.5 1.938v12.124c-1.323-1.176-3.284-1.938-5.5-1.938-1.746 0-3.332.477-4.5 1.253" /></svg>
+          Tutorials
+        </RouterLink>
       </nav>
       <div class="p-3 border-t border-base-300 space-y-1">
         <RouterLink to="/settings" class="btn btn-sm justify-start w-full gap-2" :class="route.path === '/settings' ? 'btn-primary' : 'btn-ghost'" @click="sidebarOpen = false">

@@ -73,3 +73,21 @@ export async function uploadGroupAvatar(groupId, file) {
   const { data } = supabase.storage.from('avatars').getPublicUrl(path)
   return data.publicUrl
 }
+
+export async function uploadTutorialDeck(tutorialSlug, file) {
+  const ext = file.name.split('.').pop()?.toLowerCase() || 'pdf'
+  const safeSlug = (tutorialSlug || 'tutorial')
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, '-')
+    .replace(/(^-|-$)/g, '') || 'tutorial'
+  const path = `tutorial-decks/${safeSlug}-${Date.now()}.${ext}`
+
+  const { error } = await supabase.storage
+    .from('avatars')
+    .upload(path, file, { upsert: true, contentType: file.type || 'application/pdf' })
+
+  if (error) throw error
+
+  const { data } = supabase.storage.from('avatars').getPublicUrl(path)
+  return data.publicUrl
+}

@@ -61,6 +61,45 @@
               <label class="label"><span class="label-text">Description</span></label>
               <textarea v-model="tutorial.description" class="textarea textarea-bordered h-24 text-sm" placeholder="Brief summary for the library..."></textarea>
             </div>
+
+            <div class="form-control w-full">
+              <label class="label"><span class="label-text">Slides PDF</span></label>
+              <div class="space-y-2">
+                <input
+                  v-model="tutorial.deck_pdf_url"
+                  type="url"
+                  placeholder="https://...pdf"
+                  class="input input-bordered input-sm"
+                />
+                <div class="flex flex-wrap gap-2">
+                  <input
+                    ref="deckFileInput"
+                    type="file"
+                    accept="application/pdf,.pdf"
+                    class="file-input file-input-bordered file-input-sm w-full"
+                    @change="handleDeckSelected"
+                  />
+                  <button class="btn btn-outline btn-sm" :disabled="uploadingDeck || !selectedDeckFile" @click="handleDeckUpload">
+                    <span v-if="uploadingDeck" class="loading loading-spinner loading-xs"></span>
+                    Upload PDF
+                  </button>
+                  <a
+                    v-if="tutorial.deck_pdf_url"
+                    :href="tutorial.deck_pdf_url"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="btn btn-ghost btn-sm"
+                  >
+                    Open Current PDF
+                  </a>
+                  <button v-if="tutorial.deck_pdf_url" class="btn btn-ghost btn-sm text-error" @click="clearDeckUrl">
+                    Remove PDF
+                  </button>
+                </div>
+                <p class="text-xs text-base-content/50">Upload a PDF to replace the slide deck, or paste a direct PDF URL.</p>
+                <p v-if="deckMessage" class="text-xs" :class="deckMessageType === 'error' ? 'text-error' : 'text-success'">{{ deckMessage }}</p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -123,7 +162,7 @@
 import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useTrainingStore } from '../../stores/training'
-import { supabase } from '../../lib/supabase'
+import { supabase, uploadTutorialDeck } from '../../lib/supabase'
 
 const route = useRoute()
 const router = useRouter()
@@ -131,6 +170,11 @@ const store = useTrainingStore()
 
 const loading = ref(false)
 const saving = ref(false)
+const uploadingDeck = ref(false)
+const selectedDeckFile = ref(null)
+const deckFileInput = ref(null)
+const deckMessage = ref('')
+const deckMessageType = ref('success')
 const isNew = computed(() => !route.params.id)
 
 const tutorial = ref({
@@ -139,6 +183,7 @@ const tutorial = ref({
   description: '',
   category: 'investments',
   status: 'draft',
+  deck_pdf_url: '',
   steps: []
 })
 
@@ -170,6 +215,48 @@ async function handleSaveTutorial() {
     }
   }
   saving.value = false
+}
+
+function handleDeckSelected(event) {
+  const [file] = event.target.files || []
+  selectedDeckFile.value = file || null
+  deckMessage.value = ''
+}
+
+async function handleDeckUpload() {
+  if (!selectedDeckFile.value) return
+
+  uploadingDeck.value = true
+  deckMessage.value = ''
+  try {
+    if (selectedDeckFile.value.type && selectedDeckFile.value.type !== 'application/pdf') {
+      throw new Error('Please choose a PDF file.')
+    }
+
+    const slug = tutorial.value.slug || tutorial.value.title
+    const publicUrl = await uploadTutorialDeck(slug, selectedDeckFile.value)
+    tutorial.value.deck_pdf_url = publicUrl
+    deckMessageType.value = 'success'
+    deckMessage.value = 'PDF uploaded. Save changes to keep it on the tutorial.'
+    selectedDeckFile.value = null
+    if (deckFileInput.value) {
+      deckFileInput.value.value = ''
+    }
+  } catch (error) {
+    deckMessageType.value = 'error'
+    deckMessage.value = error.message || 'Failed to upload PDF.'
+  } finally {
+    uploadingDeck.value = false
+  }
+}
+
+function clearDeckUrl() {
+  tutorial.value.deck_pdf_url = ''
+  deckMessage.value = ''
+  selectedDeckFile.value = null
+  if (deckFileInput.value) {
+    deckFileInput.value.value = ''
+  }
 }
 
 function addStep() {

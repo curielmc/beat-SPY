@@ -192,7 +192,11 @@ export const useTrainingStore = defineStore('training', () => {
         description: tutorial.description,
         category: tutorial.category,
         status: tutorial.status,
-        position: tutorial.position || 0
+        position: tutorial.position || 0,
+        deck_pdf_url: tutorial.deck_pdf_url || null,
+        source_type: tutorial.source_type || null,
+        source_url: tutorial.source_url || null,
+        source_name: tutorial.source_name || null
       })
       .select()
       .single()
