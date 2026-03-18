@@ -230,9 +230,9 @@ export const useAuthStore = defineStore('auth', () => {
         if (profileResult.error) return
         if (await handleDisabledProfile(profileResult.profile)) return
         await ensureOwnerAdminProfile()
-        
-        // Handle auto-join on initial load
-        await _handleAutoJoin(session)
+
+        // Handle auto-join in background — don't block app loading
+        _handleAutoJoin(session).catch(e => console.warn('[AUTH] auto-join error:', e))
       }
     } finally {
       loading.value = false
@@ -255,9 +255,9 @@ export const useAuthStore = defineStore('auth', () => {
         if (await handleDisabledProfile(profileResult.profile)) return
         await ensureOwnerAdminProfile()
 
-        // Auto-join class if student has a pending invite and no memberships
+        // Auto-join class if student has a pending invite and no memberships (non-blocking)
         if (event === 'SIGNED_IN') {
-          await _handleAutoJoin(session)
+          _handleAutoJoin(session).catch(e => console.warn('[AUTH] auto-join error:', e))
         }
       } else if (event === 'SIGNED_OUT') {
         currentUser.value = null
@@ -310,7 +310,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     const promise = (async () => {
       console.log('[AUTH] requireProfile: starting wait for', userId)
-      const profileData = await waitForProfile(userId, { timeoutMs: 8000 })
+      const profileData = await waitForProfile(userId, { timeoutMs: 4000 })
       if (profileData) {
         console.log('[AUTH] requireProfile: SUCCESS for', userId)
         return { profile: profileData }
@@ -359,12 +359,21 @@ export const useAuthStore = defineStore('auth', () => {
     })
     if (error) return { error: error.message }
     currentUser.value = data.user
-    const profileResult = await requireProfile(
-      data.user.id,
-      'Your account authenticated, but your profile could not be loaded. Please contact your teacher or try again shortly.'
-    )
-    if (profileResult.error) return profileResult
-    const disabled = await handleDisabledProfile(profileResult.profile)
+    // For login (not signup), the profile already exists — fetch it directly
+    // instead of polling for up to 8 seconds
+    const profileData = await fetchProfile(data.user.id)
+    if (!profileData) {
+      // Fallback: brief retry in case of transient delay
+      await new Promise(r => setTimeout(r, 500))
+      const retry = await fetchProfile(data.user.id)
+      if (!retry) {
+        await supabase.auth.signOut()
+        currentUser.value = null
+        profile.value = null
+        return { error: 'Your account authenticated, but your profile could not be loaded. Please contact your teacher or try again shortly.' }
+      }
+    }
+    const disabled = await handleDisabledProfile(profile.value)
     if (disabled) return disabled
     return { user: data.user }
   }

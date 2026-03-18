@@ -15,9 +15,5 @@ const pinia = createPinia()
 app.use(pinia)
 app.use(router)
 
-// Initialize auth store before mounting
-import { useAuthStore } from './stores/auth'
-const auth = useAuthStore()
-auth.init().then(() => {
-  app.mount('#app')
-})
+// Mount app immediately, auth initializes in background via router guard
+app.mount('#app')
