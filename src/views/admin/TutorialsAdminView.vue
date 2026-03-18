@@ -64,7 +64,7 @@ function editTutorial(tutorial) {
 
 async function toggleStatus(tutorial) {
   const newStatus = tutorial.status === 'active' ? 'draft' : 'active'
-  await store.saveTutorial({ ...tutorial, status: newStatus })
+  await store.saveTutorial({ ...tutorial, status: newStatus }, { includeInactive: true })
 }
 
 function formatCategory(cat) {
@@ -79,7 +79,7 @@ async function confirmDelete(tutorial) {
 
 onMounted(async () => {
   loading.value = true
-  await store.fetchTutorials()
+  await store.fetchTutorials({ includeInactive: true })
   loading.value = false
 })
 </script>

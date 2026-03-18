@@ -28,6 +28,15 @@
               <h1 class="text-2xl font-bold">{{ store.currentTutorial.title }}</h1>
               <p v-if="store.currentTutorial.description" class="text-base-content/60 mt-1">{{ store.currentTutorial.description }}</p>
             </div>
+            <a
+              v-if="store.currentTutorial.deck_pdf_url"
+              :href="store.currentTutorial.deck_pdf_url"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="btn btn-outline btn-sm"
+            >
+              Download Slides PDF
+            </a>
           </div>
 
           <!-- Progress bar -->

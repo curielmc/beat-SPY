@@ -163,7 +163,7 @@ async function loadTutorial() {
 
 async function handleSaveTutorial() {
   saving.value = true
-  const { data, error } = await store.saveTutorial(tutorial.value)
+  const { data, error } = await store.saveTutorial(tutorial.value, { includeInactive: true })
   if (!error && data) {
     if (isNew.value) {
       router.replace(`/admin/tutorials/edit/${data.id}`)

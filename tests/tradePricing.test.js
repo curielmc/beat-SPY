@@ -19,8 +19,16 @@ test('getQueuedExecutionPrice uses the official session open only', () => {
   assert.equal(getQueuedExecutionPrice({ open: 99.75, price: 104.1 }), 99.75)
 })
 
-test('getQueuedExecutionPrice returns null when no open is available yet', () => {
-  assert.equal(getQueuedExecutionPrice({ open: null, price: 104.1 }), null)
+test('getQueuedExecutionPrice falls back to the latest available price when open is unavailable', () => {
+  assert.equal(getQueuedExecutionPrice({ open: null, price: 104.1 }), 104.1)
+})
+
+test('getQueuedExecutionPrice falls back to previous close when open and price are unavailable', () => {
+  assert.equal(getQueuedExecutionPrice({ open: null, price: null, previousClose: 101.2 }), 101.2)
+})
+
+test('getQueuedExecutionPrice returns null when no usable quote fields are available', () => {
+  assert.equal(getQueuedExecutionPrice({ open: null, price: null, previousClose: null }), null)
 })
 
 test('getAvailableCashForQueuedBuys subtracts queued and processing buy reservations', () => {

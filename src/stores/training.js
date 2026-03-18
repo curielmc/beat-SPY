@@ -10,15 +10,21 @@ export const useTrainingStore = defineStore('training', () => {
   const loading = ref(false)
   const classTutorials = ref([])
 
-  // Fetch all active tutorials
-  async function fetchTutorials() {
+  // Fetch tutorials for the current context.
+  async function fetchTutorials(options = {}) {
+    const { includeInactive = false } = options
     loading.value = true
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('training_tutorials')
         .select('*')
-        .eq('status', 'active')
         .order('position')
+
+      if (!includeInactive) {
+        query = query.eq('status', 'active')
+      }
+
+      const { data, error } = await query
       if (!error) tutorials.value = data || []
     } finally {
       loading.value = false
@@ -176,7 +182,7 @@ export const useTrainingStore = defineStore('training', () => {
     }
 
     // Admin: Create or update a tutorial
-    async function saveTutorial(tutorial) {
+    async function saveTutorial(tutorial, options = {}) {
     const { data, error } = await supabase
       .from('training_tutorials')
       .upsert({
@@ -192,7 +198,7 @@ export const useTrainingStore = defineStore('training', () => {
       .single()
 
     if (!error && data) {
-      await fetchTutorials()
+      await fetchTutorials(options)
     }
     return { data, error }
     }
