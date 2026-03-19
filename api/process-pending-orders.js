@@ -115,6 +115,91 @@ async function notifyAdmin(subject, body) {
   } catch (e) { /* best effort */ }
 }
 
+function formatTradeDollars(dollars) {
+  return `$${Number(dollars || 0).toLocaleString('en-US', { maximumFractionDigits: 2 })}`
+}
+
+function formatExecutionPrice(price) {
+  const value = Number(price || 0)
+  return value > 0 ? `$${value.toFixed(2)}` : 'an unavailable price'
+}
+
+function formatOrderLabel(order) {
+  const fundNumber = order.portfolios?.fund_number
+  const fundName = order.portfolios?.fund_name
+  if (fundName) return fundName
+  if (fundNumber != null) return `Fund ${fundNumber}`
+  return 'portfolio'
+}
+
+async function getNotificationTarget(order) {
+  const portfolio = order.portfolios || {}
+  const ownerType = portfolio.owner_type
+  const ownerId = portfolio.owner_id
+
+  if (ownerType === 'group' && ownerId) {
+    const groups = await sbFetch(`/groups?id=eq.${ownerId}&select=id,class_id,name&limit=1`).catch(() => [])
+    const group = groups?.[0]
+    if (group?.class_id) {
+      return {
+        classId: group.class_id,
+        recipientType: 'group',
+        recipientId: group.id,
+        recipientName: group.name || 'your group'
+      }
+    }
+  }
+
+  if ((ownerType === 'user' || ownerType === 'competition') && ownerId) {
+    const memberships = await sbFetch(`/class_memberships?user_id=eq.${ownerId}&select=class_id&order=joined_at.desc&limit=1`).catch(() => [])
+    const membership = memberships?.[0]
+    if (membership?.class_id) {
+      return {
+        classId: membership.class_id,
+        recipientType: 'user',
+        recipientId: ownerId,
+        recipientName: 'you'
+      }
+    }
+  }
+
+  return null
+}
+
+async function sendOrderNotification(order, kind, details = {}) {
+  const target = await getNotificationTarget(order)
+  if (!target?.classId || !target?.recipientType) return
+
+  const side = String(order.side || '').toUpperCase()
+  const ticker = order.ticker || 'Unknown ticker'
+  const dollars = formatTradeDollars(order.dollars)
+  const fundLabel = formatOrderLabel(order)
+
+  let content = ''
+  if (kind === 'executed') {
+    const shares = Number(details.shares || 0)
+    const sharesText = shares > 0 ? ` for ${shares.toFixed(4)} shares` : ''
+    content = `Order executed: ${side} ${ticker} in ${fundLabel} for ${dollars} at ${formatExecutionPrice(details.executionPrice)}${sharesText}.`
+  } else if (kind === 'failed') {
+    const reason = details.reason || 'Unknown error'
+    content = `Order failed: ${side} ${ticker} in ${fundLabel} for ${dollars}. Reason: ${reason}.`
+  } else {
+    return
+  }
+
+  await sbFetch('/messages', {
+    method: 'POST',
+    headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({
+      class_id: target.classId,
+      sender_id: null,
+      recipient_type: target.recipientType,
+      recipient_id: target.recipientId,
+      content
+    })
+  }).catch(() => {})
+}
+
 export default async function handler(req) {
   const auth = req.headers.get('authorization')
   const cronSecret = req.headers.get('x-cron-secret')
@@ -133,7 +218,7 @@ export default async function handler(req) {
 
   const nowIso = new Date().toISOString()
   // Select orders where attempts < 10 to prevent infinite retries of broken tickers
-  const path = `/pending_trade_orders?status=in.(queued,processing)&execute_after=lte.${encodeURIComponent(nowIso)}&attempts=lt.10&select=id,ticker,portfolio_id,user_id,placed_by_user_id,placed_by_role,attempts,portfolios(benchmark_ticker)&order=requested_at.asc&limit=100`
+  const path = `/pending_trade_orders?status=in.(queued,processing)&execute_after=lte.${encodeURIComponent(nowIso)}&attempts=lt.10&select=id,ticker,side,dollars,portfolio_id,user_id,placed_by_user_id,placed_by_role,attempts,portfolios(benchmark_ticker,owner_type,owner_id,fund_name,fund_number)&order=requested_at.asc&limit=100`
   const orders = await sbFetch(path).catch(() => [])
 
   if (!orders.length) {
@@ -184,6 +269,11 @@ export default async function handler(req) {
         attempts: newAttempts,
         permanently_failed: isPermanentlyFailed
       })
+      if (isPermanentlyFailed) {
+        await sendOrderNotification(order, 'failed', {
+          reason: 'The market opening price was unavailable after multiple retries.'
+        })
+      }
       continue
     }
 
@@ -203,8 +293,13 @@ export default async function handler(req) {
           })
         }).catch(() => {})
       }
+      await sendOrderNotification(order, 'executed', {
+        executionPrice,
+        shares: data?.shares
+      })
       results.push({ id: order.id, success: true, status: data?.status || 'executed' })
     } catch (error) {
+      await sendOrderNotification(order, 'failed', { reason: error.message })
       results.push({ id: order.id, success: false, error: error.message })
     }
   }
