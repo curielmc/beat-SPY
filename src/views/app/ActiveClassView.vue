@@ -171,8 +171,7 @@ import { supabase } from '../../lib/supabase'
 import LeaderboardEntry from '../../components/LeaderboardEntry.vue'
 import { getHistoricalDaily } from '../../services/fmpApi'
 import {
-  computeTodayReturn,
-  computeAnnualizedReturn
+  computeTodayReturn
 } from '../../utils/leaderboardMetrics'
 
 const auth = useAuthStore()
@@ -192,8 +191,7 @@ const activeMetric = ref('today')
 
 const metrics = [
   { key: 'sinceInception', label: 'Since Inception' },
-  { key: 'today', label: 'Today' },
-  { key: 'annualized', label: 'Annualized' }
+  { key: 'today', label: 'Today' }
 ]
 
 const tradeFrequencyLabel = computed(() => {
@@ -309,14 +307,11 @@ async function loadLeaderboard(classId) {
     }
     const today = computeTodayReturn(pHoldings, quotesMap, cashBalance)
 
-    const createdAt = p?.created_at || new Date().toISOString()
-    const annualized = computeAnnualizedReturn(sinceInception, createdAt)
-
     enriched.push({
       ...group,
       portfolioId: p?.id,
       totalValue,
-      metrics: { sinceInception, today, annualized },
+      metrics: { sinceInception, today },
       memberNames: (group.memberships || []).map(m => m.profiles?.full_name?.split(' ')[0]).filter(Boolean)
     })
   }
@@ -348,9 +343,6 @@ async function loadLeaderboard(classId) {
     benchmarkMetrics.value.sinceInception = spySinceInception
     const spyPrevClose = spyQuote.previousClose || spyQuote.price
     benchmarkMetrics.value.today = spyPrevClose > 0 ? ((spyQuote.price - spyPrevClose) / spyPrevClose) * 100 : 0
-    benchmarkMetrics.value.annualized = spySinceInception !== null && benchmarkStartDate
-      ? computeAnnualizedReturn(spySinceInception, benchmarkStartDate)
-      : null
   }
 
   leaderboardLoading.value = false

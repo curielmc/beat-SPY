@@ -108,9 +108,7 @@ import {
   reconstructHoldingsAsOf,
   reconstructCashAsOf,
   computePeriodReturn,
-  computeTodayReturn,
-  computeAnnualizedReturn,
-  computeRiskAdjustedReturn
+  computeTodayReturn
 } from '../../utils/leaderboardMetrics'
 
 const market = useMarketDataStore()
@@ -123,9 +121,7 @@ const metrics = [
   { key: 'd20', label: '20D' },
   { key: 'd30', label: '30D' },
   { key: 'd90', label: '90D' },
-  { key: 'y1', label: '1Y' },
-  { key: 'annualized', label: 'Annualized' },
-  { key: 'riskAdjusted', label: 'Risk-Adj' }
+  { key: 'y1', label: '1Y' }
 ]
 
 const PERIOD_METRICS = {
@@ -139,7 +135,6 @@ const search = ref('')
 const benchmarkMetrics = ref({})
 const benchmarkMetricLoading = ref(false)
 const periodMetricsLoading = ref(true)
-const riskMetricsLoading = ref(true)
 
 const uniqueInvestors = computed(() => {
   const ids = new Set(portfolios.value.map(p => p.owner_id))
@@ -147,13 +142,11 @@ const uniqueInvestors = computed(() => {
 })
 
 const activeBenchmarkValue = computed(() => {
-  if (activeMetric.value === 'riskAdjusted') return benchmarkMetrics.value.sinceInception ?? null
   return benchmarkMetrics.value[activeMetric.value] ?? null
 })
 
 function isMetricLoading(key) {
-  if (['sinceInception', 'today', 'annualized'].includes(key)) return false
-  if (key === 'riskAdjusted') return riskMetricsLoading.value
+  if (['sinceInception', 'today'].includes(key)) return false
   return periodMetricsLoading.value
 }
 
@@ -219,12 +212,11 @@ onMounted(async () => {
     }
     const today = computeTodayReturn(pHoldings, quotesMap, cashBalance)
     const createdAt = entry.created_at || new Date().toISOString()
-    const annualized = computeAnnualizedReturn(sinceInception, createdAt)
 
     enriched.push({
       ...entry,
       totalValue,
-      metrics: { sinceInception, today, annualized },
+      metrics: { sinceInception, today },
       holdings: pHoldings,
       trades: tradesMap[entry.portfolio_id] || [],
       cashBalance,
@@ -242,14 +234,12 @@ onMounted(async () => {
     const spyPrevClose = spyQuote.previousClose || spyQuote.price
     benchmarkMetrics.value.sinceInception = spyQuote.changesPercentage || 0
     benchmarkMetrics.value.today = spyPrevClose > 0 ? ((spyQuote.price - spyPrevClose) / spyPrevClose) * 100 : 0
-    benchmarkMetrics.value.annualized = benchmarkMetrics.value.sinceInception
   }
 
   loading.value = false
 
   // Phase 2: background
   computePeriodMetrics(enriched)
-  computeRiskMetrics(enriched)
 })
 
 async function computePeriodMetrics(entries) {
@@ -314,31 +304,4 @@ async function computePeriodMetrics(entries) {
   }
 }
 
-async function computeRiskMetrics(entries) {
-  try {
-    const allTickers = new Set()
-    for (const entry of entries) {
-      for (const h of entry.holdings) allTickers.add(h.ticker)
-    }
-    const tickerList = [...allTickers]
-
-    if (tickerList.length === 0) {
-      riskMetricsLoading.value = false
-      return
-    }
-
-    const profiles = await market.fetchBatchProfiles(tickerList)
-
-    for (const entry of entries) {
-      const sinceInception = entry.metrics.sinceInception || 0
-      entry.metrics.riskAdjusted = computeRiskAdjustedReturn(sinceInception, entry.holdings, profiles)
-    }
-
-    portfolios.value = [...portfolios.value]
-  } catch (e) {
-    console.error('Failed to compute risk metrics:', e)
-  } finally {
-    riskMetricsLoading.value = false
-  }
-}
 </script>

@@ -177,9 +177,7 @@ import { getHistoricalDaily } from '../../services/fmpApi'
 import { isMarketOpen } from '../../utils/marketHours'
 import {
   computePeriodReturn,
-  computeTodayReturn,
-  computeAnnualizedReturn,
-  computeRiskAdjustedReturn
+  computeTodayReturn
 } from '../../utils/leaderboardMetrics'
 
 const auth = useAuthStore()
@@ -193,9 +191,7 @@ const metrics = [
   { key: 'd20', label: '20D' },
   { key: 'd30', label: '30D' },
   { key: 'd90', label: '90D' },
-  { key: 'y1', label: '1Y' },
-  { key: 'annualized', label: 'Annualized' },
-  { key: 'riskAdjusted', label: 'Risk-Adj' }
+  { key: 'y1', label: '1Y' }
 ]
 
 // --- Highlight Stats ---
@@ -276,19 +272,13 @@ const visibleDatasets = computed(() => {
 const benchmarkMetrics = ref({})
 const benchmarkMetricLoading = ref(false)
 const periodMetricsLoading = ref(true)
-const riskMetricsLoading = ref(true)
 
 const activeBenchmarkValue = computed(() => {
-  if (activeMetric.value === 'sinceInception') return benchmarkMetrics.value.sinceInception ?? null
-  if (activeMetric.value === 'today') return benchmarkMetrics.value.today ?? null
-  if (activeMetric.value === 'annualized') return benchmarkMetrics.value.annualized ?? null
-  if (activeMetric.value === 'riskAdjusted') return benchmarkMetrics.value.sinceInception ?? null // SPY beta ~= 1
   return benchmarkMetrics.value[activeMetric.value] ?? null
 })
 
 function isMetricLoading(key) {
-  if (['sinceInception', 'today', 'annualized'].includes(key)) return false
-  if (key === 'riskAdjusted') return riskMetricsLoading.value
+  if (['sinceInception', 'today'].includes(key)) return false
   return periodMetricsLoading.value
 }
 
@@ -318,7 +308,6 @@ async function loadLeaderboard() {
   chartDatasets.value = []
   individualDatasets.value = []
   periodMetricsLoading.value = true
-  riskMetricsLoading.value = true
 
   try {
     const membership = await auth.getCurrentMembership(true)
@@ -396,9 +385,7 @@ async function loadLeaderboard() {
         if (gainLoss < 0 && gainLoss < maxLoss) { maxLoss = gainLoss; topHurter = driverObj }
       }
 
-      const annualized = computeAnnualizedReturn(sinceInception, createdAt)
-
-      return { totalValue, holdingsValue, sinceInception, today, annualized, drivers: { helper: topHelper, hurter: topHurter } }
+      return { totalValue, holdingsValue, sinceInception, today, drivers: { helper: topHelper, hurter: topHurter } }
     }
 
     // Phase 1: build fund-level entries AND aggregate group entries
@@ -424,7 +411,7 @@ async function loadLeaderboard() {
           name: `${group.name} — ${p.fund_name || p.name || 'Fund'}`,
           portfolioId: p.id,
           totalValue: m.totalValue,
-          metrics: { sinceInception: m.sinceInception, today: m.today, annualized: m.annualized },
+          metrics: { sinceInception: m.sinceInception, today: m.today },
           drivers: m.drivers,
           memberNames,
           holdings: pHoldings,
@@ -448,7 +435,7 @@ async function loadLeaderboard() {
         groupId: group.id,
         portfolioId: groupPortfolios[0]?.id,
         totalValue: aggM.totalValue,
-        metrics: { sinceInception: aggM.sinceInception, today: aggM.today, annualized: aggM.annualized },
+        metrics: { sinceInception: aggM.sinceInception, today: aggM.today },
         drivers: aggM.drivers,
         memberNames,
         holdings: allGroupHoldings,
@@ -487,13 +474,9 @@ async function loadLeaderboard() {
       benchmarkMetrics.value.sinceInception = spySinceInception
       const spyPrevClose = spyQuote.previousClose || spyQuote.price
       benchmarkMetrics.value.today = spyPrevClose > 0 ? ((spyQuote.price - spyPrevClose) / spyPrevClose) * 100 : 0
-      benchmarkMetrics.value.annualized = spySinceInception !== null && benchmarkStartDate
-        ? computeAnnualizedReturn(spySinceInception, benchmarkStartDate)
-        : null
     } else {
       benchmarkMetrics.value.sinceInception = null
       benchmarkMetrics.value.today = null
-      benchmarkMetrics.value.annualized = null
     }
 
     // Build chart datasets (non-blocking) — use first portfolio per group for chart
@@ -503,9 +486,8 @@ async function loadLeaderboard() {
     }
     buildChartDatasets(enriched, firstPortfolioByGroup, tradesMap)
 
-    // Phase 2: background — period metrics + risk-adjusted (both views)
+    // Phase 2: background — period metrics
     computePeriodMetrics(enriched, allFundEntries)
-    computeRiskMetrics(enriched, allFundEntries)
 
     // Auto-refresh prices every 5 minutes (300,000ms)
     // Only if market is open and tab is focused to save API calls
@@ -879,36 +861,5 @@ async function computePeriodMetrics(entries, fundEntriesArr) {
   }
 }
 
-async function computeRiskMetrics(entries, fundEntriesArr) {
-  try {
-    const allEntries = [...entries, ...fundEntriesArr]
-    // Collect all unique tickers
-    const allTickers = new Set()
-    for (const entry of allEntries) {
-      for (const h of entry.holdings) allTickers.add(h.ticker)
-    }
-    const tickerList = [...allTickers]
-
-    if (tickerList.length === 0) {
-      riskMetricsLoading.value = false
-      return
-    }
-
-    // Fetch profiles for beta data
-    const profiles = await market.fetchBatchProfiles(tickerList)
-
-    for (const entry of allEntries) {
-      const sinceInception = entry.metrics.sinceInception || 0
-      entry.metrics.riskAdjusted = computeRiskAdjustedReturn(sinceInception, entry.holdings, profiles)
-    }
-
-    groups.value = [...groups.value]
-    fundEntries.value = [...fundEntries.value]
-  } catch (e) {
-    console.error('Failed to compute risk metrics:', e)
-  } finally {
-    riskMetricsLoading.value = false
-  }
-}
 onUnmounted(() => { if (refreshInterval) clearInterval(refreshInterval) })
 </script>
