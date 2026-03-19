@@ -3,20 +3,6 @@
     <h1 class="text-xl font-bold">Tutorials</h1>
     <p class="text-sm text-base-content/60">Learn the fundamentals of investing, trading, and personal finance.</p>
 
-    <!-- Resources Card -->
-    <div class="card bg-primary text-primary-content shadow-sm">
-      <div class="card-body p-4 flex-row items-center justify-between gap-4">
-        <div>
-          <h2 class="font-bold">Presentation Slides</h2>
-          <p class="text-xs opacity-80">Prefer to read at your own pace? Download the full slide deck.</p>
-        </div>
-        <a href="/Beat-the-SandP-500.pdf" download class="btn btn-sm btn-outline border-primary-content text-primary-content hover:bg-primary-content hover:text-primary gap-2">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-          Download PDF
-        </a>
-      </div>
-    </div>
-
     <!-- Category filter tabs -->
     <div class="tabs tabs-boxed">
       <button class="tab" :class="{ 'tab-active': !categoryFilter }" @click="categoryFilter = null">All</button>
