@@ -77,8 +77,8 @@ const isMoreActive = computed(() =>
   route.path.startsWith('/teacher/tutorials')
 )
 
-function logout() {
-  auth.logout()
-  router.push({ name: 'landing' })
+async function logout() {
+  await auth.logout()
+  router.push({ name: 'login' })
 }
 </script>

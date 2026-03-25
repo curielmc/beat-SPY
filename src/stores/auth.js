@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { supabase, getAccessToken } from '../lib/supabase'
+import { OWNER_EMAIL } from '../lib/constants'
 
 export const useAuthStore = defineStore('auth', () => {
   const currentUser = ref(null)
@@ -149,7 +150,7 @@ export const useAuthStore = defineStore('auth', () => {
     const role = profile.value?.role
     const email = currentUser.value?.email?.toLowerCase()
     // Hardcoded fallback for the owner to prevent lockouts
-    if (email === 'martin@myecfo.com') return true
+    if (email === OWNER_EMAIL) return true
     return role === 'admin'
   })
 
@@ -158,13 +159,13 @@ export const useAuthStore = defineStore('auth', () => {
     // During masquerade, show the student's role for the student view
     if (isMasquerading.value) return profile.value?.role || 'student'
     const email = currentUser.value?.email?.toLowerCase()
-    if (email === 'martin@myecfo.com') return 'admin'
+    if (email === OWNER_EMAIL) return 'admin'
     return profile.value?.role || null
   })
 
   async function ensureOwnerAdminProfile() {
     const email = currentUser.value?.email?.toLowerCase()
-    if (email !== 'martin@myecfo.com' || profile.value?.role === 'admin') return
+    if (email !== OWNER_EMAIL || profile.value?.role === 'admin') return
 
     const { data, error } = await supabase
       .from('profiles')
@@ -262,6 +263,7 @@ export const useAuthStore = defineStore('auth', () => {
       } else if (event === 'SIGNED_OUT') {
         currentUser.value = null
         profile.value = null
+        _clearCaches()
       }
     })
   }
@@ -635,6 +637,7 @@ export const useAuthStore = defineStore('auth', () => {
     await supabase.auth.signOut()
     currentUser.value = null
     profile.value = null
+    _clearCaches()
   }
 
   return {
