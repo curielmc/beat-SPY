@@ -1,6 +1,8 @@
 export const config = { maxDuration: 60 }
 
-import { sbFetch as _sbFetch } from './_lib/supabase.js'
+import { SUPABASE_URL, SUPABASE_SERVICE_KEY, sbFetch as _sbFetch } from './_lib/supabase.js'
+
+const SUPABASE_KEY = SUPABASE_SERVICE_KEY
 
 async function sbFetch(path) {
   return _sbFetch(path).catch(() => null)

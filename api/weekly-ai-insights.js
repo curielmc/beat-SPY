@@ -1,6 +1,8 @@
 export const config = { runtime: 'edge' }
 
-import { FMP_KEY, sbFetch as _sbFetch } from './_lib/supabase.js'
+import { SUPABASE_URL, SUPABASE_SERVICE_KEY, FMP_KEY, sbFetch as _sbFetch } from './_lib/supabase.js'
+
+const SUPABASE_KEY = SUPABASE_SERVICE_KEY
 
 async function sbFetch(path, options = {}) {
   return _sbFetch(path, options).catch(() => null)
