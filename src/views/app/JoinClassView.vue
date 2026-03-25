@@ -1,7 +1,7 @@
 <template>
   <div class="max-w-md mx-auto space-y-6">
     <div>
-      <h1 class="text-2xl font-bold">Join a Class</h1>
+      <h1 class="text-xl font-bold">Join a Class</h1>
       <p class="text-base-content/60 text-sm">Enter a class code from your teacher to join their class.</p>
     </div>
 

@@ -2,7 +2,7 @@
   <div class="space-y-6">
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
       <div>
-        <h1 class="text-2xl font-bold">Settings & Restrictions</h1>
+        <h1 class="text-xl font-bold">Settings & Restrictions</h1>
         <p class="text-base-content/70">Configure trading rules, group mode, and parameters for {{ currentClass?.class_name || 'your class' }}</p>
       </div>
       <div v-if="currentClass" class="badge badge-lg badge-outline gap-2 py-4">

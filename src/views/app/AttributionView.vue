@@ -3,7 +3,7 @@
     <!-- Header -->
     <div class="flex items-center justify-between flex-wrap gap-3">
       <div>
-        <h1 class="text-2xl font-bold">Performance Attribution</h1>
+        <h1 class="text-xl font-bold">Performance Attribution</h1>
         <p class="text-base-content/60 text-sm mt-1">
           <span v-if="portfolioLabel" class="font-semibold text-base-content/80">{{ portfolioLabel }}</span>
           <span v-if="portfolioLabel"> — </span>

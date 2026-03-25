@@ -1,7 +1,7 @@
 <template>
   <div class="space-y-6">
     <div>
-      <h1 class="text-2xl font-bold">Platform Settings</h1>
+      <h1 class="text-xl font-bold">Platform Settings</h1>
       <p class="text-base-content/70">Manage platform-wide configuration</p>
     </div>
 

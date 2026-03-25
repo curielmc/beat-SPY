@@ -1,6 +1,6 @@
 <template>
   <div class="space-y-4">
-    <h1 class="text-2xl font-bold">Feed</h1>
+    <h1 class="text-xl font-bold">Feed</h1>
     <p class="text-sm text-base-content/60">Recent takes from people you follow</p>
 
     <div v-if="loading" class="flex justify-center py-12">
