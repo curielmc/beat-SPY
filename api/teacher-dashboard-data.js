@@ -1,6 +1,8 @@
 export const config = { runtime: 'edge' }
 
-import { sbFetch } from './_lib/supabase.js'
+import { SUPABASE_URL, SUPABASE_SERVICE_KEY, sbFetch } from './_lib/supabase.js'
+
+const SUPABASE_KEY = SUPABASE_SERVICE_KEY
 
 function encodeIn(values) {
   return values.map(v => encodeURIComponent(String(v))).join(',')
