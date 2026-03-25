@@ -1,11 +1,8 @@
 export const config = { runtime: 'edge' }
 
 import { getImmediateExecutionPrice } from '../src/lib/tradePricing.js'
-
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY
-const FMP_KEY = process.env.VITE_FMP_API_KEY
+import { SUPABASE_URL, SUPABASE_SERVICE_KEY, FMP_KEY, sbFetch, jsonResponse, fetchUserFromToken, loadProfile } from './_lib/supabase.js'
+import { OWNER_EMAIL } from './_lib/constants.js'
 
 async function fetchLivePrice(ticker) {
   if (!FMP_KEY) return null
@@ -23,48 +20,6 @@ async function fetchLivePrice(ticker) {
   return null
 }
 
-function jsonResponse(body, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': 'application/json' }
-  })
-}
-
-async function fetchUserFromToken(token) {
-  const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-    headers: {
-      apikey: SUPABASE_ANON_KEY,
-      Authorization: `Bearer ${token}`
-    }
-  })
-  if (!res.ok) return null
-  return res.json().catch(() => null)
-}
-
-async function sbFetch(path, options = {}) {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1${path}`, {
-    ...options,
-    headers: {
-      apikey: SUPABASE_SERVICE_KEY,
-      Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
-      'Content-Type': 'application/json',
-      ...options.headers
-    }
-  })
-
-  if (!res.ok) {
-    throw new Error(await res.text())
-  }
-
-  if (res.status === 204) return null
-  return res.json()
-}
-
-async function loadProfile(userId) {
-  const data = await sbFetch(`/profiles?id=eq.${userId}&select=id,role,email&limit=1`)
-  return data?.[0] || null
-}
-
 async function loadPortfolio(portfolioId) {
   const data = await sbFetch(`/portfolios?id=eq.${portfolioId}&select=id,owner_type,owner_id&limit=1`)
   return data?.[0] || null
@@ -72,7 +27,7 @@ async function loadPortfolio(portfolioId) {
 
 async function actorCanTradeForPortfolio(actorProfile, effectiveUserId, portfolioId) {
   if (!actorProfile?.id || !actorProfile?.role) return false
-  if (actorProfile.role === 'admin' || actorProfile.email?.toLowerCase() === 'martin@myecfo.com') return true
+  if (actorProfile.role === 'admin' || actorProfile.email?.toLowerCase() === OWNER_EMAIL) return true
   if (actorProfile.role !== 'teacher') return actorProfile.id === effectiveUserId
 
   const portfolio = await loadPortfolio(portfolioId)
@@ -116,6 +71,9 @@ async function annotateTradeActor(result, actorProfile) {
   }
 }
 
+const TICKER_RE = /^[A-Z]{1,5}$/
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 export default async function handler(req) {
   if (req.method !== 'POST') {
     return jsonResponse({ error: 'Method not allowed' }, 405)
@@ -130,7 +88,7 @@ export default async function handler(req) {
   const actorHeader = req.headers.get('x-actor-authorization')
   const actorJwt = actorHeader?.startsWith('Bearer ') ? actorHeader.replace('Bearer ', '') : null
 
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !SUPABASE_SERVICE_KEY) {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
     return jsonResponse({ error: 'Server auth is not configured' }, 500)
   }
 
@@ -145,6 +103,21 @@ export default async function handler(req) {
 
   if (!portfolio_id || !ticker || !side || !dollars) {
     return jsonResponse({ error: 'Missing required fields: portfolio_id, ticker, side, dollars' }, 400)
+  }
+
+  // Validate field formats
+  if (!UUID_RE.test(portfolio_id)) {
+    return jsonResponse({ error: 'Invalid portfolio_id format' }, 400)
+  }
+  if (!TICKER_RE.test(ticker.toUpperCase())) {
+    return jsonResponse({ error: 'Invalid ticker format (1-5 uppercase letters)' }, 400)
+  }
+  if (side !== 'buy' && side !== 'sell') {
+    return jsonResponse({ error: 'Side must be "buy" or "sell"' }, 400)
+  }
+  const dollarsNum = Number(dollars)
+  if (!Number.isFinite(dollarsNum) || dollarsNum <= 0) {
+    return jsonResponse({ error: 'Dollars must be a positive number' }, 400)
   }
 
   const effectiveUser = await fetchUserFromToken(userJwt)
@@ -200,7 +173,7 @@ export default async function handler(req) {
       p_portfolio_id: portfolio_id,
       p_ticker: ticker,
       p_side: side,
-      p_dollars: dollars,
+      p_dollars: dollarsNum,
       p_price: livePrice,
       p_rationale: rationale || null,
       p_approval_code: approval_code || null,
@@ -220,7 +193,7 @@ export default async function handler(req) {
   }
 
   const result = await rpcRes.json()
-  await annotateTradeActor(result, actorProfile).catch(() => {})
+  await annotateTradeActor(result, actorProfile).catch(e => console.error('annotateTradeActor failed:', e.message))
   if (result?.status === 'queued') {
     return jsonResponse({ ...result, submitted_price: livePrice })
   }

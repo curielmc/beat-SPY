@@ -1,7 +1,9 @@
 export const config = { runtime: 'edge' }
 
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY
+import { SUPABASE_URL, SUPABASE_SERVICE_KEY } from './_lib/supabase.js'
+import { OWNER_EMAIL } from './_lib/constants.js'
+
+const SUPABASE_KEY = SUPABASE_SERVICE_KEY
 
 export default async function handler(req) {
   if (req.method !== 'POST') {
@@ -28,7 +30,7 @@ export default async function handler(req) {
   const callerRole = profiles?.[0]?.role
   const callerEmail = profiles?.[0]?.email?.toLowerCase()
 
-  if (!['admin', 'teacher'].includes(callerRole) && callerEmail !== 'martin@myecfo.com') {
+  if (!['admin', 'teacher'].includes(callerRole) && callerEmail !== OWNER_EMAIL) {
     return new Response('Forbidden', { status: 403 })
   }
 

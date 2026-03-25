@@ -1,78 +1,9 @@
 export const config = { runtime: 'edge' }
 
 import { getQueuedExecutionPrice } from '../src/lib/tradePricing.js'
-
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY
-const FMP_KEY = process.env.VITE_FMP_API_KEY
-
-function easterDate(year) {
-  const a = year % 19, b = Math.floor(year / 100), c = year % 100
-  const d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25)
-  const g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30
-  const i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7
-  const m = Math.floor((a + 11 * h + 22 * l) / 451), em = h + l - 7 * m + 114
-  return new Date(year, Math.floor(em / 31) - 1, (em % 31) + 1)
-}
-
-function isUSMarketHoliday(date) {
-  const y = date.getFullYear()
-  const same = (a, b) => a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
-  const observed = (m, d) => { const dt = new Date(y, m - 1, d); const dow = dt.getDay(); if (dow === 0) dt.setDate(dt.getDate() + 1); if (dow === 6) dt.setDate(dt.getDate() - 1); return dt }
-  const nthDay = (m, wd, n) => { const f = new Date(y, m - 1, 1); return new Date(y, m - 1, 1 + ((wd - f.getDay() + 7) % 7) + (n - 1) * 7) }
-  const lastMon = () => { const last = new Date(y, 5, 0); return new Date(y, 4, last.getDate() - ((last.getDay() - 1 + 7) % 7)) }
-  const holidays = [
-    observed(1, 1), nthDay(1, 1, 3), nthDay(2, 1, 3),
-    new Date(easterDate(y).getTime() - 2 * 86400000),
-    lastMon(), observed(6, 19), observed(7, 4),
-    nthDay(9, 1, 1), nthDay(11, 4, 4), observed(12, 25)
-  ]
-  return holidays.some(h => same(h, date))
-}
-
-function isMarketOpen(now = new Date()) {
-  const easternTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }))
-  const day = easternTime.getDay()
-  const timeInMinutes = easternTime.getHours() * 60 + easternTime.getMinutes()
-  return day >= 1 && day <= 5 && timeInMinutes >= 570 && timeInMinutes < 960 && !isUSMarketHoliday(easternTime)
-}
-
-async function sbFetch(path, options = {}) {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1${path}`, {
-    ...options,
-    headers: {
-      apikey: SUPABASE_KEY,
-      Authorization: `Bearer ${SUPABASE_KEY}`,
-      'Content-Type': 'application/json',
-      ...options.headers
-    }
-  })
-
-  if (!res.ok) {
-    throw new Error(await res.text())
-  }
-
-  if (res.status === 204) return null
-  return res.json()
-}
-
-async function sbRpc(fn, body) {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
-    method: 'POST',
-    headers: {
-      apikey: SUPABASE_KEY,
-      Authorization: `Bearer ${SUPABASE_KEY}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(body)
-  })
-
-  if (!res.ok) {
-    throw new Error(await res.text())
-  }
-
-  return res.json()
-}
+import { isMarketOpen } from '../src/utils/marketHours.js'
+import { FMP_KEY, sbFetch, sbRpc } from './_lib/supabase.js'
+import { OWNER_EMAIL, AGENTMAIL_INBOX } from './_lib/constants.js'
 
 async function fetchQuotes(tickers) {
   const quoteMap = {}
@@ -95,15 +26,13 @@ async function fetchQuotes(tickers) {
 
 async function notifyAdmin(subject, body) {
   const AGENTMAIL_KEY = process.env.AGENTMAIL_API_KEY
-  const INBOX_ID = 'beat-snp@agentmail.to'
-  const ADMIN_EMAIL = 'martin@myecfo.com'
   if (!AGENTMAIL_KEY) return
   try {
-    await fetch(`https://api.agentmail.to/v0/inboxes/${INBOX_ID}/messages/send`, {
+    await fetch(`https://api.agentmail.to/v0/inboxes/${AGENTMAIL_INBOX}/messages/send`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${AGENTMAIL_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        to: [ADMIN_EMAIL],
+        to: [OWNER_EMAIL],
         subject,
         html: `<div style="font-family:sans-serif;padding:20px;">
           <h2 style="color:#dc2626;">${subject}</h2>
@@ -244,7 +173,7 @@ export default async function handler(req) {
 
     if (!executionPrice || !benchmarkExecutionPrice) {
       skipped += 1
-      
+
       // Increment attempts and update execute_after by 5 minutes to move to back of queue
       const nextExecution = new Date(Date.now() + 300000).toISOString()
       const newAttempts = (order.attempts || 0) + 1
@@ -259,7 +188,7 @@ export default async function handler(req) {
           error_message: 'opening_price_unavailable',
           status: isPermanentlyFailed ? 'failed' : order.status
         })
-      }).catch(() => {})
+      }).catch(e => console.error('Failed to update pending order:', order.id, e.message))
 
       results.push({
         id: order.id,
@@ -291,7 +220,7 @@ export default async function handler(req) {
             placed_by_user_id: order.placed_by_user_id,
             placed_by_role: order.placed_by_role
           })
-        }).catch(() => {})
+        }).catch(e => console.error('Failed to annotate trade actor:', data.trade_id, e.message))
       }
       await sendOrderNotification(order, 'executed', {
         executionPrice,

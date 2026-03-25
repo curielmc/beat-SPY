@@ -1,26 +1,6 @@
 export const config = { runtime: 'edge' }
 
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY
-
-async function sbFetch(path, options = {}) {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1${path}`, {
-    ...options,
-    headers: {
-      apikey: SUPABASE_KEY,
-      Authorization: `Bearer ${SUPABASE_KEY}`,
-      'Content-Type': 'application/json',
-      ...options.headers
-    }
-  })
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => '')
-    throw new Error(text || `Supabase request failed: ${res.status}`)
-  }
-
-  return res.json()
-}
+import { sbFetch } from './_lib/supabase.js'
 
 function encodeIn(values) {
   return values.map(v => encodeURIComponent(String(v))).join(',')

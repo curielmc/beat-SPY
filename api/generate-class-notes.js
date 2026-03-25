@@ -1,18 +1,9 @@
 export const config = { maxDuration: 60 }
 
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY
+import { sbFetch as _sbFetch } from './_lib/supabase.js'
 
 async function sbFetch(path) {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1${path}`, {
-    headers: {
-      apikey: SUPABASE_KEY,
-      Authorization: `Bearer ${SUPABASE_KEY}`,
-      'Content-Type': 'application/json'
-    }
-  })
-  if (!res.ok) return null
-  return res.json()
+  return _sbFetch(path).catch(() => null)
 }
 
 function getAIConfig(prompt) {

@@ -1,21 +1,9 @@
 export const config = { runtime: 'edge' }
 
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY
-const FMP_KEY = process.env.VITE_FMP_API_KEY
+import { FMP_KEY, sbFetch as _sbFetch } from './_lib/supabase.js'
 
 async function sbFetch(path, options = {}) {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1${path}`, {
-    ...options,
-    headers: {
-      apikey: SUPABASE_KEY,
-      Authorization: `Bearer ${SUPABASE_KEY}`,
-      'Content-Type': 'application/json',
-      ...options.headers
-    }
-  })
-  if (!res.ok) return null
-  return res.json()
+  return _sbFetch(path, options).catch(() => null)
 }
 
 async function generateAIAnalysis(prompt) {

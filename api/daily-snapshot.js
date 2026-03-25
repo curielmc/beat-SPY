@@ -1,20 +1,21 @@
 export const config = { runtime: 'edge' }
 
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY
-const FMP_KEY = process.env.VITE_FMP_API_KEY
-const AGENTMAIL_KEY = process.env.AGENTMAIL_API_KEY
-const INBOX_ID = 'beat-snp@agentmail.to'
-const ADMIN_EMAIL = 'martin@myecfo.com'
+import { FMP_KEY, sbFetch as _sbFetch } from './_lib/supabase.js'
+import { OWNER_EMAIL, AGENTMAIL_INBOX } from './_lib/constants.js'
+
+async function sbFetch(path) {
+  return _sbFetch(path).catch(() => null)
+}
 
 async function notifyAdmin(subject, body) {
+  const AGENTMAIL_KEY = process.env.AGENTMAIL_API_KEY
   if (!AGENTMAIL_KEY) return
   try {
-    await fetch(`https://api.agentmail.to/v0/inboxes/${INBOX_ID}/messages/send`, {
+    await fetch(`https://api.agentmail.to/v0/inboxes/${AGENTMAIL_INBOX}/messages/send`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${AGENTMAIL_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        to: [ADMIN_EMAIL],
+        to: [OWNER_EMAIL],
         subject,
         html: `<div style="font-family:sans-serif;padding:20px;">
           <h2 style="color:#dc2626;">${subject}</h2>
@@ -24,14 +25,6 @@ async function notifyAdmin(subject, body) {
       })
     })
   } catch (e) { /* best effort */ }
-}
-
-async function sbFetch(path) {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1${path}`, {
-    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' }
-  })
-  if (!res.ok) return null
-  return res.json()
 }
 
 export default async function handler(req) {
