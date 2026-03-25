@@ -15,12 +15,12 @@ test('getImmediateExecutionPrice falls back to previous close', () => {
   assert.equal(getImmediateExecutionPrice({ price: null, previousClose: 101.2 }), 101.2)
 })
 
-test('getQueuedExecutionPrice uses the official session open only', () => {
-  assert.equal(getQueuedExecutionPrice({ open: 99.75, price: 104.1 }), 99.75)
+test('getQueuedExecutionPrice prefers the real-time price over session open', () => {
+  assert.equal(getQueuedExecutionPrice({ price: 104.1, open: 99.75 }), 104.1)
 })
 
-test('getQueuedExecutionPrice falls back to the latest available price when open is unavailable', () => {
-  assert.equal(getQueuedExecutionPrice({ open: null, price: 104.1 }), 104.1)
+test('getQueuedExecutionPrice falls back to open when price is unavailable', () => {
+  assert.equal(getQueuedExecutionPrice({ price: null, open: 99.75 }), 99.75)
 })
 
 test('getQueuedExecutionPrice falls back to previous close when open and price are unavailable', () => {
