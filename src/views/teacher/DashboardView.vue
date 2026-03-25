@@ -91,7 +91,7 @@
         </div>
       </div>
 
-      <!-- Leaderboard Table -->
+      <!-- Group Leaderboard -->
       <div class="card bg-base-100 shadow border border-base-200">
         <div class="card-body p-5 xl:p-6">
           <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -100,156 +100,48 @@
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
                 Group Leaderboard
               </h2>
-              <p class="text-xs text-base-content/50 mt-1">Sortable performance snapshot for every group in this class.</p>
+              <p class="text-xs text-base-content/50 mt-1">Each group's total assets under management and since-inception return.</p>
             </div>
-            <div class="text-xs text-base-content/45 sm:text-right">
-              Click any heading to reorder the board.
-            </div>
+            <div v-if="leaderboardError" class="text-xs text-error">{{ leaderboardError }}</div>
           </div>
-          <div class="overflow-x-auto mt-4">
+
+          <div v-if="leaderboardLoading" class="flex justify-center py-8">
+            <span class="loading loading-spinner loading-md"></span>
+          </div>
+
+          <div v-else class="overflow-x-auto mt-4">
             <table class="table w-full">
               <thead>
                 <tr>
-                  <th class="w-16">
-                    <button class="btn btn-ghost btn-xs px-0 normal-case" @click="setSort('rank')">
-                      Rank {{ sortIndicator('rank') }}
-                    </button>
-                  </th>
-                  <th class="min-w-[12rem]">
-                    <button class="btn btn-ghost btn-xs px-0 normal-case" @click="setSort('name')">
-                      Group {{ sortIndicator('name') }}
-                    </button>
-                  </th>
-                  <th class="min-w-[16rem]">
-                    <button class="btn btn-ghost btn-xs px-0 normal-case" @click="setSort('members')">
-                      Members {{ sortIndicator('members') }}
-                    </button>
-                  </th>
-                  <th class="text-right min-w-[7rem]">
-                    <button class="btn btn-ghost btn-xs px-0 normal-case" @click="setSort('returnPct')">
-                      Return % {{ sortIndicator('returnPct') }}
-                    </button>
-                  </th>
-                  <th class="text-right min-w-[7rem]">vs S&P 500</th>
-                  <th class="text-right min-w-[10rem]">
-                    <button class="btn btn-ghost btn-xs px-0 normal-case" @click="setSort('totalValue')">
-                      All Funds {{ sortIndicator('totalValue') }}
-                    </button>
-                  </th>
-                  <th class="text-right min-w-[9rem]">
-                    <button class="btn btn-ghost btn-xs px-0 normal-case" @click="setSort('cash')">
-                      Uninvested Cash {{ sortIndicator('cash') }}
-                    </button>
-                  </th>
-                  <th class="min-w-[7rem]">
-                    <button class="btn btn-ghost btn-xs px-0 normal-case" @click="setSort('lastTradeAt')">
-                      Last Trade {{ sortIndicator('lastTradeAt') }}
-                    </button>
-                  </th>
-                  <th class="text-right min-w-[8rem]">Actions</th>
+                  <th class="w-12">Rank</th>
+                  <th>Group</th>
+                  <th>Members</th>
+                  <th class="text-right">Funds</th>
+                  <th class="text-right">AUM</th>
+                  <th class="text-right">Cash</th>
+                  <th class="text-right">Return</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="(group, i) in sortedGroups" :key="group.id" class="border-t border-base-200 align-top">
-                  <td class="py-4">
+                <tr v-for="(group, i) in leaderboardGroups" :key="group.id" class="hover">
+                  <td>
                     <span class="badge badge-lg" :class="i === 0 ? 'badge-warning' : 'badge-ghost'">{{ i + 1 }}</span>
                   </td>
-                  <td class="py-4">
-                    <div class="font-semibold">{{ group.name }}</div>
-                    <div class="text-xs text-base-content/45 mt-1">{{ group.fundCount || 0 }} fund{{ (group.fundCount || 0) === 1 ? '' : 's' }}</div>
-                  </td>
-                  <td class="py-4">
-                    <div class="space-y-2">
-                      <div class="flex flex-wrap items-center gap-1.5">
-                        <span v-for="name in group.memberNames" :key="name" class="badge badge-sm badge-outline whitespace-nowrap">{{ name.split(' ')[0] }}</span>
-                      </div>
-                      <button
-                        v-if="group.members.length"
-                        class="btn btn-ghost btn-xs h-7 min-h-7 px-2"
-                        title="View member emails"
-                        @click="openMemberModal(group)"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8m-18 8h18a2 2 0 002-2V8a2 2 0 00-2-2H3a2 2 0 00-2 2v6a2 2 0 002 2z" />
-                        </svg>
-                        Contacts
-                      </button>
+                  <td class="font-semibold">{{ group.name }}</td>
+                  <td>
+                    <div class="flex flex-wrap gap-1">
+                      <span v-for="name in group.members" :key="name" class="badge badge-sm badge-outline whitespace-nowrap">{{ name.split(' ')[0] }}</span>
                     </div>
                   </td>
-                  <td class="py-4 text-right font-mono text-sm font-semibold" :class="group.returnPct >= 0 ? 'text-success' : 'text-error'">
+                  <td class="text-right text-sm text-base-content/60">{{ group.fundCount }}</td>
+                  <td class="text-right font-mono text-sm font-semibold">${{ formatMoney(group.totalValue) }}</td>
+                  <td class="text-right font-mono text-sm text-base-content/60">${{ formatMoney(group.cash) }}</td>
+                  <td class="text-right font-mono text-sm font-semibold" :class="group.returnPct >= 0 ? 'text-success' : 'text-error'">
                     {{ group.returnPct >= 0 ? '+' : '' }}{{ group.returnPct.toFixed(2) }}%
                   </td>
-                  <td class="py-4 text-right">
-                    <div class="flex items-center justify-end gap-1.5 tooltip tooltip-left" :data-tip="`S&P 500 Benchmark: ${group.benchmarkReturnPct.toFixed(2)}%`">
-                      <span class="text-[10px] text-base-content/40 font-mono">{{ group.benchmarkReturnPct.toFixed(1) }}%</span>
-                      <span v-if="group.isBeatingSP500" class="text-success font-bold" title="Beating S&P 500">✓</span>
-                      <span v-else class="text-error font-bold" title="Trailing S&P 500">✕</span>
-                    </div>
-                  </td>
-                  <td class="py-4 text-right">
-                    <div class="flex items-start justify-end gap-2">
-                      <div>
-                        <div class="font-mono text-sm font-semibold">${{ formatMoney(group.totalValue) }}</div>
-                        <div class="text-xs text-base-content/45 mt-1">combined value</div>
-                      </div>
-                      <button
-                        class="btn btn-ghost btn-xs btn-square tooltip tooltip-left"
-                        data-tip="View all funds"
-                        @click="openFundsModal(group)"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-                        </svg>
-                      </button>
-                    </div>
-                  </td>
-                  <td class="py-4 text-right font-mono text-sm">${{ formatMoney(group.cash) }}</td>
-                  <td class="py-4 text-sm text-base-content/60">{{ formatTradeDateCompact(group.lastTradeAt) }}</td>
-                  <td class="py-4 text-right">
-                    <div class="flex justify-end gap-2">
-                      <button
-                        class="btn btn-square btn-sm btn-outline btn-warning tooltip tooltip-left"
-                        data-tip="Quick messages"
-                        @click="openQuickMessageModal(group)"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                        </svg>
-                      </button>
-                      <button
-                        class="btn btn-square btn-sm btn-outline btn-primary tooltip tooltip-left"
-                        data-tip="Performance attribution"
-                        @click="openAttributionModal(group)"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                        </svg>
-                      </button>
-                      <button
-                        class="btn btn-square btn-sm btn-outline btn-info tooltip tooltip-left"
-                        data-tip="Send lesson"
-                        :disabled="sendingLessonId === group.id"
-                        @click="openLessonModal(group.id, 'group', group.name)"
-                      >
-                        <span v-if="sendingLessonId === group.id" class="loading loading-spinner loading-xs"></span>
-                        <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6l4 2m5-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                      </button>
-                      <RouterLink
-                        :to="{ name: 'teacher-messages', query: { class_id: currentClass?.id, group_id: group.id } }"
-                        class="btn btn-sm btn-outline gap-2"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                        </svg>
-                        Message
-                      </RouterLink>
-                    </div>
-                  </td>
                 </tr>
-                <tr v-if="sortedGroups.length === 0">
-                  <td colspan="9" class="text-center text-base-content/50">No groups yet</td>
+                <tr v-if="leaderboardGroups.length === 0">
+                  <td colspan="7" class="text-center text-base-content/50 py-8">No groups yet</td>
                 </tr>
               </tbody>
             </table>
@@ -660,6 +552,9 @@ const route = useRoute()
 const teacher = useTeacherStore()
 const loading = ref(true)
 const rankedGroups = ref([])
+const leaderboardGroups = ref([])
+const leaderboardLoading = ref(false)
+const leaderboardError = ref('')
 const sortKey = ref('returnPct')
 const sortDirection = ref('desc')
 const showMembersModal = ref(false)
@@ -693,9 +588,10 @@ const classStudents = computed(() =>
 )
 
 const dashboardSummary = computed(() => {
-  const totalValue = rankedGroups.value.reduce((sum, group) => sum + Number(group.totalValue || 0), 0)
-  const totalStartingCash = rankedGroups.value.reduce((sum, group) => sum + Number(group.startingCash || 0), 0)
-  const cash = rankedGroups.value.reduce((sum, group) => sum + Number(group.cash || 0), 0)
+  const groups = leaderboardGroups.value
+  const totalValue = groups.reduce((sum, g) => sum + Number(g.totalValue || 0), 0)
+  const totalStartingCash = groups.reduce((sum, g) => sum + Number(g.startingCash || 0), 0)
+  const cash = groups.reduce((sum, g) => sum + Number(g.cash || 0), 0)
   const returnPct = totalStartingCash > 0 ? ((totalValue - totalStartingCash) / totalStartingCash) * 100 : 0
   return { totalValue, totalStartingCash, cash, returnPct }
 })
@@ -1075,17 +971,39 @@ const renderedNotes = computed(() => {
 async function loadDashboard() {
   if (!teacher.classes.length || (route.query.class_id && !currentClass.value)) {
     rankedGroups.value = []
+    leaderboardGroups.value = []
     loading.value = false
     return
   }
 
   loading.value = true
+  leaderboardLoading.value = true
+  leaderboardError.value = ''
   try {
-    rankedGroups.value = await teacher.getRankedGroups(currentClass.value?.id || null)
+    // Load leaderboard from server-side API (computes market values server-side)
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session?.access_token && currentClass.value?.id) {
+      const res = await fetch('/api/teacher-leaderboard', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ class_id: currentClass.value.id })
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok && data.groups) {
+        leaderboardGroups.value = data.groups
+      } else {
+        leaderboardError.value = data.error || 'Failed to load leaderboard'
+      }
+    }
   } catch (err) {
     console.error('Failed to load dashboard:', err)
+    leaderboardError.value = 'Failed to load leaderboard'
   } finally {
     loading.value = false
+    leaderboardLoading.value = false
   }
 }
 
