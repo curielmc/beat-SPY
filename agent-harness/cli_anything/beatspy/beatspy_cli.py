@@ -21,6 +21,7 @@ from cli_anything.beatspy.core.portfolios import PortfolioOperations
 from cli_anything.beatspy.core.trades import TradeOperations
 from cli_anything.beatspy.core.lessons import LessonOperations
 from cli_anything.beatspy.core.leaderboard import LeaderboardOperations
+from cli_anything.beatspy.core.groups import GroupOperations
 
 
 class BeatSpyCLI:
@@ -41,6 +42,7 @@ class BeatSpyCLI:
         self.trades_ops = TradeOperations(self.api)
         self.lessons_ops = LessonOperations(self.api)
         self.leaderboard_ops = LeaderboardOperations(self.api)
+        self.groups_ops = GroupOperations(self.api)
 
         # Setup history file
         history_dir = Path.home() / ".beatspy_cli"
@@ -293,6 +295,110 @@ class BeatSpyCLI:
         except Exception as e:
             print(format_error(f"API connection failed: {str(e)}"))
 
+    def cmd_group_list(self, args: list) -> None:
+        """List all groups in current class."""
+        if not self.cache.is_in_class():
+            print(format_error("No class selected. Use 'class select <id>' first."))
+            return
+
+        try:
+            groups = self.groups_ops.list_for_class(self.cache.class_id)
+            if not groups:
+                print("No groups found in this class.")
+                return
+
+            display = [
+                {
+                    "ID": g.get("id", "")[:8],
+                    "Name": g.get("name", ""),
+                    "Created": g.get("created_at", "")[:10],
+                }
+                for g in groups
+            ]
+            print(format_table(display))
+        except Exception as e:
+            print(format_error(str(e)))
+
+    def cmd_group_show(self, args: list) -> None:
+        """Show group details."""
+        if not args:
+            print(format_error("Usage: group show <id>"))
+            return
+
+        group_id = args[0]
+        try:
+            group = self.groups_ops.get(group_id)
+            if not group:
+                print(format_error(f"Group not found: {group_id}"))
+                return
+
+            print(f"\n=== Group ===")
+            print(
+                f"ID: {group.get('id', '')[:8]}\n"
+                f"Name: {group.get('name', '')}\n"
+                f"Created: {group.get('created_at', '')}"
+            )
+        except Exception as e:
+            print(format_error(str(e)))
+
+    def cmd_group_members(self, args: list) -> None:
+        """Show members in a group with their performance."""
+        if not args:
+            print(format_error("Usage: group members <id>"))
+            return
+
+        group_id = args[0]
+        try:
+            group = self.groups_ops.get(group_id)
+            if not group:
+                print(format_error(f"Group not found: {group_id}"))
+                return
+
+            members = self.groups_ops.get_members(group_id)
+            if not members:
+                print(f"No members found in group: {group.get('name', group_id)}")
+                return
+
+            print(f"\n=== {group.get('name', 'Group')} Members ({len(members)}) ===\n")
+            display = [
+                {
+                    "Name": m.get("name", "Unknown")[:25],
+                    "Cash": f"${m.get('cash_balance', 0):,.2f}",
+                    "Return": f"{m.get('return_pct', 0):+.2f}%",
+                }
+                for m in sorted(members, key=lambda x: x.get("return_pct", 0), reverse=True)
+            ]
+            print(format_table(display))
+        except Exception as e:
+            print(format_error(str(e)))
+
+    def cmd_group_leaderboard(self, args: list) -> None:
+        """Show group leaderboard ranked by aggregate returns."""
+        if not self.cache.is_in_class():
+            print(format_error("No class selected. Use 'class select <id>' first."))
+            return
+
+        try:
+            leaderboard = self.groups_ops.get_leaderboard(self.cache.class_id)
+            if not leaderboard:
+                print("No groups found in this class.")
+                return
+
+            print(f"\n=== Group Leaderboard ===\n")
+            display = [
+                {
+                    "Rank": i + 1,
+                    "Group": g.get("name", "")[:25],
+                    "Members": g.get("member_count", 0),
+                    "Total": f"${g.get('total_current', 0):,.0f}",
+                    "Return": f"{g.get('return_pct', 0):+.2f}%",
+                }
+                for i, g in enumerate(leaderboard)
+            ]
+            print(format_table(display))
+        except Exception as e:
+            print(format_error(str(e)))
+
     def cmd_help(self, args: list) -> None:
         """Show help message."""
         help_text = """
@@ -315,6 +421,10 @@ Class Context:
   portfolio pending <id>  - Show pending orders
   tutorial list           - List available training tutorials
   leaderboard             - Show class leaderboard
+  group list              - List all groups in class
+  group show <id>         - Show group details
+  group members <id>      - Show members in a group
+  group leaderboard       - Show groups ranked by aggregate returns
 """
         print(help_text)
 
@@ -389,6 +499,10 @@ Class Context:
                 elif line.startswith("config "):
                     cmd = "config " + line[7:].split()[0]
                     rest = line[7 + len(cmd.split()[-1]) + 1:].strip()
+                    args = rest.split() if rest else []
+                elif line.startswith("group "):
+                    cmd = "group " + line[6:].split()[0]
+                    rest = line[6 + len(cmd.split()[-1]) + 1:].strip()
                     args = rest.split() if rest else []
                 else:
                     cmd, args = self.parse_command(line)

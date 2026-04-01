@@ -1,0 +1,2 @@
+[console_scripts]
+cli-anything-beatspy = cli_anything.beatspy.beatspy_cli:main

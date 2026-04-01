@@ -42,7 +42,8 @@ cli-anything-beatspy
 - **Two-Level Context** — Navigate from global to class context
 - **Class Management** — List and select classes (courses)
 - **Portfolio Monitoring** — View student portfolios, holdings, trade history
-- **Performance Analytics** — View class leaderboard and rankings
+- **Performance Analytics** — View class leaderboard, individual rankings, and group performance
+- **Group Management** — View teams, members, and group-level performance aggregation
 - **Trading Insights** — Track pending orders and trade history
 - **Training Management** — Access educational tutorials
 - **Command History** — Persistent across sessions (`~/.beatspy_cli/history`)
@@ -68,6 +69,10 @@ portfolio show <id>
 portfolio trades <id>
 portfolio pending <id>
 leaderboard
+group list
+group show <id>
+group members <id>
+group leaderboard
 back
 ```
 
