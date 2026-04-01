@@ -1,0 +1,1 @@
+"""CLI anything namespace package."""
