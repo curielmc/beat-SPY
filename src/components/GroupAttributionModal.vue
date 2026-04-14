@@ -1,5 +1,5 @@
 <template>
-  <dialog class="modal" :class="{ 'modal-open': isOpen }">
+  <dialog v-if="isOpen && group" class="modal" :class="{ 'modal-open': isOpen }">
     <div class="modal-box max-w-4xl max-h-[90vh] overflow-y-auto">
       <div class="flex items-center justify-between mb-4">
         <div>
@@ -39,8 +39,8 @@
         <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
           <div class="card bg-success/10 border border-success/20 p-4 text-center">
             <div class="text-xs text-base-content/60 mb-1">Biggest Help</div>
-            <div class="font-mono font-bold text-lg text-success">{{ topHelper?.ticker }}</div>
-            <div class="text-success font-semibold">{{ topHelper?.contribution >= 0 ? '+' : '' }}{{ topHelper?.contribution.toFixed(2) }}%</div>
+            <div class="font-mono font-bold text-lg text-success">{{ topHelper?.ticker || '—' }}</div>
+            <div class="text-success font-semibold">{{ formatSignedPct(topHelper?.contribution) }}</div>
           </div>
           <div class="card bg-base-100 border border-base-300 p-4 text-center">
             <div class="text-xs text-base-content/60 mb-1">Total Return ({{ selectedRange }})</div>
@@ -51,8 +51,8 @@
           </div>
           <div class="card bg-error/10 border border-error/20 p-4 text-center">
             <div class="text-xs text-base-content/60 mb-1">Biggest Drag</div>
-            <div class="font-mono font-bold text-lg text-error">{{ topDrag?.ticker }}</div>
-            <div class="text-error font-semibold">{{ topDrag?.contribution >= 0 ? '+' : '' }}{{ topDrag?.contribution.toFixed(2) }}%</div>
+            <div class="font-mono font-bold text-lg text-error">{{ topDrag?.ticker || '—' }}</div>
+            <div class="text-error font-semibold">{{ formatSignedPct(topDrag?.contribution) }}</div>
           </div>
         </div>
 
@@ -179,6 +179,12 @@ function barStyle(contribution) {
   } else {
     return { width: `${pct}%`, marginRight: '50%', marginLeft: 'auto' }
   }
+}
+
+function formatSignedPct(value) {
+  const num = Number(value)
+  if (!Number.isFinite(num)) return '—'
+  return `${num >= 0 ? '+' : ''}${num.toFixed(2)}%`
 }
 
 function getPeriodStartDate(range) {
@@ -331,22 +337,39 @@ async function loadAttribution() {
     attributions.value = finalAttributions
     totalReturn.value = finalAttributions.reduce((sum, a) => sum + a.contribution, 0)
 
+    if (finalAttributions.length > 0) {
+      await explainPortfolio(finalAttributions)
+    } else {
+      explanation.value = 'No holdings with enough recent data to explain for this period.'
+    }
+
   } catch (err) {
     console.error('Error loading group attribution:', err)
+    explanation.value = 'Could not load attribution details for this group.'
   } finally {
     loading.value = false
   }
 }
 
-async function explainPortfolio() {
+async function explainPortfolio(rows = attributions.value) {
   explaining.value = true
   try {
     const { data: { session } } = await supabase.auth.getSession()
-    if (!session) return
-    
-    const tickers = attributions.value.slice(0, 10).map(a => a.ticker)
-    const changes = Object.fromEntries(attributions.value.map(a => [a.ticker, a.stockReturn]))
-    const summary = `Group portfolio return (${selectedRange.value}): ${totalReturn.value.toFixed(2)}%. Best: ${topHelper.value?.ticker}. Worst: ${topDrag.value?.ticker}. vs SPY: ${(totalReturn.value - spyReturn.value).toFixed(2)}%.`
+    if (!session) {
+      explanation.value = 'Please sign in again to generate the explanation.'
+      return
+    }
+
+    const tickers = rows.slice(0, 10).map(a => a.ticker)
+    if (tickers.length === 0) {
+      explanation.value = 'No positions are available to explain for this period.'
+      return
+    }
+
+    const changes = Object.fromEntries(rows.map(a => [a.ticker, a.stockReturn]))
+    const best = rows[0]?.ticker || 'N/A'
+    const worst = [...rows].sort((a, b) => a.contribution - b.contribution)[0]?.ticker || 'N/A'
+    const summary = `Group portfolio return (${selectedRange.value}): ${totalReturn.value.toFixed(2)}%. Best: ${best}. Worst: ${worst}. vs SPY: ${(totalReturn.value - spyReturn.value).toFixed(2)}%.`
     
     const res = await fetch('/api/explain-attribution', {
       method: 'POST',
@@ -356,8 +379,14 @@ async function explainPortfolio() {
       },
       body: JSON.stringify({ tickers, changes, portfolioSummary: summary, mode: 'portfolio' })
     })
-    const data = await res.json()
-    explanation.value = data.explanation
+
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      explanation.value = data.error || 'Explanation service is unavailable right now.'
+      return
+    }
+
+    explanation.value = data.explanation || 'No explanation was returned for this portfolio.'
   } catch (err) {
     explanation.value = 'Could not load explanation. Please try again.'
   } finally {
