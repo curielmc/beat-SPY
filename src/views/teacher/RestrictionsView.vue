@@ -126,6 +126,12 @@
                 </div>
               </div>
 
+              <div v-if="activeFundNum !== 'global'" class="mb-4 flex justify-end">
+                <button class="btn btn-outline btn-error btn-sm" @click="openDeleteFundModal(Number(activeFundNum))">
+                  Delete This Fund
+                </button>
+              </div>
+
               <div class="divider">Universe & Parameters</div>
 
               <!-- SPY Toggle (Universe) -->
@@ -270,6 +276,26 @@
           </div>
         </div>
       </div>
+
+      <dialog class="modal" :class="{ 'modal-open': showDeleteFundModal }">
+        <div class="modal-box">
+          <h3 class="font-bold text-lg">Delete Fund</h3>
+          <p class="py-3">
+            This will permanently delete <strong>{{ deleteFundLabel }}</strong> for this class, including its group portfolios,
+            holdings, trades, benchmark history, pending orders, snapshots, visibility settings, and fund-specific overrides.
+          </p>
+          <p class="text-sm text-warning mb-4">This cannot be undone.</p>
+
+          <div class="modal-action">
+            <button class="btn btn-ghost" @click="showDeleteFundModal = false">Cancel</button>
+            <button class="btn btn-error" :disabled="deletingFund" @click="handleDeleteFund">
+              <span v-if="deletingFund" class="loading loading-spinner loading-xs"></span>
+              Delete Fund
+            </button>
+          </div>
+        </div>
+        <form method="dialog" class="modal-backdrop" @click="showDeleteFundModal = false"><button>close</button></form>
+      </dialog>
     </template>
   </div>
 </template>
@@ -309,6 +335,9 @@ const editingFundNum = ref(null)
 const editingFundName = ref('')
 const groupModeLocal = ref('student_choice')
 const currentApprovalCode = ref(null)
+const showDeleteFundModal = ref(false)
+const deletingFund = ref(false)
+const deleteFundNum = ref(null)
 
 onMounted(async () => {
   await teacher.loadTeacherData()
@@ -391,6 +420,10 @@ function startRenameFund(num) {
   editingFundName.value = getFundLabel(num)
 }
 
+const deleteFundLabel = computed(() =>
+  deleteFundNum.value ? getFundLabel(deleteFundNum.value) : 'this fund'
+)
+
 async function saveRenameFund(num) {
   const newName = editingFundName.value.trim()
   if (!newName || !classGroupIds_cache.length) {
@@ -426,6 +459,56 @@ async function toggleFundHidden(fund) {
     .eq('fund_number', fund.fund_number)
   fund.hidden = newHidden
   showSaved(newHidden ? `Fund ${fund.fund_number} hidden from leaderboard` : `Fund ${fund.fund_number} visible on leaderboard`)
+}
+
+function openDeleteFundModal(num) {
+  deleteFundNum.value = num
+  showDeleteFundModal.value = true
+}
+
+async function handleDeleteFund() {
+  if (!currentClass.value || !deleteFundNum.value || !classGroupIds_cache.length) return
+  deletingFund.value = true
+  try {
+    const fundNum = deleteFundNum.value
+
+    const { data: portfolios } = await supabase
+      .from('portfolios')
+      .select('id')
+      .eq('owner_type', 'group')
+      .in('owner_id', classGroupIds_cache)
+      .eq('fund_number', fundNum)
+
+    const portfolioIds = (portfolios || []).map(p => p.id)
+
+    if (portfolioIds.length > 0) {
+      await supabase.from('holdings').delete().in('portfolio_id', portfolioIds)
+      await supabase.from('benchmark_holdings').delete().in('portfolio_id', portfolioIds)
+      await supabase.from('trades').delete().in('portfolio_id', portfolioIds)
+      await supabase.from('benchmark_trades').delete().in('portfolio_id', portfolioIds)
+      await supabase.from('portfolio_snapshots').delete().in('portfolio_id', portfolioIds)
+      await supabase.from('pending_trade_orders').delete().in('portfolio_id', portfolioIds)
+      await supabase.from('portfolios').delete().in('id', portfolioIds)
+    }
+
+    delete fundRestrictions.value[String(fundNum)]
+    const restrictions = {
+      ...globalRestrictions.value,
+      byFund: { ...fundRestrictions.value }
+    }
+    await teacher.updateRestrictions(currentClass.value.id, restrictions)
+
+    fundVisibility.value = fundVisibility.value.filter(f => f.fund_number !== fundNum)
+    availableFunds.value = availableFunds.value.filter(n => n !== fundNum)
+    if (!availableFunds.value.length) availableFunds.value = [1]
+
+    showDeleteFundModal.value = false
+    deleteFundNum.value = null
+    setScope('global')
+    showSaved(`${getFundLabel(fundNum)} deleted.`)
+  } finally {
+    deletingFund.value = false
+  }
 }
 
 function loadScopeForm() {
