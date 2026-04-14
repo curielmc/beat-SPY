@@ -17,6 +17,14 @@ async function fmpBatchQuotes(tickers) {
   return map
 }
 
+async function fmpHistoricalClose(ticker, date) {
+  if (!ticker || !date || !FMP_KEY) return null
+  const res = await fetch(`${FMP_BASE}/historical-price-full/${ticker}?from=${date}&to=${date}&apikey=${FMP_KEY}`)
+  if (!res.ok) return null
+  const data = await res.json()
+  return data?.historical?.[0]?.close || null
+}
+
 export default async function handler(req) {
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 })
 
@@ -53,7 +61,7 @@ export default async function handler(req) {
 
     // 2. Get all group portfolios
     const portfolios = await sbFetch(
-      `/portfolios?owner_type=eq.group&owner_id=in.(${groupIdFilter})&status=eq.active&select=id,owner_id,cash_balance,starting_cash,fund_starting_cash,fund_name,fund_number`
+      `/portfolios?owner_type=eq.group&owner_id=in.(${groupIdFilter})&status=eq.active&select=id,owner_id,cash_balance,starting_cash,fund_starting_cash,fund_name,fund_number,benchmark_ticker,created_at`
     )
 
     // 3. Get members
@@ -91,9 +99,29 @@ export default async function handler(req) {
       `/holdings?portfolio_id=in.(${portfolioIdFilter})&select=portfolio_id,ticker,shares,avg_cost`
     )
 
-    // 5. Fetch current market prices for all tickers
-    const allTickers = [...new Set((holdings || []).map(h => h.ticker).filter(Boolean))]
+    // 5. Fetch current market prices for all tickers (include SPY for benchmark)
+    const allTickers = [...new Set([
+      ...(holdings || []).map(h => h.ticker).filter(Boolean),
+      'SPY'
+    ])]
     const priceMap = await fmpBatchQuotes(allTickers)
+
+    // 5b. Fetch historical benchmark prices for each portfolio's start date
+    const benchmarkDates = new Map() // "TICKER:DATE" -> price
+    const benchmarkFetches = []
+    for (const p of portfolios) {
+      const bt = p.benchmark_ticker || 'SPY'
+      const date = (p.created_at || '').split('T')[0]
+      if (!date) continue
+      const key = `${bt}:${date}`
+      if (!benchmarkDates.has(key)) {
+        benchmarkDates.set(key, null)
+        benchmarkFetches.push(
+          fmpHistoricalClose(bt, date).then(price => { benchmarkDates.set(key, price) })
+        )
+      }
+    }
+    await Promise.all(benchmarkFetches)
 
     // 6. Build per-group aggregation
     const membersByGroup = {}
@@ -116,8 +144,9 @@ export default async function handler(req) {
       let totalValue = 0
       let totalStartingCash = 0
       let totalCash = 0
+      let aggregateBenchmarkValue = 0
 
-      for (const p of groupPortfolios) {
+      const funds = groupPortfolios.map(p => {
         const cash = Number(p.cash_balance || 0)
         const startingCash = Number(p.fund_starting_cash || p.starting_cash || 100000)
         const pHoldings = holdingsByPortfolio[p.id] || []
@@ -128,13 +157,43 @@ export default async function handler(req) {
           investedValue += Number(h.shares || 0) * price
         }
 
-        totalValue += investedValue + cash
+        const fundTotalValue = investedValue + cash
+        const fundReturnPct = startingCash > 0
+          ? ((fundTotalValue - startingCash) / startingCash) * 100
+          : 0
+
+        // Benchmark comparison
+        const bt = p.benchmark_ticker || 'SPY'
+        const date = (p.created_at || '').split('T')[0]
+        const currentBenchmarkPrice = priceMap[bt] || priceMap['SPY']
+        const startBenchmarkPrice = benchmarkDates.get(`${bt}:${date}`)
+        let benchmarkReturnPct = 0
+        if (currentBenchmarkPrice && startBenchmarkPrice) {
+          benchmarkReturnPct = ((currentBenchmarkPrice - startBenchmarkPrice) / startBenchmarkPrice) * 100
+        }
+
+        totalValue += fundTotalValue
         totalStartingCash += startingCash
         totalCash += cash
-      }
+        aggregateBenchmarkValue += startingCash * (1 + benchmarkReturnPct / 100)
+
+        return {
+          id: p.id,
+          fundName: p.fund_name || `Fund ${p.fund_number || 1}`,
+          fundNumber: p.fund_number || 1,
+          returnPct: Math.round(fundReturnPct * 100) / 100,
+          benchmarkReturnPct: Math.round(benchmarkReturnPct * 100) / 100,
+          isBeatingSP500: fundReturnPct > benchmarkReturnPct,
+          totalValue: Math.round(fundTotalValue * 100) / 100,
+          startingCash: Math.round(startingCash * 100) / 100
+        }
+      }).sort((a, b) => (a.fundNumber || 1) - (b.fundNumber || 1))
 
       const returnPct = totalStartingCash > 0
         ? ((totalValue - totalStartingCash) / totalStartingCash) * 100
+        : 0
+      const groupBenchmarkReturnPct = totalStartingCash > 0
+        ? ((aggregateBenchmarkValue - totalStartingCash) / totalStartingCash) * 100
         : 0
 
       return {
@@ -144,8 +203,11 @@ export default async function handler(req) {
         totalValue: Math.round(totalValue * 100) / 100,
         startingCash: Math.round(totalStartingCash * 100) / 100,
         returnPct: Math.round(returnPct * 100) / 100,
+        benchmarkReturnPct: Math.round(groupBenchmarkReturnPct * 100) / 100,
+        isBeatingSP500: returnPct > groupBenchmarkReturnPct,
         cash: Math.round(totalCash * 100) / 100,
-        fundCount: groupPortfolios.length
+        fundCount: groupPortfolios.length,
+        funds
       }
     })
 

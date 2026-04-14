@@ -91,61 +91,146 @@
         </div>
       </div>
 
-      <!-- Group Leaderboard -->
+      <!-- Tabs: Leaderboard | vs S&P 500 -->
       <div class="card bg-base-100 shadow border border-base-200">
         <div class="card-body p-5 xl:p-6">
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <h2 class="card-title flex items-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
-                Group Leaderboard
-              </h2>
-              <p class="text-xs text-base-content/50 mt-1">Each group's total assets under management and since-inception return.</p>
-            </div>
-            <div v-if="leaderboardError" class="text-xs text-error">{{ leaderboardError }}</div>
+          <div class="tabs tabs-bordered mb-4">
+            <a class="tab" :class="{ 'tab-active': activeTab === 'leaderboard' }" @click="activeTab = 'leaderboard'">Group Leaderboard</a>
+            <a class="tab" :class="{ 'tab-active': activeTab === 'benchmark' }" @click="activeTab = 'benchmark'">vs S&P 500</a>
           </div>
+
+          <div v-if="leaderboardError" class="text-xs text-error mb-2">{{ leaderboardError }}</div>
 
           <div v-if="leaderboardLoading" class="flex justify-center py-8">
             <span class="loading loading-spinner loading-md"></span>
           </div>
 
-          <div v-else class="overflow-x-auto mt-4">
-            <table class="table w-full">
-              <thead>
-                <tr>
-                  <th class="w-12">Rank</th>
-                  <th>Group</th>
-                  <th>Members</th>
-                  <th class="text-right">Funds</th>
-                  <th class="text-right">AUM</th>
-                  <th class="text-right">Cash</th>
-                  <th class="text-right">Return</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="(group, i) in leaderboardGroups" :key="group.id" class="hover">
-                  <td>
-                    <span class="badge badge-lg" :class="i === 0 ? 'badge-warning' : 'badge-ghost'">{{ i + 1 }}</span>
-                  </td>
-                  <td class="font-semibold">{{ group.name }}</td>
-                  <td>
-                    <div class="flex flex-wrap gap-1">
-                      <span v-for="name in group.members" :key="name" class="badge badge-sm badge-outline whitespace-nowrap">{{ name.split(' ')[0] }}</span>
-                    </div>
-                  </td>
-                  <td class="text-right text-sm text-base-content/60">{{ group.fundCount }}</td>
-                  <td class="text-right font-mono text-sm font-semibold">${{ formatMoney(group.totalValue) }}</td>
-                  <td class="text-right font-mono text-sm text-base-content/60">${{ formatMoney(group.cash) }}</td>
-                  <td class="text-right font-mono text-sm font-semibold" :class="group.returnPct >= 0 ? 'text-success' : 'text-error'">
-                    {{ group.returnPct >= 0 ? '+' : '' }}{{ group.returnPct.toFixed(2) }}%
-                  </td>
-                </tr>
-                <tr v-if="leaderboardGroups.length === 0">
-                  <td colspan="7" class="text-center text-base-content/50 py-8">No groups yet</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          <!-- Leaderboard Tab -->
+          <template v-else-if="activeTab === 'leaderboard'">
+            <p class="text-xs text-base-content/50 mb-3">Each group's total assets under management and since-inception return.</p>
+            <div class="overflow-x-auto">
+              <table class="table w-full">
+                <thead>
+                  <tr>
+                    <th class="w-12">Rank</th>
+                    <th>Group</th>
+                    <th>Members</th>
+                    <th class="text-right">Funds</th>
+                    <th class="text-right">AUM</th>
+                    <th class="text-right">Cash</th>
+                    <th class="text-right">Return</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(group, i) in leaderboardGroups" :key="group.id" class="hover">
+                    <td>
+                      <span class="badge badge-lg" :class="i === 0 ? 'badge-warning' : 'badge-ghost'">{{ i + 1 }}</span>
+                    </td>
+                    <td class="font-semibold">{{ group.name }}</td>
+                    <td>
+                      <div class="flex flex-wrap gap-1">
+                        <span v-for="name in group.members" :key="name" class="badge badge-sm badge-outline whitespace-nowrap">{{ name.split(' ')[0] }}</span>
+                      </div>
+                    </td>
+                    <td class="text-right text-sm text-base-content/60">{{ group.fundCount }}</td>
+                    <td class="text-right font-mono text-sm font-semibold">${{ formatMoney(group.totalValue) }}</td>
+                    <td class="text-right font-mono text-sm text-base-content/60">${{ formatMoney(group.cash) }}</td>
+                    <td class="text-right font-mono text-sm font-semibold" :class="group.returnPct >= 0 ? 'text-success' : 'text-error'">
+                      {{ group.returnPct >= 0 ? '+' : '' }}{{ group.returnPct.toFixed(2) }}%
+                    </td>
+                  </tr>
+                  <tr v-if="leaderboardGroups.length === 0">
+                    <td colspan="7" class="text-center text-base-content/50 py-8">No groups yet</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </template>
+
+          <!-- vs S&P 500 Tab -->
+          <template v-else-if="activeTab === 'benchmark'">
+            <!-- Group-level benchmark -->
+            <div class="mb-6">
+              <h3 class="font-semibold text-sm mb-1">By Group</h3>
+              <p class="text-xs text-base-content/50 mb-3">Each group's aggregate return compared to the S&P 500 over the same period.</p>
+              <div class="overflow-x-auto">
+                <table class="table w-full">
+                  <thead>
+                    <tr>
+                      <th>Group</th>
+                      <th class="text-right">Group Return</th>
+                      <th class="text-right">S&P 500</th>
+                      <th class="text-right">Alpha</th>
+                      <th class="text-center">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="group in benchmarkGroupsSorted" :key="group.id" class="hover">
+                      <td class="font-semibold">{{ group.name }}</td>
+                      <td class="text-right font-mono text-sm font-semibold" :class="group.returnPct >= 0 ? 'text-success' : 'text-error'">
+                        {{ group.returnPct >= 0 ? '+' : '' }}{{ group.returnPct.toFixed(2) }}%
+                      </td>
+                      <td class="text-right font-mono text-sm text-base-content/60">
+                        {{ (group.benchmarkReturnPct || 0) >= 0 ? '+' : '' }}{{ (group.benchmarkReturnPct || 0).toFixed(2) }}%
+                      </td>
+                      <td class="text-right font-mono text-sm font-semibold" :class="(group.returnPct - (group.benchmarkReturnPct || 0)) >= 0 ? 'text-success' : 'text-error'">
+                        {{ (group.returnPct - (group.benchmarkReturnPct || 0)) >= 0 ? '+' : '' }}{{ (group.returnPct - (group.benchmarkReturnPct || 0)).toFixed(2) }}%
+                      </td>
+                      <td class="text-center">
+                        <span v-if="group.isBeatingSP500" class="badge badge-success badge-sm gap-1">Beating</span>
+                        <span v-else class="badge badge-error badge-sm gap-1">Trailing</span>
+                      </td>
+                    </tr>
+                    <tr v-if="leaderboardGroups.length === 0">
+                      <td colspan="5" class="text-center text-base-content/50 py-8">No groups yet</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Fund-level benchmark -->
+            <div>
+              <h3 class="font-semibold text-sm mb-1">By Fund</h3>
+              <p class="text-xs text-base-content/50 mb-3">Each individual fund's return compared to the S&P 500 since inception.</p>
+              <div class="overflow-x-auto">
+                <table class="table w-full">
+                  <thead>
+                    <tr>
+                      <th>Group</th>
+                      <th>Fund</th>
+                      <th class="text-right">Fund Return</th>
+                      <th class="text-right">S&P 500</th>
+                      <th class="text-right">Alpha</th>
+                      <th class="text-center">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="row in benchmarkFundRows" :key="row.fundId" class="hover">
+                      <td class="text-sm">{{ row.groupName }}</td>
+                      <td class="font-semibold text-sm">{{ row.fundName }}</td>
+                      <td class="text-right font-mono text-sm font-semibold" :class="row.returnPct >= 0 ? 'text-success' : 'text-error'">
+                        {{ row.returnPct >= 0 ? '+' : '' }}{{ row.returnPct.toFixed(2) }}%
+                      </td>
+                      <td class="text-right font-mono text-sm text-base-content/60">
+                        {{ row.benchmarkReturnPct >= 0 ? '+' : '' }}{{ row.benchmarkReturnPct.toFixed(2) }}%
+                      </td>
+                      <td class="text-right font-mono text-sm font-semibold" :class="(row.returnPct - row.benchmarkReturnPct) >= 0 ? 'text-success' : 'text-error'">
+                        {{ (row.returnPct - row.benchmarkReturnPct) >= 0 ? '+' : '' }}{{ (row.returnPct - row.benchmarkReturnPct).toFixed(2) }}%
+                      </td>
+                      <td class="text-center">
+                        <span v-if="row.isBeatingSP500" class="badge badge-success badge-sm gap-1">Beating</span>
+                        <span v-else class="badge badge-error badge-sm gap-1">Trailing</span>
+                      </td>
+                    </tr>
+                    <tr v-if="benchmarkFundRows.length === 0">
+                      <td colspan="6" class="text-center text-base-content/50 py-8">No funds yet</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </template>
         </div>
       </div>
 
@@ -564,6 +649,7 @@ const showAttributionModal = ref(false)
 const selectedGroup = ref(null)
 const copiedMemberEmails = ref(false)
 const copiedClassEmails = ref(false)
+const activeTab = ref('leaderboard')
 
 const currentClass = computed(() => {
   const qid = route.query.class_id
@@ -594,6 +680,35 @@ const dashboardSummary = computed(() => {
   const cash = groups.reduce((sum, g) => sum + Number(g.cash || 0), 0)
   const returnPct = totalStartingCash > 0 ? ((totalValue - totalStartingCash) / totalStartingCash) * 100 : 0
   return { totalValue, totalStartingCash, cash, returnPct }
+})
+
+const benchmarkGroupsSorted = computed(() =>
+  [...leaderboardGroups.value].sort((a, b) => {
+    const alphaA = a.returnPct - (a.benchmarkReturnPct || 0)
+    const alphaB = b.returnPct - (b.benchmarkReturnPct || 0)
+    return alphaB - alphaA
+  })
+)
+
+const benchmarkFundRows = computed(() => {
+  const rows = []
+  for (const group of leaderboardGroups.value) {
+    for (const fund of (group.funds || [])) {
+      rows.push({
+        groupName: group.name,
+        fundId: fund.id,
+        fundName: fund.fundName || `Fund ${fund.fundNumber || 1}`,
+        returnPct: fund.returnPct || 0,
+        benchmarkReturnPct: fund.benchmarkReturnPct || 0,
+        isBeatingSP500: fund.isBeatingSP500 || false
+      })
+    }
+  }
+  return rows.sort((a, b) => {
+    const alphaA = a.returnPct - a.benchmarkReturnPct
+    const alphaB = b.returnPct - b.benchmarkReturnPct
+    return alphaB - alphaA
+  })
 })
 
 const selectedGroupEmails = computed(() =>

@@ -212,7 +212,7 @@ export const useTeacherStore = defineStore('teacher', () => {
             const holdings = (enrichedHoldingsByPort[portfolio.id] || []).sort((a, b) => b.marketValue - a.marketValue)
             const investedValue = holdings.reduce((sum, h) => sum + h.marketValue, 0)
             const fundCash = Number(portfolio.cash_balance || 0)
-            const fundStartingCash = Number(portfolio.starting_cash || portfolio.fund_starting_cash || 100000)
+            const fundStartingCash = Number(portfolio.fund_starting_cash || portfolio.starting_cash || 100000)
             const fundTotalValue = investedValue + fundCash
             const fundReturnPct = fundStartingCash > 0 ? ((fundTotalValue - fundStartingCash) / fundStartingCash) * 100 : 0
 
