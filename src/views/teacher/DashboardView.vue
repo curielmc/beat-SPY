@@ -159,6 +159,7 @@
                     <th class="text-right">AUM</th>
                     <th class="text-right">Cash</th>
                     <th class="text-right">Return</th>
+                    <th class="text-center">Explain</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -178,9 +179,14 @@
                     <td class="text-right font-mono text-sm font-semibold" :class="group.returnPct >= 0 ? 'text-success' : 'text-error'">
                       {{ group.returnPct >= 0 ? '+' : '' }}{{ group.returnPct.toFixed(2) }}%
                     </td>
+                    <td class="text-center">
+                      <button type="button" class="btn btn-ghost btn-xs text-[10px] text-primary" @click="openAttributionModal(group)">
+                        Explain
+                      </button>
+                    </td>
                   </tr>
                   <tr v-if="leaderboardGroups.length === 0">
-                    <td colspan="7" class="text-center text-base-content/50 py-8">No groups yet</td>
+                    <td colspan="8" class="text-center text-base-content/50 py-8">No groups yet</td>
                   </tr>
                 </tbody>
               </table>
