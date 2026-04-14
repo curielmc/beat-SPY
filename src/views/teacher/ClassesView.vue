@@ -46,7 +46,7 @@
                 </label>
               </div>
             </div>
-            <p class="text-xs text-base-content/40">Note: Starting cash only applies to new groups created after this change.</p>
+            <p class="text-xs text-base-content/40">Starting cash updates new groups immediately and also rewrites untouched team base funds that have no holdings yet.</p>
 
             <!-- Pre-load Students -->
             <div class="border-t pt-4 mt-4">
@@ -234,6 +234,15 @@ async function updateSetting(classId, key, value) {
   if (result.error) {
     error.value = result.error
     setTimeout(() => { error.value = '' }, 3000)
+    return
+  }
+
+  if (key === 'starting_cash') {
+    const updatedCount = Number(result.updatedGroupFunds || 0)
+    success.value = updatedCount > 0
+      ? `Starting cash updated. ${updatedCount} untouched team fund${updatedCount === 1 ? '' : 's'} were reset to $${Number(value).toLocaleString()}.`
+      : `Starting cash updated for future groups. Existing teams with trades or changed cash were left alone.`
+    setTimeout(() => { success.value = '' }, 5000)
   }
 }
 

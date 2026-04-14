@@ -483,6 +483,7 @@ export const useAuthStore = defineStore('auth', () => {
           owner_id: newGroup.id,
           starting_cash: classCash,
           cash_balance: classCash,
+          fund_starting_cash: classCash,
           allow_reset: classData.allow_reset || false
         })
       } else if (groupId) {

@@ -62,6 +62,19 @@
                   </label>
                 </div>
               </div>
+
+              <div v-if="trashedFunds.length" class="mt-4 pt-3 border-t border-base-200">
+                <h3 class="text-xs font-bold uppercase tracking-wider text-base-content/40 mb-2">Trashed Funds</h3>
+                <div class="space-y-2">
+                  <div v-for="fund in trashedFunds" :key="`trash-${fund.fund_number}`" class="flex items-center justify-between px-2">
+                    <span class="text-sm opacity-70">{{ fund.fund_name || `Fund ${fund.fund_number}` }}</span>
+                    <button class="btn btn-xs btn-outline btn-success" :disabled="restoringFundNum === fund.fund_number" @click="restoreFund(fund.fund_number)">
+                      <span v-if="restoringFundNum === fund.fund_number" class="loading loading-spinner loading-xs"></span>
+                      Restore
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -128,7 +141,7 @@
 
               <div v-if="activeFundNum !== 'global'" class="mb-4 flex justify-end">
                 <button class="btn btn-outline btn-error btn-sm" @click="openDeleteFundModal(Number(activeFundNum))">
-                  Delete This Fund
+                  Move Fund To Trash
                 </button>
               </div>
 
@@ -279,18 +292,17 @@
 
       <dialog class="modal" :class="{ 'modal-open': showDeleteFundModal }">
         <div class="modal-box">
-          <h3 class="font-bold text-lg">Delete Fund</h3>
+          <h3 class="font-bold text-lg">Move Fund To Trash</h3>
           <p class="py-3">
-            This will permanently delete <strong>{{ deleteFundLabel }}</strong> for this class, including its group portfolios,
-            holdings, trades, benchmark history, pending orders, snapshots, visibility settings, and fund-specific overrides.
+            This will archive <strong>{{ deleteFundLabel }}</strong> for this class. Portfolio history is kept and can be restored later.
           </p>
-          <p class="text-sm text-warning mb-4">This cannot be undone.</p>
+          <p class="text-sm text-base-content/60 mb-4">Archived funds are hidden from active fund settings and leaderboard calculations.</p>
 
           <div class="modal-action">
             <button class="btn btn-ghost" @click="showDeleteFundModal = false">Cancel</button>
             <button class="btn btn-error" :disabled="deletingFund" @click="handleDeleteFund">
               <span v-if="deletingFund" class="loading loading-spinner loading-xs"></span>
-              Delete Fund
+              Move To Trash
             </button>
           </div>
         </div>
@@ -330,6 +342,7 @@ const form = reactive({
 })
 
 const fundVisibility = ref([])
+const trashedFunds = ref([])
 let classGroupIds_cache = []
 const editingFundNum = ref(null)
 const editingFundName = ref('')
@@ -338,6 +351,7 @@ const currentApprovalCode = ref(null)
 const showDeleteFundModal = ref(false)
 const deletingFund = ref(false)
 const deleteFundNum = ref(null)
+const restoringFundNum = ref(null)
 
 onMounted(async () => {
   await teacher.loadTeacherData()
@@ -371,15 +385,18 @@ onMounted(async () => {
 
     const { data: fundPorts } = await supabase
       .from('portfolios')
-      .select('fund_number, fund_name, hidden')
+      .select('fund_number, fund_name, hidden, status')
       .eq('owner_type', 'group')
       .in('owner_id', classGroupIds.length ? classGroupIds : ['00000000-0000-0000-0000-000000000000'])
-    const nums = [...new Set((fundPorts || []).map(p => p.fund_number).filter(Boolean))].sort((a,b) => a-b)
+    const activePorts = (fundPorts || []).filter(p => p.status === 'active' || p.status == null)
+    const closedPorts = (fundPorts || []).filter(p => p.status === 'closed')
+
+    const nums = [...new Set(activePorts.map(p => p.fund_number).filter(Boolean))].sort((a,b) => a-b)
     availableFunds.value = nums.length ? nums : [1]
 
-    // Build fund info from first occurrence of each fund_number
+    // Build active fund info from first occurrence of each fund_number
     const seen = new Map()
-    for (const p of (fundPorts || [])) {
+    for (const p of activePorts) {
       if (p.fund_number && !seen.has(p.fund_number)) {
         seen.set(p.fund_number, {
           fund_number: p.fund_number,
@@ -389,6 +406,18 @@ onMounted(async () => {
       }
     }
     fundVisibility.value = [...seen.values()].sort((a, b) => a.fund_number - b.fund_number)
+
+    // Build trashed fund info from first closed occurrence of each fund_number
+    const trashedSeen = new Map()
+    for (const p of closedPorts) {
+      if (p.fund_number && !trashedSeen.has(p.fund_number)) {
+        trashedSeen.set(p.fund_number, {
+          fund_number: p.fund_number,
+          fund_name: p.fund_name || null
+        })
+      }
+    }
+    trashedFunds.value = [...trashedSeen.values()].sort((a, b) => a.fund_number - b.fund_number)
     classGroupIds_cache = classGroupIds
 
     // Default to last fund if global not preferred? Let's default to global for visibility.
@@ -412,7 +441,9 @@ function setScope(scope) {
 
 function getFundLabel(num) {
   const info = fundVisibility.value.find(f => f.fund_number === num)
-  return info?.fund_name || `Fund ${num}`
+  if (info?.fund_name) return info.fund_name
+  const trashed = trashedFunds.value.find(f => f.fund_number === num)
+  return trashed?.fund_name || `Fund ${num}`
 }
 
 function startRenameFund(num) {
@@ -471,43 +502,65 @@ async function handleDeleteFund() {
   deletingFund.value = true
   try {
     const fundNum = deleteFundNum.value
+    const fundName = getFundLabel(fundNum)
 
-    const { data: portfolios } = await supabase
+    await supabase
       .from('portfolios')
-      .select('id')
+      .update({
+        status: 'closed',
+        closed_at: new Date().toISOString(),
+        hidden: true
+      })
       .eq('owner_type', 'group')
       .in('owner_id', classGroupIds_cache)
       .eq('fund_number', fundNum)
-
-    const portfolioIds = (portfolios || []).map(p => p.id)
-
-    if (portfolioIds.length > 0) {
-      await supabase.from('holdings').delete().in('portfolio_id', portfolioIds)
-      await supabase.from('benchmark_holdings').delete().in('portfolio_id', portfolioIds)
-      await supabase.from('trades').delete().in('portfolio_id', portfolioIds)
-      await supabase.from('benchmark_trades').delete().in('portfolio_id', portfolioIds)
-      await supabase.from('portfolio_snapshots').delete().in('portfolio_id', portfolioIds)
-      await supabase.from('pending_trade_orders').delete().in('portfolio_id', portfolioIds)
-      await supabase.from('portfolios').delete().in('id', portfolioIds)
-    }
-
-    delete fundRestrictions.value[String(fundNum)]
-    const restrictions = {
-      ...globalRestrictions.value,
-      byFund: { ...fundRestrictions.value }
-    }
-    await teacher.updateRestrictions(currentClass.value.id, restrictions)
+      .or('status.eq.active,status.is.null')
 
     fundVisibility.value = fundVisibility.value.filter(f => f.fund_number !== fundNum)
     availableFunds.value = availableFunds.value.filter(n => n !== fundNum)
-    if (!availableFunds.value.length) availableFunds.value = [1]
+    if (!trashedFunds.value.some(f => f.fund_number === fundNum)) {
+      trashedFunds.value.push({ fund_number: fundNum, fund_name: fundName })
+      trashedFunds.value.sort((a, b) => a.fund_number - b.fund_number)
+    }
 
     showDeleteFundModal.value = false
     deleteFundNum.value = null
     setScope('global')
-    showSaved(`${getFundLabel(fundNum)} deleted.`)
+    showSaved(`${fundName} moved to trash.`)
   } finally {
     deletingFund.value = false
+  }
+}
+
+async function restoreFund(fundNum) {
+  if (!classGroupIds_cache.length) return
+  restoringFundNum.value = fundNum
+  try {
+    await supabase
+      .from('portfolios')
+      .update({
+        status: 'active',
+        closed_at: null
+      })
+      .eq('owner_type', 'group')
+      .in('owner_id', classGroupIds_cache)
+      .eq('fund_number', fundNum)
+      .eq('status', 'closed')
+
+    const trashed = trashedFunds.value.find(f => f.fund_number === fundNum)
+    const fundName = trashed?.fund_name || `Fund ${fundNum}`
+    trashedFunds.value = trashedFunds.value.filter(f => f.fund_number !== fundNum)
+    if (!availableFunds.value.includes(fundNum)) {
+      availableFunds.value.push(fundNum)
+      availableFunds.value.sort((a, b) => a - b)
+    }
+    if (!fundVisibility.value.some(f => f.fund_number === fundNum)) {
+      fundVisibility.value.push({ fund_number: fundNum, fund_name: fundName, hidden: false })
+      fundVisibility.value.sort((a, b) => a.fund_number - b.fund_number)
+    }
+    showSaved(`${fundName} restored.`)
+  } finally {
+    restoringFundNum.value = null
   }
 }
 

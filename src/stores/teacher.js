@@ -341,6 +341,7 @@ export const useTeacherStore = defineStore('teacher', () => {
       owner_id: data.id,
       starting_cash: cash,
       cash_balance: cash,
+      fund_starting_cash: cash,
       allow_reset: allowReset
     })
 
@@ -357,7 +358,63 @@ export const useTeacherStore = defineStore('teacher', () => {
     if (error) return { error: error.message }
     const cls = classes.value.find(c => c.id === classId)
     if (cls) Object.assign(cls, settings)
-    return { success: true }
+
+    let updatedGroupFunds = 0
+    if (settings.starting_cash != null) {
+      const nextStartingCash = Number(settings.starting_cash)
+      if (Number.isFinite(nextStartingCash) && nextStartingCash > 0) {
+        const { data: classGroups, error: groupsError } = await supabase
+          .from('groups')
+          .select('id')
+          .eq('class_id', classId)
+
+        if (groupsError) return { error: groupsError.message }
+
+        const groupIds = (classGroups || []).map(group => group.id)
+        if (groupIds.length) {
+          const { data: portfolios, error: portfoliosError } = await supabase
+            .from('portfolios')
+            .select('id, cash_balance, starting_cash, fund_number')
+            .eq('owner_type', 'group')
+            .in('owner_id', groupIds)
+            .or('status.eq.active,status.is.null')
+
+          if (portfoliosError) return { error: portfoliosError.message }
+
+          const basePortfolios = (portfolios || []).filter(portfolio => (portfolio.fund_number || 1) === 1)
+          const untouchedPortfolioIds = basePortfolios
+            .filter(portfolio => Number(portfolio.cash_balance) === Number(portfolio.starting_cash))
+            .map(portfolio => portfolio.id)
+
+          if (untouchedPortfolioIds.length) {
+            const { data: holdings, error: holdingsError } = await supabase
+              .from('holdings')
+              .select('portfolio_id')
+              .in('portfolio_id', untouchedPortfolioIds)
+
+            if (holdingsError) return { error: holdingsError.message }
+
+            const portfoliosWithHoldings = new Set((holdings || []).map(holding => holding.portfolio_id))
+            const safePortfolioIds = untouchedPortfolioIds.filter(id => !portfoliosWithHoldings.has(id))
+
+            if (safePortfolioIds.length) {
+              const { error: updatePortfoliosError } = await supabase
+                .from('portfolios')
+                .update({
+                  starting_cash: nextStartingCash,
+                  cash_balance: nextStartingCash,
+                  fund_starting_cash: nextStartingCash
+                })
+                .in('id', safePortfolioIds)
+
+              if (updatePortfoliosError) return { error: updatePortfoliosError.message }
+              updatedGroupFunds = safePortfolioIds.length
+            }
+          }
+        }
+      }
+    }
+    return { success: true, updatedGroupFunds }
   }
 
   // Assign student to group
@@ -441,7 +498,8 @@ export const useTeacherStore = defineStore('teacher', () => {
         owner_type: 'group',
         owner_id: groupId,
         starting_cash: 100000,
-        cash_balance: 100000 + amount
+        cash_balance: 100000 + amount,
+        fund_starting_cash: 100000
       })
     }
 
