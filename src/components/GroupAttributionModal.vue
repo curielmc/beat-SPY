@@ -278,6 +278,7 @@ async function loadAttribution() {
     // Aggregate analysis across all funds
     const aggregateTickers = {} // ticker -> { weightedReturn, startValue }
     let totalStartValue = 0
+    let totalCurrentValue = 0
     let aggregateSpyStartValue = 0
     let aggregateSpyCurrentValue = 0
 
@@ -292,8 +293,14 @@ async function loadAttribution() {
       if (fundStartValue <= 0) {
         fundStartValue = Number(analysis.fund.startingCash || analysis.fund.starting_cash || analysis.fund.fund_starting_cash || 100000)
       }
-      
+
+      let fundCurrentValue = Number(analysis.currentCash || 0)
+      analysis.currentHoldings.forEach(h => {
+        fundCurrentValue += Number(h.shares || 0) * Number(currentPrices[h.ticker] || 0)
+      })
+
       totalStartValue += fundStartValue
+      totalCurrentValue += fundCurrentValue
       const spyStart = startPrices.SPY || 0
       const spyNow = currentPrices.SPY || 0
       if (spyStart > 0 && spyNow > 0) {
@@ -365,7 +372,9 @@ async function loadAttribution() {
     .sort((a, b) => b.contribution - a.contribution)
 
     attributions.value = finalAttributions
-    totalReturn.value = finalAttributions.reduce((sum, a) => sum + a.contribution, 0)
+    totalReturn.value = totalStartValue > 0
+      ? ((totalCurrentValue - totalStartValue) / totalStartValue) * 100
+      : 0
 
     if (finalAttributions.length > 0) {
       await explainPortfolio(finalAttributions)
