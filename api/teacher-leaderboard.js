@@ -60,16 +60,20 @@ export default async function handler(req) {
     const groupIdFilter = groupIds.map(id => encodeURIComponent(id)).join(',')
 
     // 2. Get all group portfolios
-    const portfolios = await sbFetch(
+    const groupPortfolios = await sbFetch(
       `/portfolios?owner_type=eq.group&owner_id=in.(${groupIdFilter})&status=eq.active&select=id,owner_id,cash_balance,starting_cash,fund_starting_cash,fund_name,fund_number,benchmark_ticker,created_at`
     )
 
-    // 3. Get members
-    const memberships = await sbFetch(
-      `/class_memberships?class_id=eq.${class_id}&select=user_id,group_id,profiles:profiles(full_name)`
+    // 2b. Get all student (user) portfolios for students in this class
+    const studentIds = memberships.map(m => m.user_id)
+    const studentIdFilter = studentIds.map(id => encodeURIComponent(id)).join(',')
+    const studentPortfolios = await sbFetch(
+      `/portfolios?owner_type=eq.user&owner_id=in.(${studentIdFilter})&status=eq.active&select=id,owner_id,cash_balance,starting_cash,fund_starting_cash,fund_name,fund_number,benchmark_ticker,created_at`
     )
 
-    if (!portfolios?.length) {
+    const allPortfolios = [...(groupPortfolios || []), ...(studentPortfolios || [])]
+
+    if (!allPortfolios.length) {
       // No portfolios — return groups with zero values
       const membersByGroup = {}
       for (const m of (memberships || [])) {
@@ -87,11 +91,12 @@ export default async function handler(req) {
           returnPct: 0,
           cash: 0,
           fundCount: 0
-        }))
+        })),
+        stats: { pctStudentsBeating: 0, pctGroupsBeating: 0, pctFundsBeating: 0, maxAlpha: 0, minAlpha: 0, avgAlpha: 0 }
       })
     }
 
-    const portfolioIds = portfolios.map(p => p.id)
+    const portfolioIds = allPortfolios.map(p => p.id)
     const portfolioIdFilter = portfolioIds.map(id => encodeURIComponent(id)).join(',')
 
     // 4. Get all holdings
@@ -109,7 +114,7 @@ export default async function handler(req) {
     // 5b. Fetch historical benchmark prices for each portfolio's start date
     const benchmarkDates = new Map() // "TICKER:DATE" -> price
     const benchmarkFetches = []
-    for (const p of portfolios) {
+    for (const p of allPortfolios) {
       const bt = p.benchmark_ticker || 'SPY'
       const date = (p.created_at || '').split('T')[0]
       if (!date) continue
@@ -138,54 +143,71 @@ export default async function handler(req) {
       holdingsByPortfolio[h.portfolio_id].push(h)
     }
 
+    // Process all portfolios to get performance
+    const portfolioPerformance = allPortfolios.map(p => {
+      const cash = Number(p.cash_balance || 0)
+      const startingCash = Number(p.fund_starting_cash || p.starting_cash || 100000)
+      const pHoldings = holdingsByPortfolio[p.id] || []
+
+      let investedValue = 0
+      for (const h of pHoldings) {
+        const price = priceMap[h.ticker] || Number(h.avg_cost || 0)
+        investedValue += Number(h.shares || 0) * price
+      }
+
+      const totalValue = investedValue + cash
+      const returnPct = startingCash > 0 ? ((totalValue - startingCash) / startingCash) * 100 : 0
+
+      // Benchmark comparison
+      const bt = p.benchmark_ticker || 'SPY'
+      const date = (p.created_at || '').split('T')[0]
+      const currentBenchmarkPrice = priceMap[bt] || priceMap['SPY']
+      const startBenchmarkPrice = benchmarkDates.get(`${bt}:${date}`)
+      let benchmarkReturnPct = 0
+      if (currentBenchmarkPrice && startBenchmarkPrice) {
+        benchmarkReturnPct = ((currentBenchmarkPrice - startBenchmarkPrice) / startBenchmarkPrice) * 100
+      }
+
+      const alpha = returnPct - benchmarkReturnPct
+
+      return {
+        ...p,
+        totalValue,
+        startingCash,
+        returnPct,
+        benchmarkReturnPct,
+        alpha,
+        isBeatingSP500: returnPct > benchmarkReturnPct,
+        cash
+      }
+    })
+
     // Aggregate per group
     const groupResults = groups.map(group => {
-      const groupPortfolios = portfolios.filter(p => p.owner_id === group.id)
+      const groupPortfolios = portfolioPerformance.filter(p => p.owner_id === group.id && p.owner_type === 'group')
       let totalValue = 0
       let totalStartingCash = 0
       let totalCash = 0
       let aggregateBenchmarkValue = 0
 
       const funds = groupPortfolios.map(p => {
-        const cash = Number(p.cash_balance || 0)
-        const startingCash = Number(p.fund_starting_cash || p.starting_cash || 100000)
-        const pHoldings = holdingsByPortfolio[p.id] || []
-
-        let investedValue = 0
-        for (const h of pHoldings) {
-          const price = priceMap[h.ticker] || Number(h.avg_cost || 0)
-          investedValue += Number(h.shares || 0) * price
-        }
-
-        const fundTotalValue = investedValue + cash
-        const fundReturnPct = startingCash > 0
-          ? ((fundTotalValue - startingCash) / startingCash) * 100
-          : 0
-
-        // Benchmark comparison
-        const bt = p.benchmark_ticker || 'SPY'
-        const date = (p.created_at || '').split('T')[0]
-        const currentBenchmarkPrice = priceMap[bt] || priceMap['SPY']
-        const startBenchmarkPrice = benchmarkDates.get(`${bt}:${date}`)
-        let benchmarkReturnPct = 0
-        if (currentBenchmarkPrice && startBenchmarkPrice) {
-          benchmarkReturnPct = ((currentBenchmarkPrice - startBenchmarkPrice) / startBenchmarkPrice) * 100
-        }
-
-        totalValue += fundTotalValue
-        totalStartingCash += startingCash
-        totalCash += cash
-        aggregateBenchmarkValue += startingCash * (1 + benchmarkReturnPct / 100)
+        totalValue += p.totalValue
+        totalStartingCash += p.starting_cash
+        totalCash += p.cash
+        aggregateBenchmarkValue += p.starting_cash * (1 + p.benchmarkReturnPct / 100)
 
         return {
           id: p.id,
           fundName: p.fund_name || `Fund ${p.fund_number || 1}`,
           fundNumber: p.fund_number || 1,
-          returnPct: Math.round(fundReturnPct * 100) / 100,
-          benchmarkReturnPct: Math.round(benchmarkReturnPct * 100) / 100,
-          isBeatingSP500: fundReturnPct > benchmarkReturnPct,
-          totalValue: Math.round(fundTotalValue * 100) / 100,
-          startingCash: Math.round(startingCash * 100) / 100
+          returnPct: Math.round(p.returnPct * 100) / 100,
+          benchmarkReturnPct: Math.round(p.benchmarkReturnPct * 100) / 100,
+          isBeatingSP500: p.isBeatingSP500,
+          alpha: Math.round(p.alpha * 100) / 100,
+          totalValue: Math.round(p.totalValue * 100) / 100,
+          startingCash: Math.round(p.starting_cash * 100) / 100,
+          holdings: holdingsByPortfolio[p.id] || [], // Include for attribution
+          cash_balance: p.cash
         }
       }).sort((a, b) => (a.fundNumber || 1) - (b.fundNumber || 1))
 
@@ -195,6 +217,7 @@ export default async function handler(req) {
       const groupBenchmarkReturnPct = totalStartingCash > 0
         ? ((aggregateBenchmarkValue - totalStartingCash) / totalStartingCash) * 100
         : 0
+      const alpha = returnPct - groupBenchmarkReturnPct
 
       return {
         id: group.id,
@@ -205,16 +228,31 @@ export default async function handler(req) {
         returnPct: Math.round(returnPct * 100) / 100,
         benchmarkReturnPct: Math.round(groupBenchmarkReturnPct * 100) / 100,
         isBeatingSP500: returnPct > groupBenchmarkReturnPct,
+        alpha: Math.round(alpha * 100) / 100,
         cash: Math.round(totalCash * 100) / 100,
         fundCount: groupPortfolios.length,
         funds
       }
     })
 
+    // Calculate Summary Stats
+    const studentPerf = portfolioPerformance.filter(p => p.owner_type === 'user')
+    const groupPerf = groupResults
+    const fundPerf = portfolioPerformance.filter(p => p.owner_type === 'group')
+
+    const stats = {
+      pctStudentsBeating: studentPerf.length ? (studentPerf.filter(p => p.isBeatingSP500).length / studentPerf.length) * 100 : 0,
+      pctGroupsBeating: groupPerf.length ? (groupPerf.filter(p => p.isBeatingSP500).length / groupPerf.length) * 100 : 0,
+      pctFundsBeating: fundPerf.length ? (fundPerf.filter(p => p.isBeatingSP500).length / fundPerf.length) * 100 : 0,
+      maxAlpha: portfolioPerformance.length ? Math.max(...portfolioPerformance.map(p => p.alpha)) : 0,
+      minAlpha: portfolioPerformance.length ? Math.min(...portfolioPerformance.map(p => p.alpha)) : 0,
+      avgAlpha: portfolioPerformance.length ? portfolioPerformance.reduce((sum, p) => sum + p.alpha, 0) / portfolioPerformance.length : 0
+    }
+
     // Sort by return % descending
     groupResults.sort((a, b) => b.returnPct - a.returnPct)
 
-    return jsonResponse({ groups: groupResults })
+    return jsonResponse({ groups: groupResults, stats })
   } catch (error) {
     console.error('Teacher leaderboard error:', error)
     return jsonResponse({ error: error.message || 'Failed to load leaderboard' }, 500)

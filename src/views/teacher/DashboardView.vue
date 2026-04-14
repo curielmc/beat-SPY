@@ -51,6 +51,46 @@
         </div>
       </div>
 
+      <!-- S&P 500 Performance Stats -->
+      <div class="grid grid-cols-2 xl:grid-cols-5 gap-3">
+        <div class="card bg-base-100 shadow border border-base-200">
+          <div class="card-body p-4">
+            <div class="text-[10px] uppercase tracking-wider text-base-content/50 leading-tight">Students Beating<br>S&P 500</div>
+            <div class="text-2xl font-bold mt-1" :class="leaderboardStats.pctStudentsBeating > 50 ? 'text-success' : 'text-base-content'">
+              {{ Math.round(leaderboardStats.pctStudentsBeating) }}%
+            </div>
+          </div>
+        </div>
+        <div class="card bg-base-100 shadow border border-base-200">
+          <div class="card-body p-4">
+            <div class="text-[10px] uppercase tracking-wider text-base-content/50 leading-tight">Groups Beating<br>S&P 500</div>
+            <div class="text-2xl font-bold mt-1" :class="leaderboardStats.pctGroupsBeating > 50 ? 'text-success' : 'text-base-content'">
+              {{ Math.round(leaderboardStats.pctGroupsBeating) }}%
+            </div>
+          </div>
+        </div>
+        <div class="card bg-base-100 shadow border border-base-200">
+          <div class="card-body p-4">
+            <div class="text-[10px] uppercase tracking-wider text-base-content/50 leading-tight">Funds Beating<br>S&P 500</div>
+            <div class="text-2xl font-bold mt-1" :class="leaderboardStats.pctFundsBeating > 50 ? 'text-success' : 'text-base-content'">
+              {{ Math.round(leaderboardStats.pctFundsBeating) }}%
+            </div>
+          </div>
+        </div>
+        <div class="card bg-base-100 shadow border border-base-200">
+          <div class="card-body p-4">
+            <div class="text-[10px] uppercase tracking-wider text-base-content/50 leading-tight">Max Alpha<br>(Beating by)</div>
+            <div class="text-2xl font-bold text-success mt-1">+{{ leaderboardStats.maxAlpha.toFixed(1) }}%</div>
+          </div>
+        </div>
+        <div class="card bg-base-100 shadow border border-base-200">
+          <div class="card-body p-4">
+            <div class="text-[10px] uppercase tracking-wider text-base-content/50 leading-tight">Min Alpha<br>(Trailing by)</div>
+            <div class="text-2xl font-bold text-error mt-1">{{ leaderboardStats.minAlpha.toFixed(1) }}%</div>
+          </div>
+        </div>
+      </div>
+
       <div class="card bg-base-100 shadow border border-base-200">
         <div class="card-body p-5 xl:p-6">
           <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -150,17 +190,41 @@
           <!-- vs S&P 500 Tab -->
           <template v-else-if="activeTab === 'benchmark'">
             <!-- Group-level benchmark -->
-            <div class="mb-6">
-              <h3 class="font-semibold text-sm mb-1">By Group</h3>
-              <p class="text-xs text-base-content/50 mb-3">Each group's aggregate return compared to the S&P 500 over the same period.</p>
+            <div class="mb-10">
+              <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-4">
+                <div>
+                  <h3 class="font-bold text-lg mb-1">By Group</h3>
+                  <p class="text-xs text-base-content/50">Each group's aggregate return compared to the S&P 500 over the same period.</p>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                  <div class="relative">
+                    <input v-model="groupSearch" type="text" placeholder="Search group..." class="input input-bordered input-sm w-full sm:w-48 pl-8" />
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 absolute left-2.5 top-2 text-base-content/40" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                  </div>
+                  <select v-model="groupStatusFilter" class="select select-bordered select-sm">
+                    <option value="all">All Status</option>
+                    <option value="beating">Beating Only</option>
+                    <option value="trailing">Trailing Only</option>
+                  </select>
+                </div>
+              </div>
+
               <div class="overflow-x-auto">
                 <table class="table w-full">
                   <thead>
                     <tr>
-                      <th>Group</th>
-                      <th class="text-right">Group Return</th>
-                      <th class="text-right">S&P 500</th>
-                      <th class="text-right">Alpha</th>
+                      <th class="cursor-pointer hover:bg-base-200 transition-colors" @click="toggleGroupSort('name')">
+                        Group <span class="text-[10px] ml-1 opacity-50">{{ getSortIcon('name', groupSortKey, groupSortOrder) }}</span>
+                      </th>
+                      <th class="text-right cursor-pointer hover:bg-base-200 transition-colors" @click="toggleGroupSort('returnPct')">
+                        Group Return <span class="text-[10px] ml-1 opacity-50">{{ getSortIcon('returnPct', groupSortKey, groupSortOrder) }}</span>
+                      </th>
+                      <th class="text-right cursor-pointer hover:bg-base-200 transition-colors" @click="toggleGroupSort('benchmarkReturnPct')">
+                        S&P 500 <span class="text-[10px] ml-1 opacity-50">{{ getSortIcon('benchmarkReturnPct', groupSortKey, groupSortOrder) }}</span>
+                      </th>
+                      <th class="text-right cursor-pointer hover:bg-base-200 transition-colors" @click="toggleGroupSort('alpha')">
+                        Alpha <span class="text-[10px] ml-1 opacity-50">{{ getSortIcon('alpha', groupSortKey, groupSortOrder) }}</span>
+                      </th>
                       <th class="text-center">Status</th>
                     </tr>
                   </thead>
@@ -177,12 +241,18 @@
                         {{ (group.returnPct - (group.benchmarkReturnPct || 0)) >= 0 ? '+' : '' }}{{ (group.returnPct - (group.benchmarkReturnPct || 0)).toFixed(2) }}%
                       </td>
                       <td class="text-center">
-                        <span v-if="group.isBeatingSP500" class="badge badge-success badge-sm gap-1">Beating</span>
-                        <span v-else class="badge badge-error badge-sm gap-1">Trailing</span>
+                        <div class="flex flex-col items-center gap-1.5">
+                          <span v-if="group.isBeatingSP500" class="badge badge-success badge-sm gap-1">Beating</span>
+                          <span v-else class="badge badge-error badge-sm gap-1">Trailing</span>
+                          <button class="btn btn-ghost btn-xs text-[10px] text-primary" @click="openAttributionModal(group)">Explain</button>
+                        </div>
                       </td>
                     </tr>
-                    <tr v-if="leaderboardGroups.length === 0">
-                      <td colspan="5" class="text-center text-base-content/50 py-8">No groups yet</td>
+                    <tr v-if="benchmarkGroupsSorted.length === 0">
+                      <td colspan="5" class="text-center text-base-content/50 py-12">
+                        <div class="text-2xl mb-2">🔍</div>
+                        No groups found matching filters
+                      </td>
                     </tr>
                   </tbody>
                 </table>
@@ -191,17 +261,43 @@
 
             <!-- Fund-level benchmark -->
             <div>
-              <h3 class="font-semibold text-sm mb-1">By Fund</h3>
-              <p class="text-xs text-base-content/50 mb-3">Each individual fund's return compared to the S&P 500 since inception.</p>
+              <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-4">
+                <div>
+                  <h3 class="font-bold text-lg mb-1">By Fund</h3>
+                  <p class="text-xs text-base-content/50">Each individual fund's return compared to the S&P 500 since inception.</p>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                  <div class="relative">
+                    <input v-model="fundSearch" type="text" placeholder="Search fund or group..." class="input input-bordered input-sm w-full sm:w-64 pl-8" />
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 absolute left-2.5 top-2 text-base-content/40" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                  </div>
+                  <select v-model="fundStatusFilter" class="select select-bordered select-sm">
+                    <option value="all">All Status</option>
+                    <option value="beating">Beating Only</option>
+                    <option value="trailing">Trailing Only</option>
+                  </select>
+                </div>
+              </div>
+
               <div class="overflow-x-auto">
                 <table class="table w-full">
                   <thead>
                     <tr>
-                      <th>Group</th>
-                      <th>Fund</th>
-                      <th class="text-right">Fund Return</th>
-                      <th class="text-right">S&P 500</th>
-                      <th class="text-right">Alpha</th>
+                      <th class="cursor-pointer hover:bg-base-200 transition-colors" @click="toggleFundSort('groupName')">
+                        Group <span class="text-[10px] ml-1 opacity-50">{{ getSortIcon('groupName', fundSortKey, fundSortOrder) }}</span>
+                      </th>
+                      <th class="cursor-pointer hover:bg-base-200 transition-colors" @click="toggleFundSort('fundName')">
+                        Fund <span class="text-[10px] ml-1 opacity-50">{{ getSortIcon('fundName', fundSortKey, fundSortOrder) }}</span>
+                      </th>
+                      <th class="text-right cursor-pointer hover:bg-base-200 transition-colors" @click="toggleFundSort('returnPct')">
+                        Fund Return <span class="text-[10px] ml-1 opacity-50">{{ getSortIcon('returnPct', fundSortKey, fundSortOrder) }}</span>
+                      </th>
+                      <th class="text-right cursor-pointer hover:bg-base-200 transition-colors" @click="toggleFundSort('benchmarkReturnPct')">
+                        S&P 500 <span class="text-[10px] ml-1 opacity-50">{{ getSortIcon('benchmarkReturnPct', fundSortKey, fundSortOrder) }}</span>
+                      </th>
+                      <th class="text-right cursor-pointer hover:bg-base-200 transition-colors" @click="toggleFundSort('alpha')">
+                        Alpha <span class="text-[10px] ml-1 opacity-50">{{ getSortIcon('alpha', fundSortKey, fundSortOrder) }}</span>
+                      </th>
                       <th class="text-center">Status</th>
                     </tr>
                   </thead>
@@ -219,12 +315,18 @@
                         {{ (row.returnPct - row.benchmarkReturnPct) >= 0 ? '+' : '' }}{{ (row.returnPct - row.benchmarkReturnPct).toFixed(2) }}%
                       </td>
                       <td class="text-center">
-                        <span v-if="row.isBeatingSP500" class="badge badge-success badge-sm gap-1">Beating</span>
-                        <span v-else class="badge badge-error badge-sm gap-1">Trailing</span>
+                        <div class="flex flex-col items-center gap-1.5">
+                          <span v-if="row.isBeatingSP500" class="badge badge-success badge-sm gap-1">Beating</span>
+                          <span v-else class="badge badge-error badge-sm gap-1">Trailing</span>
+                          <button class="btn btn-ghost btn-xs text-[10px] text-primary" @click="openFundAttributionModal(row)">Explain</button>
+                        </div>
                       </td>
                     </tr>
                     <tr v-if="benchmarkFundRows.length === 0">
-                      <td colspan="6" class="text-center text-base-content/50 py-8">No funds yet</td>
+                      <td colspan="6" class="text-center text-base-content/50 py-12">
+                        <div class="text-2xl mb-2">🔍</div>
+                        No funds found matching filters
+                      </td>
                     </tr>
                   </tbody>
                 </table>
@@ -638,6 +740,7 @@ const teacher = useTeacherStore()
 const loading = ref(true)
 const rankedGroups = ref([])
 const leaderboardGroups = ref([])
+const leaderboardStats = ref({ pctStudentsBeating: 0, pctGroupsBeating: 0, pctFundsBeating: 0, maxAlpha: 0, minAlpha: 0, avgAlpha: 0 })
 const leaderboardLoading = ref(false)
 const leaderboardError = ref('')
 const sortKey = ref('returnPct')
@@ -651,6 +754,17 @@ const copiedMemberEmails = ref(false)
 const copiedClassEmails = ref(false)
 const activeTab = ref('leaderboard')
 
+// Benchmark Table State
+const groupSearch = ref('')
+const groupStatusFilter = ref('all')
+const groupSortKey = ref('alpha')
+const groupSortOrder = ref('desc')
+
+const fundSearch = ref('')
+const fundStatusFilter = ref('all')
+const fundSortKey = ref('alpha')
+const fundSortOrder = ref('desc')
+
 const currentClass = computed(() => {
   const qid = route.query.class_id
   if (qid) {
@@ -662,6 +776,18 @@ const currentClass = computed(() => {
 
 function openAttributionModal(group) {
   selectedGroup.value = group
+  showAttributionModal.value = true
+}
+
+function openFundAttributionModal(row) {
+  // Wrap single fund in a pseudo-group for the modal
+  const group = leaderboardGroups.value.find(g => g.name === row.groupName)
+  const fund = group?.funds?.find(f => f.id === row.fundId)
+  
+  selectedGroup.value = {
+    ...group,
+    funds: [fund].filter(Boolean)
+  }
   showAttributionModal.value = true
 }
 
@@ -682,16 +808,42 @@ const dashboardSummary = computed(() => {
   return { totalValue, totalStartingCash, cash, returnPct }
 })
 
-const benchmarkGroupsSorted = computed(() =>
-  [...leaderboardGroups.value].sort((a, b) => {
-    const alphaA = a.returnPct - (a.benchmarkReturnPct || 0)
-    const alphaB = b.returnPct - (b.benchmarkReturnPct || 0)
-    return alphaB - alphaA
+const benchmarkGroupsSorted = computed(() => {
+  let list = [...leaderboardGroups.value]
+
+  // Filter
+  if (groupSearch.value) {
+    const q = groupSearch.value.toLowerCase()
+    list = list.filter(g => g.name.toLowerCase().includes(q))
+  }
+  if (groupStatusFilter.value === 'beating') {
+    list = list.filter(g => g.isBeatingSP500)
+  } else if (groupStatusFilter.value === 'trailing') {
+    list = list.filter(g => !g.isBeatingSP500)
+  }
+
+  // Sort
+  list.sort((a, b) => {
+    let valA = a[groupSortKey.value]
+    let valB = b[groupSortKey.value]
+    
+    // Handle string comparison for 'name'
+    if (groupSortKey.value === 'name') {
+      return groupSortOrder.value === 'asc' 
+        ? valA.localeCompare(valB)
+        : valB.localeCompare(valA)
+    }
+
+    // Default numeric sort
+    const multiplier = groupSortOrder.value === 'asc' ? 1 : -1
+    return (valA - valB) * multiplier
   })
-)
+
+  return list
+})
 
 const benchmarkFundRows = computed(() => {
-  const rows = []
+  let rows = []
   for (const group of leaderboardGroups.value) {
     for (const fund of (group.funds || [])) {
       rows.push({
@@ -700,16 +852,63 @@ const benchmarkFundRows = computed(() => {
         fundName: fund.fundName || `Fund ${fund.fundNumber || 1}`,
         returnPct: fund.returnPct || 0,
         benchmarkReturnPct: fund.benchmarkReturnPct || 0,
-        isBeatingSP500: fund.isBeatingSP500 || false
+        isBeatingSP500: fund.isBeatingSP500 || false,
+        alpha: fund.alpha || 0
       })
     }
   }
-  return rows.sort((a, b) => {
-    const alphaA = a.returnPct - a.benchmarkReturnPct
-    const alphaB = b.returnPct - b.benchmarkReturnPct
-    return alphaB - alphaA
+
+  // Filter
+  if (fundSearch.value) {
+    const q = fundSearch.value.toLowerCase()
+    rows = rows.filter(r => r.groupName.toLowerCase().includes(q) || r.fundName.toLowerCase().includes(q))
+  }
+  if (fundStatusFilter.value === 'beating') {
+    rows = rows.filter(r => r.isBeatingSP500)
+  } else if (fundStatusFilter.value === 'trailing') {
+    rows = rows.filter(r => !r.isBeatingSP500)
+  }
+
+  // Sort
+  rows.sort((a, b) => {
+    let valA = a[fundSortKey.value]
+    let valB = b[fundSortKey.value]
+
+    if (fundSortKey.value === 'groupName' || fundSortKey.value === 'fundName') {
+      return fundSortOrder.value === 'asc' 
+        ? valA.localeCompare(valB)
+        : valB.localeCompare(valA)
+    }
+
+    const multiplier = fundSortOrder.value === 'asc' ? 1 : -1
+    return (valA - valB) * multiplier
   })
+
+  return rows
 })
+
+function toggleGroupSort(key) {
+  if (groupSortKey.value === key) {
+    groupSortOrder.value = groupSortOrder.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    groupSortKey.value = key
+    groupSortOrder.value = 'desc'
+  }
+}
+
+function toggleFundSort(key) {
+  if (fundSortKey.value === key) {
+    fundSortOrder.value = fundSortOrder.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    fundSortKey.value = key
+    fundSortOrder.value = 'desc'
+  }
+}
+
+function getSortIcon(key, currentKey, currentOrder) {
+  if (currentKey !== key) return '↕'
+  return currentOrder === 'asc' ? '↑' : '↓'
+}
 
 const selectedGroupEmails = computed(() =>
   (selectedGroup.value?.members || [])
@@ -1109,6 +1308,7 @@ async function loadDashboard() {
       const data = await res.json().catch(() => ({}))
       if (res.ok && data.groups) {
         leaderboardGroups.value = data.groups
+        if (data.stats) leaderboardStats.value = data.stats
       } else {
         leaderboardError.value = data.error || 'Failed to load leaderboard'
       }
