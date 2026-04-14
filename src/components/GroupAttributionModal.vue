@@ -8,7 +8,7 @@
             <strong>{{ group?.name }}</strong> — what helped, what hurt, and why
           </p>
         </div>
-        <button class="btn btn-sm btn-circle btn-ghost" @click="$emit('close')">✕</button>
+        <button type="button" class="btn btn-sm btn-circle btn-ghost" @click="$emit('close')">✕</button>
       </div>
 
       <!-- Time Range Selector -->
@@ -16,6 +16,7 @@
         <span class="text-xs text-base-content/50 font-semibold">Period:</span>
         <div class="join">
           <button
+            type="button"
             v-for="range in ranges"
             :key="range"
             class="btn btn-xs join-item"
@@ -58,7 +59,7 @@
         <!-- AI Explanation -->
         <div class="card bg-base-200/50 p-4 mb-6">
           <div class="flex items-center gap-3 flex-wrap mb-3">
-            <button class="btn btn-primary btn-sm gap-2" @click="explainPortfolio" :disabled="explaining">
+            <button type="button" class="btn btn-primary btn-sm gap-2" @click="explainPortfolio" :disabled="explaining">
               <span v-if="explaining" class="loading loading-spinner loading-xs"></span>
               <span v-else>💡</span>
               {{ explaining ? 'Analyzing...' : 'Explain Performance' }}
@@ -135,7 +136,7 @@
       </div>
 
       <div class="modal-action">
-        <button class="btn" @click="$emit('close')">Close</button>
+        <button type="button" class="btn" @click="$emit('close')">Close</button>
       </div>
     </div>
     <form method="dialog" class="modal-backdrop" @click="$emit('close')"><button>close</button></form>

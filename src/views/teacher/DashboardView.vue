@@ -244,7 +244,7 @@
                         <div class="flex flex-col items-center gap-1.5">
                           <span v-if="group.isBeatingSP500" class="badge badge-success badge-sm gap-1">Beating</span>
                           <span v-else class="badge badge-error badge-sm gap-1">Trailing</span>
-                          <button class="btn btn-ghost btn-xs text-[10px] text-primary" @click="openAttributionModal(group)">Explain</button>
+                          <button type="button" class="btn btn-ghost btn-xs text-[10px] text-primary" @click="openAttributionModal(group)">Explain</button>
                         </div>
                       </td>
                     </tr>
@@ -318,7 +318,7 @@
                         <div class="flex flex-col items-center gap-1.5">
                           <span v-if="row.isBeatingSP500" class="badge badge-success badge-sm gap-1">Beating</span>
                           <span v-else class="badge badge-error badge-sm gap-1">Trailing</span>
-                          <button class="btn btn-ghost btn-xs text-[10px] text-primary" @click="openFundAttributionModal(row)">Explain</button>
+                          <button type="button" class="btn btn-ghost btn-xs text-[10px] text-primary" @click="openFundAttributionModal(row)">Explain</button>
                         </div>
                       </td>
                     </tr>
