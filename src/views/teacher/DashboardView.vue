@@ -195,6 +195,19 @@
 
           <!-- vs S&P 500 Tab -->
           <template v-else-if="activeTab === 'benchmark'">
+            <div class="mb-8 rounded-2xl border border-base-300 bg-base-200/35 p-4">
+              <h3 class="font-semibold text-sm uppercase tracking-wide text-base-content/55 mb-2">How This Is Calculated</h3>
+              <div class="text-sm text-base-content/70 space-y-2">
+                <p>Group performance and benchmark performance are aggregated fund by fund, not treated as one single portfolio opened on one date.</p>
+                <ul class="list-disc pl-5 space-y-1">
+                  <li>Each fund keeps its own inception date and starting cash.</li>
+                  <li>For the benchmark, we assume that same starting amount was invested into <strong>SPY</strong> on that fund's start date.</li>
+                  <li>Group benchmark return is the combined result of those fund-level SPY sleeves.</li>
+                  <li>Alpha is the difference between the group's real return and that aggregated SPY benchmark.</li>
+                </ul>
+              </div>
+            </div>
+
             <!-- Group-level benchmark -->
             <div class="mb-10">
               <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-4">
