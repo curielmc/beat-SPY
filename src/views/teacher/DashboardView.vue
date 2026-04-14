@@ -479,7 +479,7 @@
       <form method="dialog" class="modal-backdrop" @click="showClassContactsModal = false"><button>close</button></form>
     </dialog>
 
-    <dialog class="modal" :class="{ 'modal-open': showFundsModal }">
+    <dialog v-if="showFundsModal && selectedGroup" class="modal" :class="{ 'modal-open': showFundsModal }">
       <div class="modal-box max-w-4xl">
         <h3 class="font-bold text-lg mb-1">All Funds</h3>
         <p class="text-sm text-base-content/60 mb-4">
@@ -507,9 +507,9 @@
                     <div class="text-xs text-base-content/45">{{ fund.fund_thesis || selectedGroup.name }}</div>
                   </td>
                   <td class="text-right font-mono">{{ fund.positionsCount }}</td>
-                  <td class="text-right font-mono">${{ fund.investedValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</td>
+                  <td class="text-right font-mono">${{ Number(fund.investedValue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</td>
                   <td class="text-right font-mono">${{ Number(fund.cash_balance || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</td>
-                  <td class="text-right font-mono font-semibold">${{ fund.totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</td>
+                  <td class="text-right font-mono font-semibold">${{ Number(fund.totalValue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</td>
                   <td class="text-right font-mono" :class="fund.returnPct >= 0 ? 'text-success' : 'text-error'">
                     {{ fund.returnPct >= 0 ? '+' : '' }}{{ fund.returnPct.toFixed(2) }}%
                   </td>
@@ -534,11 +534,11 @@
               </div>
               <div class="text-right">
                 <div class="text-xs text-base-content/45">Current Value</div>
-                <div class="font-mono font-semibold">${{ fund.totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</div>
+                <div class="font-mono font-semibold">${{ Number(fund.totalValue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</div>
               </div>
             </div>
 
-            <div v-if="fund.holdings.length === 0" class="px-4 py-4 text-sm text-base-content/45">
+            <div v-if="(fund.holdings || []).length === 0" class="px-4 py-4 text-sm text-base-content/45">
               No invested positions in this fund yet.
             </div>
             <div v-else class="overflow-x-auto">
@@ -553,7 +553,7 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="holding in fund.holdings" :key="`${fund.id}-${holding.ticker}`">
+                  <tr v-for="holding in (fund.holdings || [])" :key="`${fund.id}-${holding.ticker}`">
                     <td class="py-3">
                       <div class="flex items-center gap-2.5">
                         <div class="avatar placeholder">
