@@ -205,6 +205,7 @@ export default async function handler(req) {
           id: p.id,
           fundName: p.fund_name || `Fund ${p.fund_number || 1}`,
           fundNumber: p.fund_number || 1,
+          created_at: p.created_at,
           returnPct: Math.round(p.returnPct * 100) / 100,
           benchmarkReturnPct: Math.round((p.benchmarkReturnPct || 0) * 100) / 100,
           isBeatingSP500: p.isBeatingSP500,

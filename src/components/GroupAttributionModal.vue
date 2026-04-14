@@ -158,7 +158,7 @@ const emit = defineEmits(['close'])
 
 const market = useMarketDataStore()
 const loading = ref(false)
-const selectedRange = ref('1M')
+const selectedRange = ref('All')
 const ranges = ['1W', '1M', '3M', '1Y', 'All']
 
 const attributions = ref([])
@@ -193,14 +193,19 @@ function getPeriodStartDate(range) {
   return new Date(now.getTime() - (map[range] || 30) * 86400000)
 }
 
+function getFundStartDate(fund, requestedStartDate) {
+  const fundCreatedAt = fund?.created_at ? new Date(fund.created_at) : null
+  if (!fundCreatedAt || Number.isNaN(fundCreatedAt.getTime())) return requestedStartDate
+  return fundCreatedAt > requestedStartDate ? fundCreatedAt : requestedStartDate
+}
+
 async function loadAttribution() {
   if (!props.group || !props.isOpen) return
   loading.value = true
   explanation.value = ''
   
   try {
-    const asOfDate = getPeriodStartDate(selectedRange.value)
-    const asOfDateStr = asOfDate.toISOString().split('T')[0]
+    const requestedStartDate = getPeriodStartDate(selectedRange.value)
     const portfolioIds = (props.group.funds || []).map(f => f.id)
 
     if (portfolioIds.length === 0) {
@@ -221,17 +226,19 @@ async function loadAttribution() {
 
     const allTickers = new Set(['SPY'])
     
-    // For each fund, reconstruct past holdings and collect all tickers involved
+    // For each fund, reconstruct past holdings using the later of the selected period
+    // start or the fund's own inception date.
     const fundAnalysis = props.group.funds.map(fund => {
+      const fundStartDate = getFundStartDate(fund, requestedStartDate)
       const fundTrades = tradesByPortfolio[fund.id] || []
       const currentHoldings = fund.holdings || []
       const currentCash = fund.cash_balance || 0
       
-      const pastHoldings = reconstructHoldingsAsOf(currentHoldings, fundTrades, asOfDate)
-      const pastCash = reconstructCashAsOf(currentCash, fundTrades, asOfDate)
+      const pastHoldings = reconstructHoldingsAsOf(currentHoldings, fundTrades, fundStartDate)
+      const pastCash = reconstructCashAsOf(currentCash, fundTrades, fundStartDate)
       
       // Tickers: held at start + held now + traded during period
-      const tradesInPeriod = fundTrades.filter(t => new Date(t.executed_at) > asOfDate)
+      const tradesInPeriod = fundTrades.filter(t => new Date(t.executed_at) > fundStartDate)
       const periodTickers = new Set([
         ...pastHoldings.map(h => h.ticker),
         ...currentHoldings.map(h => h.ticker),
@@ -240,40 +247,59 @@ async function loadAttribution() {
       
       periodTickers.forEach(t => allTickers.add(t))
       
-      return { fund, pastHoldings, pastCash, currentHoldings, currentCash, tradesInPeriod }
+      return {
+        fund,
+        fundStartDate,
+        fundStartDateStr: fundStartDate.toISOString().split('T')[0],
+        pastHoldings,
+        pastCash,
+        currentHoldings,
+        currentCash,
+        tradesInPeriod
+      }
     })
 
     const tickerList = Array.from(allTickers)
-    const [historicalPrices] = await Promise.all([
-      market.fetchHistoricalCloseForTickers(tickerList, asOfDateStr),
-      market.fetchBatchQuotes(tickerList),
-      market.fetchBatchProfiles(tickerList)
-    ])
+    const uniqueStartDates = [...new Set(fundAnalysis.map(a => a.fundStartDateStr))]
+    const historicalPricesByDate = {}
 
-    const startPrices = historicalPrices
+    await Promise.all([
+      market.fetchBatchQuotes(tickerList),
+      market.fetchBatchProfiles(tickerList),
+      ...uniqueStartDates.map(dateStr =>
+        market.fetchHistoricalCloseForTickers(tickerList, dateStr).then(prices => {
+          historicalPricesByDate[dateStr] = prices || {}
+        })
+      )
+    ])
     const currentPrices = {}
     tickerList.forEach(t => currentPrices[t] = market.getCachedPrice(t) || 0)
 
-    spyReturn.value = startPrices['SPY'] > 0 
-      ? ((currentPrices['SPY'] / startPrices['SPY']) - 1) * 100 
-      : 0
-
     // Aggregate analysis across all funds
-    const aggregateTickers = {} // ticker -> { weightContrib, dollarGain, stockReturn }
+    const aggregateTickers = {} // ticker -> { weightedReturn, startValue }
     let totalStartValue = 0
+    let aggregateSpyStartValue = 0
+    let aggregateSpyCurrentValue = 0
 
     fundAnalysis.forEach(analysis => {
+      const startPrices = historicalPricesByDate[analysis.fundStartDateStr] || {}
       let fundStartValue = analysis.pastCash
       analysis.pastHoldings.forEach(h => {
         fundStartValue += h.shares * (startPrices[h.ticker] || 0)
       })
       
-      // If fund didn't exist at start, use its current starting_cash or 100k
+      // If no positions were open yet, use the actual fund starting capital.
       if (fundStartValue <= 0) {
-        fundStartValue = analysis.fund.starting_cash || analysis.fund.fund_starting_cash || 100000
+        fundStartValue = Number(analysis.fund.startingCash || analysis.fund.starting_cash || analysis.fund.fund_starting_cash || 100000)
       }
       
       totalStartValue += fundStartValue
+      const spyStart = startPrices.SPY || 0
+      const spyNow = currentPrices.SPY || 0
+      if (spyStart > 0 && spyNow > 0) {
+        aggregateSpyStartValue += fundStartValue
+        aggregateSpyCurrentValue += fundStartValue * (spyNow / spyStart)
+      }
 
       // Collect all tickers in this fund's period
       const tickers = new Set([
@@ -314,6 +340,10 @@ async function loadAttribution() {
         aggregateTickers[ticker].weightedReturn += (weightInFund * fundStartValue) * stockReturn
       })
     })
+
+    spyReturn.value = aggregateSpyStartValue > 0
+      ? ((aggregateSpyCurrentValue - aggregateSpyStartValue) / aggregateSpyStartValue) * 100
+      : 0
 
     const finalAttributions = Object.entries(aggregateTickers).map(([ticker, data]) => {
       const weight = totalStartValue > 0 ? (data.startValue / totalStartValue) * 100 : 0
