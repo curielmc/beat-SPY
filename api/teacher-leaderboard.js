@@ -66,13 +66,13 @@ export default async function handler(req) {
 
     // 2. Get all group portfolios
     const groupPortfolios = await sbFetch(
-      `/portfolios?owner_type=eq.group&owner_id=in.(${groupIdFilter})&status=eq.active&select=id,owner_id,cash_balance,starting_cash,fund_starting_cash,fund_name,fund_number,benchmark_ticker,created_at`
+      `/portfolios?owner_type=eq.group&owner_id=in.(${groupIdFilter})&status=eq.active&select=id,owner_id,owner_type,cash_balance,starting_cash,fund_starting_cash,fund_name,fund_number,benchmark_ticker,created_at`
     )
 
     // 2b. Get all student (user) portfolios (fetch all and filter to avoid long URL)
     const studentIds = new Set((memberships || []).map(m => m.user_id))
     const studentPortfoliosRaw = await sbFetch(
-      `/portfolios?owner_type=eq.user&status=eq.active&select=id,owner_id,cash_balance,starting_cash,fund_starting_cash,fund_name,fund_number,benchmark_ticker,created_at`
+      `/portfolios?owner_type=eq.user&status=eq.active&select=id,owner_id,owner_type,cash_balance,starting_cash,fund_starting_cash,fund_name,fund_number,benchmark_ticker,created_at`
     )
     const studentPortfolios = (studentPortfoliosRaw || []).filter(p => studentIds.has(p.owner_id))
 
