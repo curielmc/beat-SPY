@@ -99,6 +99,10 @@ export default async function handler(req) {
       source_url: sourceUrl || sourceExportUrl || null,
       source_name: sourceName || null,
       deck_pdf_url: deckPdfUrl || null,
+      pdf_files: deckPdfUrl ? [{
+        name: sourceName || draft.title || 'Slides PDF',
+        url: deckPdfUrl
+      }] : [],
       generated_by: 'jasper',
       jasper_metadata: {
         imported_via: 'api',
@@ -165,6 +169,7 @@ export default async function handler(req) {
     status: tutorial.status,
     category: tutorial.category,
     deck_pdf_url: tutorial.deck_pdf_url,
+    pdf_files: tutorial.pdf_files || [],
     source_type: tutorial.source_type,
     steps_created: stepsPayload.length,
     assigned_class_ids: classIds

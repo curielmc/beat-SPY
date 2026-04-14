@@ -28,15 +28,18 @@
               <h1 class="text-2xl font-bold">{{ store.currentTutorial.title }}</h1>
               <p v-if="store.currentTutorial.description" class="text-base-content/60 mt-1">{{ store.currentTutorial.description }}</p>
             </div>
-            <a
-              v-if="store.currentTutorial.deck_pdf_url"
-              :href="store.currentTutorial.deck_pdf_url"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="btn btn-outline btn-sm"
-            >
-              Download Slides PDF
-            </a>
+            <div v-if="store.currentTutorial.pdf_files?.length" class="flex flex-wrap justify-end gap-2">
+              <a
+                v-for="(pdf, index) in store.currentTutorial.pdf_files"
+                :key="`${pdf.url}-${index}`"
+                :href="pdf.url"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="btn btn-outline btn-sm"
+              >
+                {{ pdf.name || `PDF ${index + 1}` }}
+              </a>
+            </div>
           </div>
 
           <!-- Progress bar -->

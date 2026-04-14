@@ -2,6 +2,38 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { supabase } from '../lib/supabase'
 
+function normalizePdfFiles(tutorial = {}) {
+  const rawFiles = Array.isArray(tutorial.pdf_files) ? tutorial.pdf_files : []
+  const files = rawFiles
+    .map((file, index) => ({
+      name: (typeof file?.name === 'string' && file.name.trim()) || `PDF ${index + 1}`,
+      url: typeof file?.url === 'string' ? file.url.trim() : ''
+    }))
+    .filter(file => file.url)
+
+  if (files.length > 0) return files
+
+  if (tutorial.deck_pdf_url) {
+    return [{
+      name: tutorial.source_name || tutorial.title || 'Slides PDF',
+      url: tutorial.deck_pdf_url
+    }]
+  }
+
+  return []
+}
+
+function normalizeTutorial(tutorial) {
+  if (!tutorial) return tutorial
+
+  const pdfFiles = normalizePdfFiles(tutorial)
+  return {
+    ...tutorial,
+    pdf_files: pdfFiles,
+    deck_pdf_url: pdfFiles[0]?.url || null
+  }
+}
+
 export const useTrainingStore = defineStore('training', () => {
   const tutorials = ref([])
   const currentTutorial = ref(null)
@@ -25,7 +57,7 @@ export const useTrainingStore = defineStore('training', () => {
       }
 
       const { data, error } = await query
-      if (!error) tutorials.value = data || []
+      if (!error) tutorials.value = (data || []).map(normalizeTutorial)
     } finally {
       loading.value = false
     }
@@ -53,7 +85,7 @@ export const useTrainingStore = defineStore('training', () => {
         .eq('training_tutorial_id', tutorial.id)
         .order('position')
 
-      currentTutorial.value = { ...tutorial, steps: steps || [] }
+      currentTutorial.value = normalizeTutorial({ ...tutorial, steps: steps || [] })
 
       // Fetch user's progress for this tutorial's steps
       const { data: { session } } = await supabase.auth.getSession()
@@ -151,8 +183,13 @@ export const useTrainingStore = defineStore('training', () => {
       .select('*, training_tutorial:training_tutorials(*)')
       .eq('class_id', classId)
 
-    if (!error) classTutorials.value = data || []
-    return data || []
+    if (!error) {
+      classTutorials.value = (data || []).map(item => ({
+        ...item,
+        training_tutorial: normalizeTutorial(item.training_tutorial)
+      }))
+    }
+    return classTutorials.value
   }
 
   // Teacher: assign a tutorial to a class
@@ -175,14 +212,15 @@ export const useTrainingStore = defineStore('training', () => {
 
     if (!error) {
       classTutorials.value = classTutorials.value.filter(
-        ct => ct.training_tutorial_id !== tutorial_id
+        ct => ct.training_tutorial_id !== tutorialId
       )
     }
     return !error
     }
 
     // Admin: Create or update a tutorial
-    async function saveTutorial(tutorial, options = {}) {
+  async function saveTutorial(tutorial, options = {}) {
+    const pdfFiles = normalizePdfFiles(tutorial)
     const { data, error } = await supabase
       .from('training_tutorials')
       .upsert({
@@ -193,7 +231,8 @@ export const useTrainingStore = defineStore('training', () => {
         category: tutorial.category,
         status: tutorial.status,
         position: tutorial.position || 0,
-        deck_pdf_url: tutorial.deck_pdf_url || null,
+        deck_pdf_url: pdfFiles[0]?.url || null,
+        pdf_files: pdfFiles,
         source_type: tutorial.source_type || null,
         source_url: tutorial.source_url || null,
         source_name: tutorial.source_name || null

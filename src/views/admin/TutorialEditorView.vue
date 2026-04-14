@@ -63,15 +63,47 @@
             </div>
 
             <div class="form-control w-full">
-              <label class="label"><span class="label-text">Slides PDF</span></label>
-              <div class="space-y-2">
-                <input
-                  v-model="tutorial.deck_pdf_url"
-                  type="url"
-                  placeholder="https://...pdf"
-                  class="input input-bordered input-sm"
-                />
+              <label class="label"><span class="label-text">PDF Resources</span></label>
+              <div class="space-y-3">
+                <div
+                  v-for="(pdf, index) in tutorial.pdf_files"
+                  :key="`pdf-${index}`"
+                  class="rounded-lg border border-base-300 p-3 space-y-2"
+                >
+                  <div class="grid gap-2 sm:grid-cols-[minmax(0,1fr),minmax(0,2fr)]">
+                    <input
+                      v-model="pdf.name"
+                      type="text"
+                      placeholder="PDF name"
+                      class="input input-bordered input-sm"
+                    />
+                    <input
+                      v-model="pdf.url"
+                      type="url"
+                      placeholder="https://...pdf"
+                      class="input input-bordered input-sm"
+                    />
+                  </div>
+                  <div class="flex flex-wrap gap-2">
+                    <a
+                      v-if="pdf.url"
+                      :href="pdf.url"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="btn btn-ghost btn-sm"
+                    >
+                      Open PDF
+                    </a>
+                    <button class="btn btn-ghost btn-sm text-error" @click="removePdf(index)">
+                      Remove
+                    </button>
+                  </div>
+                </div>
+
                 <div class="flex flex-wrap gap-2">
+                  <button class="btn btn-outline btn-sm" @click="addPdf">
+                    Add PDF Link
+                  </button>
                   <input
                     ref="deckFileInput"
                     type="file"
@@ -83,20 +115,9 @@
                     <span v-if="uploadingDeck" class="loading loading-spinner loading-xs"></span>
                     Upload PDF
                   </button>
-                  <a
-                    v-if="tutorial.deck_pdf_url"
-                    :href="tutorial.deck_pdf_url"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="btn btn-ghost btn-sm"
-                  >
-                    Open Current PDF
-                  </a>
-                  <button v-if="tutorial.deck_pdf_url" class="btn btn-ghost btn-sm text-error" @click="clearDeckUrl">
-                    Remove PDF
-                  </button>
                 </div>
-                <p class="text-xs text-base-content/50">Upload a PDF to replace the slide deck, or paste a direct PDF URL.</p>
+
+                <p class="text-xs text-base-content/50">Add as many PDFs as needed. Uploaded files are appended to this tutorial.</p>
                 <p v-if="deckMessage" class="text-xs" :class="deckMessageType === 'error' ? 'text-error' : 'text-success'">{{ deckMessage }}</p>
               </div>
             </div>
@@ -184,8 +205,29 @@ const tutorial = ref({
   category: 'investments',
   status: 'draft',
   deck_pdf_url: '',
+  pdf_files: [],
   steps: []
 })
+
+function normalizePdfFiles(pdfFiles, fallbackUrl = '', fallbackName = '') {
+  const normalized = (Array.isArray(pdfFiles) ? pdfFiles : [])
+    .map((file, index) => ({
+      name: (typeof file?.name === 'string' && file.name.trim()) || `PDF ${index + 1}`,
+      url: typeof file?.url === 'string' ? file.url.trim() : ''
+    }))
+    .filter(file => file.url)
+
+  if (normalized.length > 0) return normalized
+
+  if (fallbackUrl) {
+    return [{
+      name: fallbackName || 'Slides PDF',
+      url: fallbackUrl
+    }]
+  }
+
+  return []
+}
 
 async function loadTutorial() {
   if (isNew.value) return
@@ -201,7 +243,10 @@ async function loadTutorial() {
   if (!error && data) {
     // Sort steps by position
     data.steps.sort((a, b) => a.position - b.position)
-    tutorial.value = data
+    tutorial.value = {
+      ...data,
+      pdf_files: normalizePdfFiles(data.pdf_files, data.deck_pdf_url, data.source_name || data.title)
+    }
   }
   loading.value = false
 }
@@ -235,7 +280,11 @@ async function handleDeckUpload() {
 
     const slug = tutorial.value.slug || tutorial.value.title
     const publicUrl = await uploadTutorialDeck(slug, selectedDeckFile.value)
-    tutorial.value.deck_pdf_url = publicUrl
+    tutorial.value.pdf_files.push({
+      name: selectedDeckFile.value.name.replace(/\.pdf$/i, '') || `PDF ${tutorial.value.pdf_files.length + 1}`,
+      url: publicUrl
+    })
+    tutorial.value.deck_pdf_url = tutorial.value.pdf_files[0]?.url || publicUrl
     deckMessageType.value = 'success'
     deckMessage.value = 'PDF uploaded. Save changes to keep it on the tutorial.'
     selectedDeckFile.value = null
@@ -250,13 +299,17 @@ async function handleDeckUpload() {
   }
 }
 
-function clearDeckUrl() {
-  tutorial.value.deck_pdf_url = ''
+function addPdf() {
+  tutorial.value.pdf_files.push({
+    name: '',
+    url: ''
+  })
+}
+
+function removePdf(index) {
+  tutorial.value.pdf_files.splice(index, 1)
+  tutorial.value.deck_pdf_url = tutorial.value.pdf_files[0]?.url || ''
   deckMessage.value = ''
-  selectedDeckFile.value = null
-  if (deckFileInput.value) {
-    deckFileInput.value.value = ''
-  }
 }
 
 function addStep() {
