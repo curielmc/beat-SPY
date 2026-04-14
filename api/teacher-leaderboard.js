@@ -59,17 +59,22 @@ export default async function handler(req) {
     const groupIds = groups.map(g => g.id)
     const groupIdFilter = groupIds.map(id => encodeURIComponent(id)).join(',')
 
+    // 1b. Get members
+    const memberships = await sbFetch(
+      `/class_memberships?class_id=eq.${class_id}&select=user_id,group_id,profiles:profiles(full_name)`
+    )
+
     // 2. Get all group portfolios
     const groupPortfolios = await sbFetch(
       `/portfolios?owner_type=eq.group&owner_id=in.(${groupIdFilter})&status=eq.active&select=id,owner_id,cash_balance,starting_cash,fund_starting_cash,fund_name,fund_number,benchmark_ticker,created_at`
     )
 
     // 2b. Get all student (user) portfolios for students in this class
-    const studentIds = memberships.map(m => m.user_id)
+    const studentIds = (memberships || []).map(m => m.user_id)
     const studentIdFilter = studentIds.map(id => encodeURIComponent(id)).join(',')
-    const studentPortfolios = await sbFetch(
+    const studentPortfolios = studentIds.length ? await sbFetch(
       `/portfolios?owner_type=eq.user&owner_id=in.(${studentIdFilter})&status=eq.active&select=id,owner_id,cash_balance,starting_cash,fund_starting_cash,fund_name,fund_number,benchmark_ticker,created_at`
-    )
+    ) : []
 
     const allPortfolios = [...(groupPortfolios || []), ...(studentPortfolios || [])]
 
