@@ -22,12 +22,10 @@ function checkRateLimit(req) {
 async function requireUser(req) {
   const authHeader = req.headers.get('authorization') || ''
   if (!authHeader.startsWith('Bearer ')) {
-    console.error('[Auth] No Bearer token in request')
     return null
   }
   // Simple auth: if they have a Bearer token, assume they're authenticated
-  // (the token came from Supabase and only valid sessions get it)
-  return { authenticated: true }
+  return { id: 'authenticated' }
 }
 
 export default async function handler(req) {
