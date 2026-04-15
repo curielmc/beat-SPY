@@ -3,7 +3,7 @@
     <div class="modal-box max-w-4xl max-h-[90vh] overflow-y-auto">
       <div class="flex items-center justify-between mb-4">
         <div>
-          <h3 class="font-bold text-lg">Performance Attribution</h3>
+          <h3 class="font-bold text-lg">✅ Performance Attribution (v2)</h3>
           <p class="text-sm text-base-content/60">
             <strong>{{ group?.name }}</strong> — what helped, what hurt, and why
           </p>
