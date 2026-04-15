@@ -293,11 +293,14 @@ async function loadAttribution() {
     const uniqueStartDates = [...new Set(fundAnalysis.map(a => a.fundStartDateStr))]
     const historicalPricesByDate = {}
 
+    console.log(`[Attribution] Fetching prices for ${tickerList.length} tickers on ${uniqueStartDates.length} dates:`, uniqueStartDates)
+
     await Promise.all([
       market.fetchBatchQuotes(tickerList),
       market.fetchBatchProfiles(tickerList),
       ...uniqueStartDates.map(dateStr =>
         market.fetchHistoricalCloseForTickers(tickerList, dateStr).then(prices => {
+          console.log(`[Attribution] Fetched ${Object.keys(prices).length} prices for date ${dateStr}:`, Object.keys(prices).slice(0, 5))
           historicalPricesByDate[dateStr] = prices || {}
         })
       )
