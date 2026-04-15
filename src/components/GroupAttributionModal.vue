@@ -202,9 +202,24 @@ function formatSignedPct(value) {
   return `${num >= 0 ? '+' : ''}${num.toFixed(2)}%`
 }
 
-function getPeriodStartDate(range) {
+function getPeriodStartDate(range, groupFunds = []) {
   const now = new Date()
-  const map = { '1D': 1, '1W': 7, '1M': 30, '3M': 90, '1Y': 365, 'All': 3650 }
+
+  if (range === 'All') {
+    // For "All", use the earliest fund inception date
+    let earliestDate = now
+    for (const fund of groupFunds) {
+      if (fund?.created_at) {
+        const fundDate = new Date(fund.created_at)
+        if (fundDate < earliestDate) {
+          earliestDate = fundDate
+        }
+      }
+    }
+    return earliestDate
+  }
+
+  const map = { '1D': 1, '1W': 7, '1M': 30, '3M': 90, '1Y': 365 }
   return new Date(now.getTime() - (map[range] || 30) * 86400000)
 }
 
@@ -220,7 +235,7 @@ async function loadAttribution() {
   explanation.value = ''
   
   try {
-    const requestedStartDate = getPeriodStartDate(selectedRange.value)
+    const requestedStartDate = getPeriodStartDate(selectedRange.value, props.group.funds)
     const portfolioIds = (props.group.funds || []).map(f => f.id)
 
     if (portfolioIds.length === 0) {
@@ -398,11 +413,8 @@ async function loadAttribution() {
       ? ((totalCurrentValue - totalStartValue) / totalStartValue) * 100
       : 0
 
-    if (finalAttributions.length > 0) {
-      await explainPortfolio(finalAttributions)
-    } else {
-      explanation.value = 'No holdings with enough recent data to explain for this period.'
-    }
+    // Clear explanation when period changes — user can click to generate new one
+    explanation.value = ''
 
   } catch (err) {
     console.error('Error loading group attribution:', err)
