@@ -42,9 +42,54 @@ export default async function handler(req) {
   const FMP_KEY = process.env.VITE_FMP_API_KEY
   const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY
   const ANTHROPIC_KEY = process.env.ANTHROPIC_KEY
-  
+  const GROK_KEY = process.env.GROK_API_KEY
+
   if (!FMP_KEY || (!OPENROUTER_KEY && !ANTHROPIC_KEY)) {
     return new Response(JSON.stringify({ error: 'Server not configured' }), { status: 500 })
+  }
+
+  // Fetch broader market themes from Grok
+  let marketThemes = ''
+  if (GROK_KEY) {
+    const periodDescriptions = {
+      '1D': 'today',
+      '1W': 'this week',
+      '1M': 'this month',
+      '3M': 'the past 3 months',
+      '1Y': 'the past year',
+      'All': 'recently'
+    }
+    const period = periodDescriptions[selectedRange] || 'recently'
+
+    try {
+      const grokResponse = await fetch('https://api.x.ai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${GROK_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'grok-2',
+          messages: [{
+            role: 'user',
+            content: `What have been the major stock market themes and news trends ${period}? Focus on: major economic announcements, Fed decisions, sector trends, notable company earnings, geopolitical events, or market-moving news. Keep it to 3-4 bullet points.`
+          }],
+          temperature: 0.7,
+          max_tokens: 500
+        })
+      })
+
+      if (grokResponse.ok) {
+        const grokData = await grokResponse.json()
+        const themeContent = grokData.choices?.[0]?.message?.content
+        if (themeContent) {
+          marketThemes = `\n\nBroader Market Context (${period}):\n${themeContent}`
+        }
+      }
+    } catch (e) {
+      console.error('Grok API error:', e)
+      // Continue without market themes
+    }
   }
 
   // Fetch recent news for each ticker in parallel
@@ -61,7 +106,7 @@ export default async function handler(req) {
   tickers.forEach((ticker, i) => {
     const articles = Array.isArray(newsResults[i]) ? newsResults[i].slice(0, 3) : []
     const chg = changes[ticker]
-    newsContext += `\n\n${ticker} (${chg >= 0 ? '+' : ''}${chg?.toFixed(2) ?? '?'}% today):`
+    newsContext += `\n\n${ticker} (${chg >= 0 ? '+' : ''}${chg?.toFixed(2) ?? '?'}%):`
     if (articles.length) {
       articles.forEach(a => { newsContext += `\n  • ${a.title}` })
     } else {
@@ -85,7 +130,7 @@ export default async function handler(req) {
 
 A student owns ${tickers[0]} which moved ${changes[tickers[0]] >= 0 ? 'up' : 'down'} ${Math.abs(changes[tickers[0]] ?? 0).toFixed(2)}% ${periodLabel}.
 
-Recent news for ${tickers[0]}:${newsContext}
+Recent news for ${tickers[0]}:${newsContext}${marketThemes}
 
 Respond with clean HTML (no outer html/body tags) containing a <div> with a one-sentence summary of why the stock moved, followed by an unordered list with up to 3 bullet points explaining the key drivers. Each bullet point should be 1 sentence without percentages. Be specific about news. End with one short investing lesson.
 
@@ -103,7 +148,7 @@ Use this format:
 
 ${portfolioSummary}
 
-Recent news for their holdings:${newsContext}
+Recent news for their holdings:${newsContext}${marketThemes}
 
 Respond with clean HTML (no outer html/body tags) containing a <div> with a one-sentence summary of portfolio performance, followed by an unordered list with up to 5 bullet points explaining the key drivers. Each bullet point should be 1 sentence without percentages. Mention specific stocks and their role. Be concrete about what helped and what hurt, based on news.
 
