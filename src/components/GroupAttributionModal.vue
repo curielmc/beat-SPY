@@ -321,16 +321,19 @@ async function loadAttribution() {
       // Calculate fund starting value from reconstructed holdings + cash at period start
       let fundStartValue = Number(analysis.pastCash || 0)
       analysis.pastHoldings.forEach(h => {
-        const sp = startPrices[h.ticker] || 0
-        fundStartValue += Number(h.shares || 0) * sp
+        const sp = startPrices[h.ticker]
+        if (sp === undefined) {
+          console.warn(`[Attribution] Missing price for ${h.ticker} on ${analysis.fundStartDateStr}`)
+        }
+        fundStartValue += Number(h.shares || 0) * (sp || 0)
       })
 
-      // If no historical prices available (data gap), fall back to starting cash
-      if (Object.keys(startPrices).length === 0) {
+      // For "All" period, always use starting cash since we want inception return
+      if (selectedRange.value === 'All') {
         fundStartValue = Number(analysis.fund.startingCash || 100000)
       }
 
-      console.log(`Fund ${analysis.fund.fundName || 'unknown'}: startDate=${analysis.fundStartDateStr}, historicalPricesAvailable=${Object.keys(startPrices).length}, fundStartValue=${fundStartValue}, pastCash=${analysis.pastCash}, pastHoldings=${analysis.pastHoldings.length}`)
+      console.log(`Fund ${analysis.fund.fundName || 'unknown'}: startDate=${analysis.fundStartDateStr}, period=${selectedRange.value}, fundStartValue=${fundStartValue}, pastCash=${analysis.pastCash}, pastHoldings=${analysis.pastHoldings.length}`)
 
       let fundCurrentValue = Number(analysis.currentCash || 0)
       analysis.currentHoldings.forEach(h => {
