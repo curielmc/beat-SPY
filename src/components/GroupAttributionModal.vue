@@ -146,7 +146,7 @@ const emit = defineEmits(['close'])
 const market = useMarketDataStore()
 const loading = ref(false)
 const selectedRange = ref('All')
-const ranges = ['1W', '1M', '3M', '1Y', 'All']
+const ranges = ['1D', '1W', '1M', '3M', '1Y', 'All']
 
 const attributions = ref([])
 const totalReturn = ref(0)
@@ -200,7 +200,7 @@ function formatSignedPct(value) {
 
 function getPeriodStartDate(range) {
   const now = new Date()
-  const map = { '1W': 7, '1M': 30, '3M': 90, '1Y': 365, 'All': 3650 }
+  const map = { '1D': 1, '1W': 7, '1M': 30, '3M': 90, '1Y': 365, 'All': 3650 }
   return new Date(now.getTime() - (map[range] || 30) * 86400000)
 }
 
