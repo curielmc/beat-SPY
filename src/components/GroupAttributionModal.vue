@@ -21,7 +21,7 @@
             :key="range"
             class="btn btn-xs join-item"
             :class="selectedRange === range ? 'btn-primary' : 'btn-ghost border border-base-300'"
-            @click="selectedRange = range"
+            @click="selectPeriod(range)"
           >
             {{ range }}
           </button>
@@ -200,6 +200,13 @@ function formatSignedPct(value) {
   const num = Number(value)
   if (!Number.isFinite(num)) return '—'
   return `${num >= 0 ? '+' : ''}${num.toFixed(2)}%`
+}
+
+function selectPeriod(range) {
+  console.log('[selectPeriod] Clicked:', range, 'current:', selectedRange.value)
+  selectedRange.value = range
+  console.log('[selectPeriod] After update:', selectedRange.value)
+  loadAttribution()
 }
 
 function getPeriodStartDate(range, groupFunds = []) {
