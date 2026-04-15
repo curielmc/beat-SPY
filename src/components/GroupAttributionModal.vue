@@ -66,9 +66,7 @@
             </button>
             <span class="text-xs text-base-content/50 italic">Claude analyzes news to explain the drivers of this group's performance.</span>
           </div>
-          <div v-if="explanation" class="text-sm leading-relaxed p-3 bg-base-100 rounded-lg border border-base-300">
-            {{ explanation }}
-          </div>
+          <div v-if="explanation" class="text-sm leading-relaxed p-3 bg-base-100 rounded-lg border border-base-300 prose prose-sm max-w-none" v-html="explanation"></div>
         </div>
 
         <!-- Detail Table -->
@@ -509,7 +507,7 @@ async function explainPortfolio(rows = attributions.value) {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${session.access_token}`
       },
-      body: JSON.stringify({ tickers, changes, portfolioSummary: summary, mode: 'portfolio' })
+      body: JSON.stringify({ tickers, changes, portfolioSummary: summary, mode: 'portfolio', selectedRange: selectedRange.value })
     })
 
     const data = await res.json().catch(() => ({}))

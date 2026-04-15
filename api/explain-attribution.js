@@ -35,7 +35,7 @@ export default async function handler(req) {
   const user = await requireUser(req)
   if (!user?.id) return new Response('Unauthorized', { status: 401 })
 
-  const { tickers, changes, portfolioSummary, mode } = await req.json()
+  const { tickers, changes, portfolioSummary, mode, selectedRange } = await req.json()
   if (!Array.isArray(tickers) || tickers.length === 0 || tickers.length > 25) {
     return new Response(JSON.stringify({ error: 'Invalid tickers payload' }), { status: 400 })
   }
@@ -69,22 +69,56 @@ export default async function handler(req) {
     }
   })
 
+  const periodLabels = {
+    '1D': 'over the last day',
+    '1W': 'over the last week',
+    '1M': 'over the last month',
+    '3M': 'over the last three months',
+    '1Y': 'over the last year',
+    'All': 'since inception'
+  }
+  const periodLabel = periodLabels[selectedRange] || 'over this period'
+
   const isSingle = mode === 'stock'
   const prompt = isSingle
     ? `You are a financial educator helping high school students understand investing.
 
-A student owns ${tickers[0]} which moved ${changes[tickers[0]] >= 0 ? 'up' : 'down'} ${Math.abs(changes[tickers[0]] ?? 0).toFixed(2)}% today.
+A student owns ${tickers[0]} which moved ${changes[tickers[0]] >= 0 ? 'up' : 'down'} ${Math.abs(changes[tickers[0]] ?? 0).toFixed(2)}% ${periodLabel}.
 
 Recent news for ${tickers[0]}:${newsContext}
 
-Write 2-3 clear sentences explaining WHY this stock moved today based on the news. Use plain language a high school student would understand. Be specific. If news is limited, explain what typically drives this type of stock. End with one short investing lesson.`
+Respond with clean HTML (no outer html/body tags) containing a <div> with a one-sentence summary of why the stock moved, followed by an unordered list with up to 3 bullet points explaining the key drivers. Each bullet point should be 1 sentence without percentages. Be specific about news. End with one short investing lesson.
+
+Use this format:
+<div>
+<p><strong>Summary:</strong> One sentence explaining the movement without numbers.</p>
+<ul>
+<li>First key driver</li>
+<li>Second key driver</li>
+<li>Third key driver</li>
+</ul>
+<p><em>Lesson:</em> One sentence investment insight.</p>
+</div>`
     : `You are a financial educator helping high school students understand investing.
 
 ${portfolioSummary}
 
 Recent news for their holdings:${newsContext}
 
-Write 3-4 engaging sentences explaining what drove today's portfolio performance. Use plain language a high school student would understand. Mention specific stocks and news. Be concrete about what went up and what went down. End with one investing lesson.`
+Respond with clean HTML (no outer html/body tags) containing a <div> with a one-sentence summary of portfolio performance, followed by an unordered list with up to 5 bullet points explaining the key drivers. Each bullet point should be 1 sentence without percentages. Mention specific stocks and their role. Be concrete about what helped and what hurt, based on news.
+
+Use this format:
+<div>
+<p><strong>Summary:</strong> One sentence about overall performance without percentages.</p>
+<ul>
+<li>Most significant positive driver and why</li>
+<li>Second biggest factor</li>
+<li>Other key contributor</li>
+<li>Notable headwind</li>
+<li>One additional insight if relevant</li>
+</ul>
+<p><em>Lesson:</em> One sentence investment insight from this period.</p>
+</div>`
 
   // AI Call Logic
   let explanation = null
