@@ -95,6 +95,14 @@ Write 3-4 engaging sentences explaining what drove today's portfolio performance
 
   try {
     if (ANTHROPIC_KEY) {
+      console.log('[AI] Using Anthropic with Haiku 4.5')
+      const requestBody = {
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 400,
+        messages: [{ role: 'user', content: prompt }]
+      }
+      console.log('[AI] Request:', { model: requestBody.model, maxTokens: requestBody.max_tokens })
+
       const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
@@ -102,20 +110,22 @@ Write 3-4 engaging sentences explaining what drove today's portfolio performance
           'anthropic-version': '2023-06-01',
           'content-type': 'application/json'
         },
-        body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 400,
-          messages: [{ role: 'user', content: prompt }]
-        }),
+        body: JSON.stringify(requestBody),
         signal: controller.signal
       })
+
+      console.log('[AI] Response status:', response.status)
 
       if (response.ok) {
         const data = await response.json()
         explanation = data.content?.[0]?.text || explanation
+        console.log('[AI] Success:', explanation?.substring(0, 50))
       } else {
-        console.error('Anthropic Error:', await response.text())
+        const errorText = await response.text()
+        console.error('[AI] Anthropic Error:', response.status, errorText)
       }
+    } else {
+      console.error('[AI] No Anthropic key available')
     } else if (OPENROUTER_KEY) {
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
