@@ -311,7 +311,13 @@ async function loadAttribution() {
       market.fetchBatchProfiles(tickerList),
       ...uniqueStartDates.map(dateStr =>
         market.fetchHistoricalCloseForTickers(tickerList, dateStr).then(prices => {
-          console.log(`[Attribution] Fetched ${Object.keys(prices).length} prices for date ${dateStr}:`, Object.keys(prices).slice(0, 5))
+          const priceCount = Object.keys(prices).length
+          console.log(`[Attribution] Fetched ${priceCount} prices for date ${dateStr}`)
+          if (priceCount === 0) {
+            console.warn(`⚠️ NO HISTORICAL PRICES for ${dateStr}! This will break the calculation.`)
+          } else {
+            console.log(`Sample prices for ${dateStr}:`, Object.entries(prices).slice(0, 3).map(([k,v]) => `${k}=${v}`))
+          }
           historicalPricesByDate[dateStr] = prices || {}
         })
       )
