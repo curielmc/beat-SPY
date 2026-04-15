@@ -71,47 +71,33 @@
           </div>
         </div>
 
-        <!-- Waterfall chart -->
-        <div class="space-y-4 mb-8">
-          <h4 class="font-bold text-sm uppercase tracking-wider text-base-content/40">Contribution to Return</h4>
-          <div class="space-y-2">
-            <div v-for="a in attributions.slice(0, 10)" :key="a.ticker" class="flex items-center gap-3">
-              <div class="w-24 shrink-0">
-                <div class="font-mono font-bold text-sm leading-none">{{ a.ticker }}</div>
-                <div class="text-[10px] text-base-content/50 truncate max-w-full mt-0.5">{{ a.companyName }}</div>
-              </div>
-              <div class="flex-1 relative h-6 flex items-center bg-base-200/30 rounded overflow-hidden">
-                <div class="absolute left-1/2 w-px h-full bg-base-300 z-10"></div>
-                <div
-                  class="h-full transition-all duration-700"
-                  :class="a.contribution >= 0 ? 'bg-success ml-auto' : 'bg-error'"
-                  :style="barStyle(a.contribution)"
-                ></div>
-              </div>
-              <div class="w-16 shrink-0 text-right font-mono text-sm" :class="a.contribution >= 0 ? 'text-success' : 'text-error'">
-                {{ a.contribution >= 0 ? '+' : '' }}{{ a.contribution.toFixed(2) }}%
-              </div>
-            </div>
-            <div v-if="attributions.length > 10" class="text-center text-xs text-base-content/40 pt-1">
-              + {{ attributions.length - 10 }} more positions
-            </div>
-          </div>
-        </div>
-
         <!-- Detail Table -->
         <div class="overflow-x-auto">
           <table class="table table-xs table-zebra w-full">
             <thead>
               <tr>
-                <th>Stock</th>
-                <th>Sector</th>
-                <th class="text-right">Weight</th>
-                <th class="text-right">Stock Return</th>
-                <th class="text-right">Contribution</th>
+                <th class="cursor-pointer hover:bg-base-300" @click="toggleSort('ticker')">
+                  Stock {{ getSortIcon('ticker') }}
+                </th>
+                <th class="cursor-pointer hover:bg-base-300" @click="toggleSort('sector')">
+                  Sector {{ getSortIcon('sector') }}
+                </th>
+                <th class="cursor-pointer hover:bg-base-300 text-right" @click="toggleSort('weight')">
+                  Weight {{ getSortIcon('weight') }}
+                </th>
+                <th class="cursor-pointer hover:bg-base-300 text-right" @click="toggleSort('stockReturn')">
+                  Stock Return {{ getSortIcon('stockReturn') }}
+                </th>
+                <th class="cursor-pointer hover:bg-base-300 text-right" @click="toggleSort('contribution')">
+                  Contribution {{ getSortIcon('contribution') }}
+                </th>
+                <th class="cursor-pointer hover:bg-base-300" @click="toggleSort('funds')">
+                  Fund(s) {{ getSortIcon('funds') }}
+                </th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="a in attributions" :key="a.ticker">
+              <tr v-for="a in sortedAttributions" :key="a.ticker">
                 <td>
                   <div class="font-mono font-bold leading-none">{{ a.ticker }}</div>
                   <div class="text-[10px] text-base-content/50">{{ a.companyName }}</div>
@@ -124,6 +110,7 @@
                 <td class="text-right font-mono font-bold" :class="a.contribution >= 0 ? 'text-success' : 'text-error'">
                   {{ a.contribution >= 0 ? '+' : '' }}{{ a.contribution.toFixed(2) }}%
                 </td>
+                <td class="text-xs">{{ a.funds.join(', ') }}</td>
               </tr>
             </tbody>
           </table>
@@ -166,19 +153,43 @@ const totalReturn = ref(0)
 const spyReturn = ref(0)
 const explaining = ref(false)
 const explanation = ref('')
+const sortBy = ref('contribution')
+const sortDesc = ref(true)
 
 const topHelper = computed(() => attributions.value[0] || null)
 const topDrag = computed(() => [...attributions.value].sort((a, b) => a.contribution - b.contribution)[0] || null)
 
-const maxContrib = computed(() => Math.max(...attributions.value.map(a => Math.abs(a.contribution)), 0.1))
+const sortedAttributions = computed(() => {
+  const sorted = [...attributions.value]
+  sorted.sort((a, b) => {
+    let aVal = a[sortBy.value]
+    let bVal = b[sortBy.value]
 
-function barStyle(contribution) {
-  const pct = (Math.abs(contribution) / maxContrib.value) * 50
-  if (contribution >= 0) {
-    return { width: `${pct}%`, marginLeft: '50%' }
+    if (sortBy.value === 'funds') {
+      aVal = a.funds.join(', ')
+      bVal = b.funds.join(', ')
+    }
+
+    if (typeof aVal === 'string') {
+      return sortDesc.value ? bVal.localeCompare(aVal) : aVal.localeCompare(bVal)
+    }
+    return sortDesc.value ? bVal - aVal : aVal - bVal
+  })
+  return sorted
+})
+
+function toggleSort(col) {
+  if (sortBy.value === col) {
+    sortDesc.value = !sortDesc.value
   } else {
-    return { width: `${pct}%`, marginRight: '50%', marginLeft: 'auto' }
+    sortBy.value = col
+    sortDesc.value = true
   }
+}
+
+function getSortIcon(col) {
+  if (sortBy.value !== col) return '⇅'
+  return sortDesc.value ? '↓' : '↑'
 }
 
 function formatSignedPct(value) {
@@ -333,9 +344,10 @@ async function loadAttribution() {
         }
 
         if (!aggregateTickers[ticker]) {
-          aggregateTickers[ticker] = { weightedReturn: 0, startValue: 0 }
+          aggregateTickers[ticker] = { weightedReturn: 0, startValue: 0, funds: new Set() }
         }
-        
+
+        aggregateTickers[ticker].funds.add(analysis.fund.fundName || `Fund ${analysis.fund.fundNumber || 1}`)
         aggregateTickers[ticker].startValue += (weightInFund * fundStartValue)
         aggregateTickers[ticker].weightedReturn += (weightInFund * fundStartValue) * stockReturn
       })
@@ -349,16 +361,17 @@ async function loadAttribution() {
       const weight = totalStartValue > 0 ? (data.startValue / totalStartValue) * 100 : 0
       const contribution = totalStartValue > 0 ? (data.weightedReturn / totalStartValue) : 0
       const stockReturn = data.startValue > 0 ? (data.weightedReturn / data.startValue) : 0
-      
+
       const profile = market.profilesCache[ticker]?.data || {}
-      
-      return { 
-        ticker, 
-        weight, 
-        contribution, 
+
+      return {
+        ticker,
+        weight,
+        contribution,
         stockReturn,
         companyName: profile.companyName || profile.name || ticker,
-        sector: profile.sector || 'N/A'
+        sector: profile.sector || 'N/A',
+        funds: Array.from(data.funds || []).sort()
       }
     })
     .filter(a => Math.abs(a.contribution) > 0.001 || Math.abs(a.weight) > 0.01)
