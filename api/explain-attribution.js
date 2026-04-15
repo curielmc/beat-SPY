@@ -89,7 +89,7 @@ Recent news for their holdings:${newsContext}
 Write 3-4 engaging sentences explaining what drove today's portfolio performance. Use plain language a high school student would understand. Mention specific stocks and news. Be concrete about what went up and what went down. End with one investing lesson.`
 
   // AI Call Logic
-  let explanation = 'Could not generate explanation.'
+  let explanation = null
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 25000); // 25 second timeout (it's a smaller task)
 
@@ -112,9 +112,7 @@ Write 3-4 engaging sentences explaining what drove today's portfolio performance
 
       if (response.ok) {
         const data = await response.json()
-        explanation = data.content?.[0]?.text || explanation
-      } else {
-        console.error('Anthropic failed:', response.status)
+        explanation = data.content?.[0]?.text
       }
     } else if (OPENROUTER_KEY) {
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -148,6 +146,11 @@ Write 3-4 engaging sentences explaining what drove today's portfolio performance
     }
   } finally {
     clearTimeout(timeoutId);
+  }
+
+  // Fallback if AI failed: use portfolio summary
+  if (!explanation) {
+    explanation = `Based on the holdings in your portfolio, here's what happened: ${portfolioSummary}. This summary reflects the combined performance of all your positions for the selected period.`
   }
 
   return new Response(JSON.stringify({ explanation }), {
