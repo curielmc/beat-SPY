@@ -230,10 +230,14 @@ function getFundStartDate(fund, requestedStartDate) {
 }
 
 async function loadAttribution() {
-  if (!props.group || !props.isOpen) return
+  console.log('[loadAttribution] Starting...', { group: props.group?.name, isOpen: props.isOpen, selectedRange: selectedRange.value })
+  if (!props.group || !props.isOpen) {
+    console.log('[loadAttribution] Early return: no group or not open')
+    return
+  }
   loading.value = true
   explanation.value = ''
-  
+
   try {
     const requestedStartDate = getPeriodStartDate(selectedRange.value, props.group.funds)
     const portfolioIds = (props.group.funds || []).map(f => f.id)
@@ -479,7 +483,8 @@ watch(() => props.isOpen, (newVal) => {
   if (newVal) loadAttribution()
 })
 
-watch(selectedRange, () => {
+watch(selectedRange, (newVal, oldVal) => {
+  console.log('[watch selectedRange] Changed from', oldVal, 'to', newVal)
   loadAttribution()
 })
 </script>
