@@ -236,6 +236,31 @@ function getFundStartDate(fund, requestedStartDate) {
   return fundCreatedAt > requestedStartDate ? fundCreatedAt : requestedStartDate
 }
 
+// Fetch historical prices from daily_prices table for a specific date
+async function fetchHistoricalPricesFromDB(tickers, dateStr) {
+  try {
+    const { data, error } = await supabase
+      .from('daily_prices')
+      .select('ticker, adj_close_price')
+      .in('ticker', tickers)
+      .eq('price_date', dateStr)
+
+    if (error) {
+      console.error(`[DB] Error fetching prices for ${dateStr}:`, error)
+      return {}
+    }
+
+    const prices = {}
+    for (const row of (data || [])) {
+      prices[row.ticker] = Number(row.adj_close_price)
+    }
+    return prices
+  } catch (e) {
+    console.error(`[DB] Exception fetching prices for ${dateStr}:`, e)
+    return {}
+  }
+}
+
 async function loadAttribution() {
   console.log('[loadAttribution] Starting...', { group: props.group?.name, isOpen: props.isOpen, selectedRange: selectedRange.value })
   if (!props.group || !props.isOpen) {
@@ -266,7 +291,7 @@ async function loadAttribution() {
     portfolioIds.forEach(id => tradesByPortfolio[id] = (trades || []).filter(t => t.portfolio_id === id))
 
     const allTickers = new Set(['SPY'])
-    
+
     // For each fund, reconstruct past holdings using the later of the selected period
     // start or the fund's own inception date.
     const fundAnalysis = props.group.funds.map(fund => {
@@ -274,10 +299,10 @@ async function loadAttribution() {
       const fundTrades = tradesByPortfolio[fund.id] || []
       const currentHoldings = fund.holdings || []
       const currentCash = fund.cash_balance || 0
-      
+
       const pastHoldings = reconstructHoldingsAsOf(currentHoldings, fundTrades, fundStartDate)
       const pastCash = reconstructCashAsOf(currentCash, fundTrades, fundStartDate)
-      
+
       // Tickers: held at start + held now + traded during period
       const tradesInPeriod = fundTrades.filter(t => new Date(t.executed_at) > fundStartDate)
       const periodTickers = new Set([
@@ -285,9 +310,9 @@ async function loadAttribution() {
         ...currentHoldings.map(h => h.ticker),
         ...tradesInPeriod.map(t => t.ticker)
       ])
-      
+
       periodTickers.forEach(t => allTickers.add(t))
-      
+
       return {
         fund,
         fundStartDate,
@@ -306,11 +331,16 @@ async function loadAttribution() {
 
     console.log(`[Attribution] Fetching prices for ${tickerList.length} tickers on ${uniqueStartDates.length} dates:`, uniqueStartDates)
 
+    // Fetch current quotes and profiles from market data store
     await Promise.all([
       market.fetchBatchQuotes(tickerList),
-      market.fetchBatchProfiles(tickerList),
-      ...uniqueStartDates.map(dateStr =>
-        market.fetchHistoricalCloseForTickers(tickerList, dateStr).then(prices => {
+      market.fetchBatchProfiles(tickerList)
+    ])
+
+    // Fetch historical prices from daily_prices table for each period start date
+    await Promise.all(
+      uniqueStartDates.map(dateStr =>
+        fetchHistoricalPricesFromDB(tickerList, dateStr).then(prices => {
           const priceCount = Object.keys(prices).length
           console.log(`[Attribution] Fetched ${priceCount} prices for date ${dateStr}`)
           if (priceCount === 0) {
@@ -321,7 +351,8 @@ async function loadAttribution() {
           historicalPricesByDate[dateStr] = prices || {}
         })
       )
-    ])
+    )
+
     const currentPrices = {}
     tickerList.forEach(t => currentPrices[t] = market.getCachedPrice(t) || 0)
 

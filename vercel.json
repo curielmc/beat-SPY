@@ -21,6 +21,10 @@
     {
       "path": "/api/process-pending-orders",
       "schedule": "*/5 * * * 1-5"
+    },
+    {
+      "path": "/api/cron/fetch-daily-prices",
+      "schedule": "15 20 * * *"
     }
   ]
 }
