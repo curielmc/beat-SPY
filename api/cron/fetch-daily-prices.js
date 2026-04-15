@@ -29,18 +29,8 @@ export default async function handler(req) {
     console.log('[Cron] Starting daily prices fetch...')
 
     // 1. Find earliest trade date across all portfolios
-    const tradesRes = await fetch(`${SUPABASE_URL}/rest/v1/trades?select=executed_at&order=executed_at.asc&limit=1`, {
-      headers: {
-        apikey: SUPABASE_SERVICE_KEY,
-        Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`
-      }
-    })
+    const trades = await sbFetch(`/trades?select=executed_at&order=executed_at.asc&limit=1`)
 
-    if (!tradesRes.ok) {
-      return jsonResponse({ error: 'Failed to fetch earliest trade' }, 500)
-    }
-
-    const trades = await tradesRes.json()
     const earliestTrade = trades?.[0]
     if (!earliestTrade?.executed_at) {
       return jsonResponse({ message: 'No trades found' }, 200)
@@ -52,21 +42,8 @@ export default async function handler(req) {
     console.log(`[Cron] Fetching prices from ${fromDate} to ${toDate}`)
 
     // 2. Get all unique tickers from trades (across all classes/portfolios)
-    const tickersRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/trades?select=ticker&distinct=true`,
-      {
-        headers: {
-          apikey: SUPABASE_SERVICE_KEY,
-          Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`
-        }
-      }
-    )
+    const tickerRows = await sbFetch(`/trades?select=ticker&distinct=true`)
 
-    if (!tickersRes.ok) {
-      return jsonResponse({ error: 'Failed to fetch tickers' }, 500)
-    }
-
-    const tickerRows = await tickersRes.json()
     const tickers = (tickerRows || [])
       .map(r => r.ticker)
       .filter(Boolean)
@@ -100,25 +77,16 @@ export default async function handler(req) {
         }))
 
         // Upsert: insert or update if conflict on (ticker, price_date)
-        const upsertRes = await fetch(`${SUPABASE_URL}/rest/v1/daily_prices`, {
+        await sbFetch(`/daily_prices`, {
           method: 'POST',
           headers: {
-            apikey: SUPABASE_SERVICE_KEY,
-            Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
-            'Content-Type': 'application/json',
             Prefer: 'resolution=merge-duplicates'
           },
           body: JSON.stringify(prices)
         })
 
-        if (!upsertRes.ok) {
-          const err = await upsertRes.text()
-          console.error(`[Cron] Failed to insert prices for ${ticker}:`, err)
-          errors.push(`${ticker}: ${err}`)
-        } else {
-          totalInserted += prices.length
-          console.log(`[Cron] Inserted ${prices.length} prices for ${ticker}`)
-        }
+        totalInserted += prices.length
+        console.log(`[Cron] Inserted ${prices.length} prices for ${ticker}`)
       } catch (e) {
         console.error(`[Cron] Error processing ${ticker}:`, e)
         errors.push(`${ticker}: ${e.message}`)
