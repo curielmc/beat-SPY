@@ -482,9 +482,11 @@ async function loadAttribution() {
 }
 
 async function explainPortfolio(rows = attributions.value) {
+  console.log('[explainPortfolio] Called', { rows: rows?.length })
   explaining.value = true
   try {
     const { data: { session } } = await supabase.auth.getSession()
+    console.log('[explainPortfolio] Session:', !!session)
     if (!session) {
       explanation.value = 'Please sign in again to generate the explanation.'
       return
