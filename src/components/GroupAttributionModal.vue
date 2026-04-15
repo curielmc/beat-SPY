@@ -299,8 +299,18 @@ async function loadAttribution() {
 
     fundAnalysis.forEach(analysis => {
       const startPrices = historicalPricesByDate[analysis.fundStartDateStr] || {}
-      // Use actual fund starting capital (ground truth from DB)
-      const fundStartValue = Number(analysis.fund.startingCash || 100000)
+
+      // Calculate fund starting value from reconstructed holdings + cash at period start
+      let fundStartValue = Number(analysis.pastCash || 0)
+      analysis.pastHoldings.forEach(h => {
+        const sp = startPrices[h.ticker] || 0
+        fundStartValue += Number(h.shares || 0) * sp
+      })
+
+      // If no historical prices available (data gap), fall back to starting cash
+      if (Object.keys(startPrices).length === 0) {
+        fundStartValue = Number(analysis.fund.startingCash || 100000)
+      }
 
       let fundCurrentValue = Number(analysis.currentCash || 0)
       analysis.currentHoldings.forEach(h => {
