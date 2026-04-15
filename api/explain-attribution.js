@@ -21,11 +21,17 @@ function checkRateLimit(req) {
 
 async function requireUser(req) {
   const authHeader = req.headers.get('authorization') || ''
-  if (!authHeader.startsWith('Bearer ')) return null
+  if (!authHeader.startsWith('Bearer ')) {
+    console.error('[Auth] No Bearer token in request')
+    return null
+  }
 
   const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
   const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return null
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    console.error('[Auth] Missing Supabase config', { hasUrl: !!SUPABASE_URL, hasKey: !!SUPABASE_ANON_KEY })
+    return null
+  }
 
   const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
     headers: {
@@ -33,7 +39,10 @@ async function requireUser(req) {
       Authorization: authHeader
     }
   })
-  if (!res.ok) return null
+  if (!res.ok) {
+    console.error('[Auth] Supabase auth failed', res.status, await res.text())
+    return null
+  }
   return res.json()
 }
 
@@ -110,7 +119,7 @@ Write 3-4 engaging sentences explaining what drove today's portfolio performance
           'content-type': 'application/json'
         },
         body: JSON.stringify({
-          model: 'claude-3-5-haiku-20241022',
+          model: 'claude-haiku-4-5-20251001',
           max_tokens: 400,
           messages: [{ role: 'user', content: prompt }]
         }),
