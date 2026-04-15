@@ -42,12 +42,13 @@ export default async function handler(req) {
     console.log(`[Cron] Fetching prices from ${fromDate} to ${toDate}`)
 
     // 2. Get all unique tickers from trades (across all classes/portfolios)
-    const tickerRows = await sbFetch(`/trades?select=ticker&distinct=true`)
+    const tickerRows = await sbFetch(`/trades?select=ticker`)
 
-    const tickers = (tickerRows || [])
-      .map(r => r.ticker)
-      .filter(Boolean)
-      .filter((t, i, a) => a.indexOf(t) === i) // unique
+    const tickers = [...new Set(
+      (tickerRows || [])
+        .map(r => r.ticker)
+        .filter(Boolean)
+    )]
 
     if (!tickers.length) {
       return jsonResponse({ message: 'No tickers found' }, 200)
