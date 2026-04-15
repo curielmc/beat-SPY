@@ -101,7 +101,29 @@ Write 3-4 engaging sentences explaining what drove today's portfolio performance
   const timeoutId = setTimeout(() => controller.abort(), 25000); // 25 second timeout (it's a smaller task)
 
   try {
-    if (OPENROUTER_KEY) {
+    if (ANTHROPIC_KEY) {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': ANTHROPIC_KEY,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'claude-3-5-haiku-20241022',
+          max_tokens: 400,
+          messages: [{ role: 'user', content: prompt }]
+        }),
+        signal: controller.signal
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        explanation = data.content?.[0]?.text || explanation
+      } else {
+        console.error('Anthropic Error:', await response.text())
+      }
+    } else if (OPENROUTER_KEY) {
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -123,28 +145,6 @@ Write 3-4 engaging sentences explaining what drove today's portfolio performance
         explanation = data.choices?.[0]?.message?.content || explanation
       } else {
         console.error('OpenRouter Error:', await response.text())
-      }
-    } else if (ANTHROPIC_KEY) {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'x-api-key': ANTHROPIC_KEY,
-          'anthropic-version': '2023-06-01',
-          'content-type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: 'claude-3-5-sonnet-20240620',
-          max_tokens: 400,
-          messages: [{ role: 'user', content: prompt }]
-        }),
-        signal: controller.signal
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        explanation = data.content?.[0]?.text || explanation
-      } else {
-        console.error('Anthropic Error:', await response.text())
       }
     }
   } catch (err) {
