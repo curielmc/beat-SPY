@@ -82,6 +82,9 @@
                 <th class="cursor-pointer hover:bg-base-300" @click="toggleSort('sector')">
                   Sector {{ getSortIcon('sector') }}
                 </th>
+                <th class="cursor-pointer hover:bg-base-300 text-right" @click="toggleSort('currentValue')">
+                  Position Value {{ getSortIcon('currentValue') }}
+                </th>
                 <th class="cursor-pointer hover:bg-base-300 text-right" @click="toggleSort('weight')">
                   Weight {{ getSortIcon('weight') }}
                 </th>
@@ -103,6 +106,7 @@
                   <div class="text-[10px] text-base-content/50">{{ a.companyName }}</div>
                 </td>
                 <td class="text-[10px] opacity-70">{{ a.sector }}</td>
+                <td class="text-right font-mono text-sm">{{ a.currentValue.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }) }}</td>
                 <td class="text-right font-mono">{{ a.weight.toFixed(1) }}%</td>
                 <td class="text-right font-mono" :class="a.stockReturn >= 0 ? 'text-success' : 'text-error'">
                   {{ a.stockReturn >= 0 ? '+' : '' }}{{ a.stockReturn.toFixed(2) }}%
@@ -344,12 +348,13 @@ async function loadAttribution() {
         }
 
         if (!aggregateTickers[ticker]) {
-          aggregateTickers[ticker] = { weightedReturn: 0, startValue: 0, funds: new Set() }
+          aggregateTickers[ticker] = { weightedReturn: 0, startValue: 0, funds: new Set(), currentValue: 0 }
         }
 
         aggregateTickers[ticker].funds.add(analysis.fund.fundName || `Fund ${analysis.fund.fundNumber || 1}`)
         aggregateTickers[ticker].startValue += (weightInFund * fundStartValue)
         aggregateTickers[ticker].weightedReturn += (weightInFund * fundStartValue) * stockReturn
+        aggregateTickers[ticker].currentValue += endShares * ep
       })
     })
 
@@ -371,10 +376,11 @@ async function loadAttribution() {
         stockReturn,
         companyName: profile.companyName || profile.name || ticker,
         sector: profile.sector || 'N/A',
-        funds: Array.from(data.funds || []).sort()
+        funds: Array.from(data.funds || []).sort(),
+        currentValue: data.currentValue
       }
     })
-    .filter(a => Math.abs(a.contribution) > 0.001 || Math.abs(a.weight) > 0.01)
+    .filter(a => a.currentValue > 0)
     .sort((a, b) => b.contribution - a.contribution)
 
     attributions.value = finalAttributions
