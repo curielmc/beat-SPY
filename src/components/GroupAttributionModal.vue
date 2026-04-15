@@ -284,15 +284,8 @@ async function loadAttribution() {
 
     fundAnalysis.forEach(analysis => {
       const startPrices = historicalPricesByDate[analysis.fundStartDateStr] || {}
-      let fundStartValue = analysis.pastCash
-      analysis.pastHoldings.forEach(h => {
-        fundStartValue += h.shares * (startPrices[h.ticker] || 0)
-      })
-      
-      // If no positions were open yet, use the actual fund starting capital.
-      if (fundStartValue <= 0) {
-        fundStartValue = Number(analysis.fund.startingCash || analysis.fund.starting_cash || analysis.fund.fund_starting_cash || 100000)
-      }
+      // Use actual fund starting capital (ground truth from DB)
+      const fundStartValue = Number(analysis.fund.startingCash || 100000)
 
       let fundCurrentValue = Number(analysis.currentCash || 0)
       analysis.currentHoldings.forEach(h => {
