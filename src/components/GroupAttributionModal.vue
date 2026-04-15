@@ -59,7 +59,7 @@
         <!-- AI Explanation -->
         <div class="card bg-base-200/50 p-4 mb-6">
           <div class="flex items-center gap-3 flex-wrap mb-3">
-            <button type="button" class="btn btn-primary btn-sm gap-2" @click="explainPortfolio" :disabled="explaining">
+            <button type="button" class="btn btn-primary btn-sm gap-2" @click="explainPortfolio(attributions)" :disabled="explaining">
               <span v-if="explaining" class="loading loading-spinner loading-xs"></span>
               <span v-else>💡</span>
               {{ explaining ? 'Analyzing...' : 'Explain Performance' }}
