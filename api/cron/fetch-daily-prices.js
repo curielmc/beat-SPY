@@ -68,11 +68,16 @@ export default async function handler(req) {
         .filter(Boolean)
     )]
 
+    // Always include SPY for benchmark comparison
+    if (!tickers.includes('SPY')) {
+      tickers.push('SPY')
+    }
+
     if (!tickers.length) {
       return jsonResponse({ message: 'No tickers found' }, 200)
     }
 
-    console.log(`[Cron] Found ${tickers.length} unique tickers`)
+    console.log(`[Cron] Found ${tickers.length} unique tickers (including SPY for benchmark)`)
 
     // 3. Fetch historical prices for each ticker from FMP
     let totalInserted = 0
