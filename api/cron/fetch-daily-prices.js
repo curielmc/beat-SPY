@@ -4,18 +4,36 @@ import { SUPABASE_URL, SUPABASE_SERVICE_KEY, FMP_KEY, sbFetch, jsonResponse } fr
 
 const FMP_BASE = 'https://financialmodelingprep.com/api/v3'
 
-async function fmpHistoricalDaily(ticker, from, to) {
+async function fmpHistoricalDaily(ticker, from, to, retries = 2) {
   if (!ticker || !FMP_KEY) return []
   const url = `${FMP_BASE}/historical-price-full/${ticker}?serietype=line&from=${from}&to=${to}&apikey=${FMP_KEY}`
-  try {
-    const res = await fetch(url)
-    if (!res.ok) return []
-    const data = await res.json()
-    return data?.historical || []
-  } catch (e) {
-    console.error(`[FMP] Failed to fetch ${ticker}:`, e)
-    return []
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(url)
+      if (!res.ok) {
+        console.warn(`[FMP] ${ticker} returned status ${res.status}`)
+        return []
+      }
+      const text = await res.text()
+      if (!text || text.length === 0) {
+        console.warn(`[FMP] ${ticker} returned empty response`)
+        if (attempt < retries) {
+          await new Promise(r => setTimeout(r, 1000 * (attempt + 1)))
+          continue
+        }
+        return []
+      }
+      const data = JSON.parse(text)
+      return data?.historical || []
+    } catch (e) {
+      console.error(`[FMP] Attempt ${attempt + 1}/${retries + 1} failed for ${ticker}:`, e.message)
+      if (attempt < retries) {
+        await new Promise(r => setTimeout(r, 1000 * (attempt + 1)))
+      }
+    }
   }
+  return []
 }
 
 export default async function handler(req) {
