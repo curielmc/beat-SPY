@@ -42,21 +42,56 @@ export async function getBatchHistoricalClose(tickers, dateStr) {
   const from = new Date(target.getTime() - 7 * 86400000).toISOString().split('T')[0]
   const to = dateStr
   const csv = tickers.join(',')
-  const data = await fmpFetch(`/historical-price-full/${csv}?from=${from}&to=${to}`)
 
-  const result = {}
-  // FMP returns { historicalStockList: [...] } for multiple tickers, or { historical: [...] } for single
-  const stockList = data?.historicalStockList || [{ symbol: tickers[0], historical: data?.historical || [] }]
-  for (const stock of stockList) {
-    const hist = stock.historical || []
-    // Pick closest trading day at or before target — hist is newest-first
-    const sorted = [...hist].sort((a, b) => new Date(b.date) - new Date(a.date))
-    const match = sorted.find(d => new Date(d.date) <= target)
-    if (match) {
-      result[stock.symbol] = match.adjClose ?? match.close
+  try {
+    const data = await fmpFetch(`/historical-price-full/${csv}?from=${from}&to=${to}`)
+
+    const result = {}
+    // FMP returns { historicalStockList: [...] } for multiple tickers, or { historical: [...] } for single
+    const stockList = data?.historicalStockList || [{ symbol: tickers[0], historical: data?.historical || [] }]
+    for (const stock of stockList) {
+      const hist = stock.historical || []
+      // Pick closest trading day at or before target — hist is newest-first
+      const sorted = [...hist].sort((a, b) => new Date(b.date) - new Date(a.date))
+      const match = sorted.find(d => new Date(d.date) <= target)
+      if (match) {
+        result[stock.symbol] = match.adjClose ?? match.close
+      }
     }
+
+    // For any tickers that didn't get prices, try fetching individually
+    const missingTickers = tickers.filter(t => result[t] === undefined)
+    if (missingTickers.length > 0) {
+      console.log(`[FMP] ${missingTickers.length} tickers missing from batch call, fetching individually:`, missingTickers)
+      const individualResults = await Promise.all(
+        missingTickers.map(ticker =>
+          fmpFetch(`/historical-price-full/${ticker}?from=${from}&to=${to}`)
+            .then(data => {
+              const hist = data?.historical || []
+              const sorted = [...hist].sort((a, b) => new Date(b.date) - new Date(a.date))
+              const match = sorted.find(d => new Date(d.date) <= target)
+              if (match) {
+                return { [ticker]: match.adjClose ?? match.close }
+              }
+              return {}
+            })
+            .catch(err => {
+              console.error(`[FMP] Failed to fetch ${ticker}:`, err)
+              return {}
+            })
+        )
+      )
+      // Merge individual results
+      for (const indResult of individualResults) {
+        Object.assign(result, indResult)
+      }
+    }
+
+    return result
+  } catch (e) {
+    console.error('Failed to fetch historical closes:', e)
+    return {}
   }
-  return result
 }
 
 export async function getBatchProfiles(tickers) {
