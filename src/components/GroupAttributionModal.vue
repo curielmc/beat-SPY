@@ -327,6 +327,8 @@ async function loadAttribution() {
         fundStartValue = Number(analysis.fund.startingCash || 100000)
       }
 
+      console.log(`Fund ${analysis.fund.fundName || 'unknown'}: startDate=${analysis.fundStartDateStr}, historicalPricesAvailable=${Object.keys(startPrices).length}, fundStartValue=${fundStartValue}, pastCash=${analysis.pastCash}, pastHoldings=${analysis.pastHoldings.length}`)
+
       let fundCurrentValue = Number(analysis.currentCash || 0)
       analysis.currentHoldings.forEach(h => {
         fundCurrentValue += Number(h.shares || 0) * Number(currentPrices[h.ticker] || 0)
