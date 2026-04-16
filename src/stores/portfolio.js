@@ -754,7 +754,7 @@ export const usePortfolioStore = defineStore('portfolio', () => {
     if (!groupId) return []
     const { data, error } = await supabase
       .from('portfolios')
-      .select('id, fund_name, fund_number, fund_thesis, cash_balance, starting_cash, fund_starting_cash, status, created_at, visibility, share_holdings')
+      .select('id, fund_name, fund_number, fund_thesis, cash_balance, starting_cash, fund_starting_cash, status, created_at, visibility, share_holdings, holdings(*)')
       .eq('owner_type', 'group')
       .eq('owner_id', groupId)
       .or('status.eq.active,status.is.null')
