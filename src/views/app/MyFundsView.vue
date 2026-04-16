@@ -462,7 +462,8 @@ function openAttributionModal(fund) {
   selectedGroupForAttribution.value = {
     id: fund.id,
     name: fund.fund_name || `Fund ${fund.fund_number || 1}`,
-    benchmark_ticker: fund.benchmark_ticker || 'SPY'
+    benchmark_ticker: fund.benchmark_ticker || 'SPY',
+    funds: [fund]
   }
   attributionModalOpen.value = true
 }
