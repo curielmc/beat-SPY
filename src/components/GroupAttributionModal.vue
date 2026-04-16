@@ -40,19 +40,26 @@
           <div class="card bg-success/10 border border-success/20 p-4 text-center">
             <div class="text-xs text-base-content/60 mb-1">Biggest Help</div>
             <div class="font-mono font-bold text-lg text-success">{{ topHelper?.ticker || '—' }}</div>
-            <div class="text-success font-semibold">{{ formatSignedPct(topHelper?.contribution) }}</div>
+            <div class="text-success font-semibold">{{ formatSignedPct(topHelper?.stockReturn) }}</div>
           </div>
           <div class="card bg-base-100 border border-base-300 p-4 text-center">
-            <div class="text-xs text-base-content/60 mb-1">Total Return ({{ selectedRange }})</div>
-            <div class="text-2xl font-bold" :class="totalReturn >= 0 ? 'text-success' : 'text-error'">
+            <div class="text-xs text-base-content/60 mb-1">Your Return ({{ selectedRange }})</div>
+            <div class="text-3xl font-bold" :class="totalReturn >= 0 ? 'text-success' : 'text-error'">
               {{ totalReturn >= 0 ? '+' : '' }}{{ totalReturn.toFixed(2) }}%
             </div>
-            <div class="text-xs text-base-content/40">vs SPY {{ spyReturn >= 0 ? '+' : '' }}{{ spyReturn.toFixed(2) }}%</div>
+            <div class="mt-2 flex items-center justify-center gap-2">
+              <span :class="isBeating ? 'badge badge-success' : 'badge badge-warning'">
+                {{ isBeating ? '✓ Beating' : '⚠ Trailing' }}
+              </span>
+            </div>
+            <div class="text-sm font-semibold mt-2" :class="spyReturn >= 0 ? 'text-success' : 'text-error'">
+              vs SPY: {{ spyReturn >= 0 ? '+' : '' }}{{ spyReturn.toFixed(2) }}%
+            </div>
           </div>
           <div class="card bg-error/10 border border-error/20 p-4 text-center">
             <div class="text-xs text-base-content/60 mb-1">Biggest Drag</div>
             <div class="font-mono font-bold text-lg text-error">{{ topDrag?.ticker || '—' }}</div>
-            <div class="text-error font-semibold">{{ formatSignedPct(topDrag?.contribution) }}</div>
+            <div class="text-error font-semibold">{{ formatSignedPct(topDrag?.stockReturn) }}</div>
           </div>
         </div>
 
@@ -160,6 +167,7 @@ const sortDesc = ref(true)
 
 const topHelper = computed(() => attributions.value[0] || null)
 const topDrag = computed(() => [...attributions.value].sort((a, b) => a.contribution - b.contribution)[0] || null)
+const isBeating = computed(() => totalReturn.value > spyReturn.value)
 
 const sortedAttributions = computed(() => {
   const sorted = [...attributions.value]
