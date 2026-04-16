@@ -33,7 +33,7 @@
     <!-- Funds overview table -->
     <div v-if="groupEnriched.length > 0" class="card bg-base-100 shadow">
       <div class="card-body p-4">
-        <div class="flex items-center justify-between mb-2">
+        <div class="flex items-center justify-between mb-4">
           <h3 class="font-semibold flex items-center gap-2">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
             Fund Summary
@@ -45,87 +45,123 @@
             <thead>
               <tr>
                 <th>Fund</th>
-                <th>Type</th>
-                <th class="text-right">Starting</th>
-                <th class="text-right">Current</th>
                 <th class="text-right">Return</th>
-                <th class="text-right">vs Benchmark</th>
+                <th class="text-right">vs SPY</th>
+                <th class="text-right">Current Value</th>
+                <th class="text-center gap-1">Actions</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="fund in groupEnriched" :key="fund.id">
-                <td class="font-semibold">
-                  <div class="flex items-start justify-between gap-3">
-                    <div class="min-w-0">
-                      <div>{{ fund.fund_name || 'Fund ' + (fund.fund_number || 1) }}</div>
-                      <div class="text-xs text-base-content/45">{{ fund.fund_thesis || 'Group fund' }}</div>
-                    </div>
-                    <button
-                      class="btn btn-xs shrink-0"
-                      :class="selectedFundId === fund.id ? 'btn-secondary' : 'btn-outline'"
-                      @click="toggleFund(fund)"
-                    >
-                      {{ selectedFundId === fund.id ? 'Hide' : 'Open' }}
-                    </button>
+                <td>
+                  <div>
+                    <div class="font-semibold">{{ fund.fund_name || 'Fund ' + (fund.fund_number || 1) }}</div>
+                    <div class="text-xs text-base-content/50">{{ fund.fund_thesis || 'Group fund' }}</div>
                   </div>
                 </td>
-                <td><span class="badge badge-xs badge-secondary">Fund {{ fund.fund_number || 1 }}</span></td>
-                <td class="text-right font-mono">${{ Number(fund.starting_cash || 100000).toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</td>
-                <td class="text-right font-mono">${{ fund._totalValue.toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</td>
-                <td class="text-right font-mono" :class="fund._returnPct >= 0 ? 'text-success' : 'text-error'">
-                  {{ fund._returnPct >= 0 ? '+' : '' }}{{ fund._returnPct.toFixed(2) }}%
+                <td class="text-right">
+                  <div class="font-semibold" :class="fund._returnPct >= 0 ? 'text-success' : 'text-error'">
+                    {{ fund._returnPct >= 0 ? '+' : '' }}{{ fund._returnPct.toFixed(2) }}%
+                  </div>
                 </td>
-                <td class="text-right font-mono" :class="fund._vsSpy >= 0 ? 'text-success' : 'text-error'">
-                  {{ fund._vsSpy >= 0 ? '+' : '' }}{{ fund._vsSpy.toFixed(2) }}%
+                <td class="text-right">
+                  <div class="flex items-center justify-end gap-2">
+                    <span :class="fund._vsSpy >= 0 ? 'badge badge-sm badge-success' : 'badge badge-sm badge-warning'">
+                      {{ fund._vsSpy >= 0 ? '✓' : '⚠' }}
+                    </span>
+                    <span class="font-mono font-semibold" :class="fund._vsSpy >= 0 ? 'text-success' : 'text-error'">
+                      {{ fund._vsSpy >= 0 ? '+' : '' }}{{ fund._vsSpy.toFixed(2) }}%
+                    </span>
+                  </div>
+                </td>
+                <td class="text-right font-mono">${{ fund._totalValue.toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</td>
+                <td class="text-center">
+                  <div class="flex items-center justify-center gap-2">
+                    <button
+                      class="btn btn-xs gap-1"
+                      :class="selectedFundId === fund.id ? 'btn-secondary' : 'btn-outline'"
+                      @click="toggleFund(fund)"
+                      title="View holdings"
+                    >
+                      <svg v-if="selectedFundId !== fund.id" xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z" /><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd" /></svg>
+                      <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3.707 2.293a1 1 0 00-1.414 1.414l14 14a1 1 0 001.414-1.414l-14-14zM2 10a4 4 0 118 0 4 4 0 01-8 0zm11.378-7.378a1 1 0 011.414 1.414l-.5.5a1 1 0 01-1.414-1.414l.5-.5z" clip-rule="evenodd" /></svg>
+                    </button>
+                    <button
+                      class="btn btn-xs btn-ghost gap-1"
+                      @click="openAttributionModal(fund)"
+                      title="Explain performance"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" /><path fill-rule="evenodd" d="M4 5a2 2 0 012-2 1 1 0 000 2H5a1 1 0 00-1 1v12a1 1 0 001 1h10a1 1 0 001-1V6a1 1 0 00-1-1h-1a1 1 0 000-2h2a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm7 4a1 1 0 11-2 0 1 1 0 012 0z" clip-rule="evenodd" /></svg>
+                      Explain
+                    </button>
+                  </div>
                 </td>
               </tr>
             </tbody>
           </table>
         </div>
         <div class="space-y-3 md:hidden">
-          <div v-for="fund in groupEnriched" :key="`mobile-${fund.id}`" class="rounded-2xl border border-base-300 bg-base-200/30 p-4">
+          <div v-for="fund in groupEnriched" :key="`mobile-${fund.id}`" class="rounded-xl border border-base-300 bg-base-200/30 p-4 space-y-3">
             <div class="flex items-start justify-between gap-3">
               <div class="min-w-0">
                 <div class="font-semibold">{{ fund.fund_name || 'Fund ' + (fund.fund_number || 1) }}</div>
                 <div class="text-xs text-base-content/50">{{ fund.fund_thesis || 'Group fund' }}</div>
               </div>
-              <button
-                class="btn btn-xs shrink-0"
-                :class="selectedFundId === fund.id ? 'btn-secondary' : 'btn-outline'"
-                @click="toggleFund(fund)"
-              >
-                {{ selectedFundId === fund.id ? 'Hide' : 'Open' }}
-              </button>
             </div>
-            <div class="mt-2">
-              <span class="badge badge-secondary badge-sm whitespace-nowrap">Fund {{ fund.fund_number || 1 }}</span>
-            </div>
-            <div class="mt-4 grid grid-cols-2 gap-3 text-sm">
-              <div>
-                <div class="text-xs uppercase tracking-wide text-base-content/45">Starting</div>
-                <div class="mt-1 font-mono">${{ Number(fund.starting_cash || 100000).toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</div>
-              </div>
-              <div>
-                <div class="text-xs uppercase tracking-wide text-base-content/45">Current</div>
-                <div class="mt-1 font-mono">${{ fund._totalValue.toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</div>
-              </div>
-              <div>
-                <div class="text-xs uppercase tracking-wide text-base-content/45">Return</div>
-                <div class="mt-1 font-mono" :class="fund._returnPct >= 0 ? 'text-success' : 'text-error'">
+
+            <div class="grid grid-cols-3 gap-3">
+              <div class="rounded-lg bg-base-100/50 p-2.5 text-center">
+                <div class="text-xs uppercase tracking-wide text-base-content/45 mb-1">Return</div>
+                <div class="font-semibold text-sm" :class="fund._returnPct >= 0 ? 'text-success' : 'text-error'">
                   {{ fund._returnPct >= 0 ? '+' : '' }}{{ fund._returnPct.toFixed(2) }}%
                 </div>
               </div>
-              <div>
-                <div class="text-xs uppercase tracking-wide text-base-content/45">vs Benchmark</div>
-                <div class="mt-1 font-mono" :class="fund._vsSpy >= 0 ? 'text-success' : 'text-error'">
-                  {{ fund._vsSpy >= 0 ? '+' : '' }}{{ fund._vsSpy.toFixed(2) }}%
+              <div class="rounded-lg bg-base-100/50 p-2.5 text-center">
+                <div class="text-xs uppercase tracking-wide text-base-content/45 mb-1">vs SPY</div>
+                <div class="flex flex-col items-center gap-1">
+                  <span :class="fund._vsSpy >= 0 ? 'badge badge-xs badge-success' : 'badge badge-xs badge-warning'">
+                    {{ fund._vsSpy >= 0 ? '✓' : '⚠' }}
+                  </span>
+                  <span class="font-semibold text-xs" :class="fund._vsSpy >= 0 ? 'text-success' : 'text-error'">
+                    {{ fund._vsSpy >= 0 ? '+' : '' }}{{ fund._vsSpy.toFixed(2) }}%
+                  </span>
                 </div>
               </div>
+              <div class="rounded-lg bg-base-100/50 p-2.5 text-center">
+                <div class="text-xs uppercase tracking-wide text-base-content/45 mb-1">Value</div>
+                <div class="font-mono font-semibold text-xs">${{ (fund._totalValue / 1000).toFixed(0) }}k</div>
+              </div>
+            </div>
+
+            <div class="flex gap-2">
+              <button
+                class="btn btn-sm flex-1 gap-1"
+                :class="selectedFundId === fund.id ? 'btn-secondary' : 'btn-outline'"
+                @click="toggleFund(fund)"
+              >
+                <svg v-if="selectedFundId !== fund.id" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z" /><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd" /></svg>
+                <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3.707 2.293a1 1 0 00-1.414 1.414l14 14a1 1 0 001.414-1.414l-14-14zM2 10a4 4 0 118 0 4 4 0 01-8 0zm11.378-7.378a1 1 0 011.414 1.414l-.5.5a1 1 0 01-1.414-1.414l.5-.5z" clip-rule="evenodd" /></svg>
+                {{ selectedFundId === fund.id ? 'Hide Holdings' : 'View Holdings' }}
+              </button>
+              <button
+                class="btn btn-sm btn-ghost flex-1 gap-1"
+                @click="openAttributionModal(fund)"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" /><path fill-rule="evenodd" d="M4 5a2 2 0 012-2 1 1 0 000 2H5a1 1 0 00-1 1v12a1 1 0 001 1h10a1 1 0 001-1V6a1 1 0 00-1-1h-1a1 1 0 000-2h2a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm7 4a1 1 0 11-2 0 1 1 0 012 0z" clip-rule="evenodd" /></svg>
+                Explain
+              </button>
             </div>
           </div>
         </div>
       </div>
     </div>
+
+    <!-- Attribution Modal -->
+    <GroupAttributionModal
+      :isOpen="attributionModalOpen"
+      :group="selectedGroupForAttribution"
+      @close="attributionModalOpen = false"
+    />
 
     <div v-if="selectedFundCard" class="card bg-base-100 shadow">
       <div class="card-body p-4 space-y-4">
@@ -344,6 +380,7 @@ import { useAuthStore } from '../../stores/auth'
 import { useMarketDataStore } from '../../stores/marketData'
 import PortfolioLineChart from '../../components/charts/PortfolioLineChart.vue'
 import SectorLabel from '../../components/SectorLabel.vue'
+import GroupAttributionModal from '../../components/GroupAttributionModal.vue'
 import { supabase } from '../../lib/supabase'
 import { getHistoricalDaily } from '../../services/fmpApi'
 import { reconstructHoldingsAsOf, reconstructCashAsOf } from '../../utils/leaderboardMetrics'
@@ -360,6 +397,8 @@ const groupName = ref('')
 const selectedFundId = ref(null)
 const selectedFundLoading = ref(false)
 const selectedFundDetails = ref(null)
+const attributionModalOpen = ref(false)
+const selectedGroupForAttribution = ref(null)
 
 const selectedFundCard = computed(() =>
   groupEnriched.value.find(fund => fund.id === selectedFundId.value) || null
@@ -417,6 +456,15 @@ function toggleFund(fund) {
 
   selectedFundId.value = fund.id
   loadSelectedFundDetails(fund)
+}
+
+function openAttributionModal(fund) {
+  selectedGroupForAttribution.value = {
+    id: fund.id,
+    name: fund.fund_name || `Fund ${fund.fund_number || 1}`,
+    benchmark_ticker: fund.benchmark_ticker || 'SPY'
+  }
+  attributionModalOpen.value = true
 }
 
 async function loadSelectedFundDetails(fund) {
