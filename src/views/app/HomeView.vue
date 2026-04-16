@@ -62,6 +62,13 @@
     <form method="dialog" class="modal-backdrop" @click="dismissBonus"><button>close</button></form>
   </dialog>
 
+  <!-- Attribution Modal -->
+  <GroupAttributionModal
+    :isOpen="attributionModalOpen"
+    :group="selectedGroupForAttribution"
+    @close="attributionModalOpen = false"
+  />
+
   <div v-if="!loading && membership?.group_id" class="space-y-4">
     <div v-if="isTeacherRoute" class="card border border-primary/20 bg-primary/5 shadow-sm">
       <div class="card-body p-4">
@@ -394,13 +401,24 @@
       </div>
       <div class="card bg-base-100 shadow">
         <div class="card-body p-3">
-          <p class="text-xs text-base-content/60">vs S&P 500 ({{ portfolioStore.benchmarkTicker }} proxy)</p>
-          <p class="text-xl font-bold" :class="vsSP500 >= 0 ? 'text-success' : 'text-error'">
-            {{ vsSP500 >= 0 ? '+' : '' }}{{ vsSP500.toFixed(2) }}%
-          </p>
-          <p class="text-xs text-base-content/50">
-            {{ portfolioStore.isBeatingSP500 ? 'Beating the market' : 'Behind the market' }}
-          </p>
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <p class="text-xs text-base-content/60">vs S&P 500 ({{ portfolioStore.benchmarkTicker }} proxy)</p>
+              <p class="text-xl font-bold" :class="vsSP500 >= 0 ? 'text-success' : 'text-error'">
+                {{ vsSP500 >= 0 ? '+' : '' }}{{ vsSP500.toFixed(2) }}%
+              </p>
+              <p class="text-xs text-base-content/50">
+                {{ portfolioStore.isBeatingSP500 ? 'Beating the market' : 'Behind the market' }}
+              </p>
+            </div>
+            <button
+              class="btn btn-xs btn-ghost gap-1 mt-1"
+              @click="openAttributionModal()"
+              title="Explain performance"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" /><path fill-rule="evenodd" d="M4 5a2 2 0 012-2 1 1 0 000 2H5a1 1 0 00-1 1v12a1 1 0 001 1h10a1 1 0 001-1V6a1 1 0 00-1-1h-1a1 1 0 000-2h2a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm7 4a1 1 0 11-2 0 1 1 0 012 0z" clip-rule="evenodd" /></svg>
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -853,6 +871,7 @@ import PortfolioLineChart from '../../components/charts/PortfolioLineChart.vue'
 import PortfolioPieChart from '../../components/charts/PortfolioPieChart.vue'
 import SectorLabel from '../../components/SectorLabel.vue'
 import TimeRangeSelector from '../../components/charts/TimeRangeSelector.vue'
+import GroupAttributionModal from '../../components/GroupAttributionModal.vue'
 import { isMarketOpen } from '../../utils/marketHours'
 
 const route = useRoute()
@@ -924,6 +943,10 @@ const showSellAllModal = ref(false)
 const sellingAll = ref(false)
 const sellAllRationale = ref('')
 const sellAllError = ref('')
+
+// Attribution modal state
+const attributionModalOpen = ref(false)
+const selectedGroupForAttribution = ref(null)
 
 function stockDetailLocation(ticker, query = {}) {
   if (isTeacherRoute.value) {
@@ -1652,6 +1675,25 @@ async function dismissBonus() {
     }
   }
 }
+
+function openAttributionModal() {
+  const portfolio = portfolioStore.portfolio
+  if (!portfolio) return
+
+  selectedGroupForAttribution.value = {
+    id: portfolio.id,
+    name: portfolio.name || 'My Investments',
+    benchmark_ticker: portfolioStore.benchmarkTicker || 'SPY',
+    funds: [{
+      id: portfolio.id,
+      holdings: portfolioStore.holdings,
+      cash_balance: portfolioStore.cashBalance,
+      created_at: portfolio.created_at
+    }]
+  }
+  attributionModalOpen.value = true
+}
+
 onUnmounted(() => {
   if (refreshInterval) clearInterval(refreshInterval)
 })
