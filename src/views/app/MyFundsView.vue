@@ -163,7 +163,8 @@
       @close="attributionModalOpen = false"
     />
 
-    <div v-if="selectedFundCard" class="card bg-base-100 shadow">
+    <Transition name="slide-right" mode="out-in">
+      <div v-if="selectedFundCard" class="card bg-base-100 shadow">
       <div class="card-body p-4 space-y-4">
         <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
@@ -307,7 +308,8 @@
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </Transition>
 
     <!-- All Funds Comparison Chart -->
     <div v-if="comparisonDatasets.length > 0" class="card bg-base-100 shadow">
@@ -776,3 +778,20 @@ function generateSyntheticHistory(startDate, endDate, startValue, endValue, seed
   return points
 }
 </script>
+
+<style scoped>
+.slide-right-enter-active,
+.slide-right-leave-active {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.slide-right-enter-from {
+  opacity: 0;
+  transform: translateX(100%);
+}
+
+.slide-right-leave-to {
+  opacity: 0;
+  transform: translateX(-100%);
+}
+</style>
