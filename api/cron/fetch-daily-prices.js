@@ -124,7 +124,11 @@ export default async function handler(req) {
         await sbFetch(`/daily_prices?on_conflict=ticker,price_date`, {
           method: 'POST',
           headers: {
-            Prefer: 'resolution=merge-duplicates'
+            // return=minimal makes PostgREST respond 201 with no body, which
+            // avoids sbFetch's res.json() choking on an empty 201 body and
+            // reporting a misleading "Unexpected end of JSON input" after the
+            // upsert has already succeeded.
+            Prefer: 'resolution=merge-duplicates,return=minimal'
           },
           body: JSON.stringify(allPrices)
         })
