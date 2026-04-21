@@ -110,6 +110,14 @@ export default async function handler(req) {
       `/holdings?portfolio_id=in.(${portfolioIdFilter})&select=portfolio_id,ticker,shares,avg_cost`
     )
 
+    // 4b. Get the set of portfolios that have ever had a trade (used to detect
+    //     students who invested at some point, even if they've since gone back
+    //     to cash).
+    const tradeRows = await sbFetch(
+      `/trades?portfolio_id=in.(${portfolioIdFilter})&select=portfolio_id`
+    )
+    const tradedPortfolioIds = new Set((tradeRows || []).map(t => t.portfolio_id))
+
     // 5. Fetch current market prices for all tickers (include SPY for benchmark)
     const allTickers = [...new Set([
       ...(holdings || []).map(h => h.ticker).filter(Boolean),
@@ -260,8 +268,12 @@ export default async function handler(req) {
       const userPortfolios = portfolioPerformance.filter(p => p.owner_id === userId && p.owner_type === 'user')
       if (!userPortfolios.length) continue
 
-      // Only include students who have actually invested (have at least one holding)
-      const hasInvested = userPortfolios.some(p => (holdingsByPortfolio[p.id] || []).length > 0)
+      // Only include students who have ever invested — either they currently
+      // hold something or they executed a trade at some point (e.g. bought
+      // and later sold back to cash).
+      const hasInvested = userPortfolios.some(p =>
+        tradedPortfolioIds.has(p.id) || (holdingsByPortfolio[p.id] || []).length > 0
+      )
       if (!hasInvested) continue
 
       let totalValue = 0
