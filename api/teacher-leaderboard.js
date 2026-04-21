@@ -97,6 +97,7 @@ export default async function handler(req) {
           cash: 0,
           fundCount: 0
         })),
+        individuals: [],
         stats: { pctStudentsBeating: 0, pctGroupsBeating: 0, pctFundsBeating: 0, studentsBeating: 0, studentsTotal: 0, groupsBeating: 0, groupsTotal: 0, fundsBeating: 0, fundsTotal: 0, maxAlpha: 0, minAlpha: 0, avgAlpha: 0, aggregateBenchmarkReturnPct: 0 }
       })
     }
@@ -241,6 +242,76 @@ export default async function handler(req) {
       }
     })
 
+    // Build per-student (individual) aggregation
+    const studentInfoById = new Map()
+    const groupNamesById = new Map(groups.map(g => [g.id, g.name]))
+    for (const m of (memberships || [])) {
+      if (!m.user_id) continue
+      if (!studentInfoById.has(m.user_id)) {
+        studentInfoById.set(m.user_id, {
+          name: m.profiles?.full_name || 'Student',
+          groupName: m.group_id ? (groupNamesById.get(m.group_id) || null) : null
+        })
+      }
+    }
+
+    const individualResults = []
+    for (const [userId, info] of studentInfoById.entries()) {
+      const userPortfolios = portfolioPerformance.filter(p => p.owner_id === userId && p.owner_type === 'user')
+      if (!userPortfolios.length) continue
+
+      let totalValue = 0
+      let totalStartingCash = 0
+      let totalCash = 0
+      let aggregateBenchmarkValue = 0
+
+      const funds = userPortfolios.map(p => {
+        totalValue += p.totalValue
+        totalStartingCash += p.startingCash
+        totalCash += p.cash
+        aggregateBenchmarkValue += p.startingCash * (1 + (p.benchmarkReturnPct || 0) / 100)
+
+        return {
+          id: p.id,
+          fundName: p.fund_name || `Fund ${p.fund_number || 1}`,
+          fundNumber: p.fund_number || 1,
+          created_at: p.created_at,
+          returnPct: Math.round(p.returnPct * 100) / 100,
+          benchmarkReturnPct: Math.round((p.benchmarkReturnPct || 0) * 100) / 100,
+          isBeatingSP500: p.isBeatingSP500,
+          alpha: Math.round(p.alpha * 100) / 100,
+          totalValue: Math.round(p.totalValue * 100) / 100,
+          startingCash: Math.round(p.startingCash * 100) / 100,
+          holdings: holdingsByPortfolio[p.id] || [],
+          cash_balance: p.cash
+        }
+      }).sort((a, b) => (a.fundNumber || 1) - (b.fundNumber || 1))
+
+      const returnPct = totalStartingCash > 0
+        ? ((totalValue - totalStartingCash) / totalStartingCash) * 100
+        : 0
+      const studentBenchmarkReturnPct = totalStartingCash > 0
+        ? ((aggregateBenchmarkValue - totalStartingCash) / totalStartingCash) * 100
+        : 0
+      const alpha = returnPct - studentBenchmarkReturnPct
+
+      individualResults.push({
+        id: userId,
+        name: info.name,
+        groupName: info.groupName,
+        totalValue: Math.round(totalValue * 100) / 100,
+        startingCash: Math.round(totalStartingCash * 100) / 100,
+        returnPct: Math.round(returnPct * 100) / 100,
+        benchmarkReturnPct: Math.round(studentBenchmarkReturnPct * 100) / 100,
+        isBeatingSP500: returnPct > studentBenchmarkReturnPct,
+        alpha: Math.round(alpha * 100) / 100,
+        cash: Math.round(totalCash * 100) / 100,
+        fundCount: userPortfolios.length,
+        funds
+      })
+    }
+    individualResults.sort((a, b) => b.returnPct - a.returnPct)
+
     // Calculate Summary Stats
     const studentPerf = portfolioPerformance.filter(p => p.owner_type === 'user')
     const groupPerf = groupResults
@@ -280,7 +351,7 @@ export default async function handler(req) {
     // Sort by return % descending
     groupResults.sort((a, b) => b.returnPct - a.returnPct)
 
-    const res = jsonResponse({ groups: groupResults, stats })
+    const res = jsonResponse({ groups: groupResults, individuals: individualResults, stats })
     res.headers.set('X-Debug-Portfolios', allPortfolios.length.toString())
     res.headers.set('X-Debug-Groups', (groupPortfolios || []).length.toString())
     res.headers.set('X-Debug-Students', (studentPortfolios || []).length.toString())

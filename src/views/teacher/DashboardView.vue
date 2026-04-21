@@ -158,6 +158,7 @@
         <div class="card-body p-5 xl:p-6">
           <div class="tabs tabs-bordered mb-4">
             <a class="tab" :class="{ 'tab-active': activeTab === 'leaderboard' }" @click="activeTab = 'leaderboard'">Group Leaderboard</a>
+            <a class="tab" :class="{ 'tab-active': activeTab === 'individuals' }" @click="activeTab = 'individuals'">Individual Leaderboard</a>
             <a class="tab" :class="{ 'tab-active': activeTab === 'benchmark' }" @click="activeTab = 'benchmark'">vs S&P 500</a>
           </div>
 
@@ -209,6 +210,53 @@
                   </tr>
                   <tr v-if="leaderboardGroups.length === 0">
                     <td colspan="8" class="text-center text-base-content/50 py-8">No groups yet</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </template>
+
+          <!-- Individual Leaderboard Tab -->
+          <template v-else-if="activeTab === 'individuals'">
+            <p class="text-xs text-base-content/50 mb-3">Each student's total assets under management and since-inception return from their individual portfolios.</p>
+            <div class="overflow-x-auto">
+              <table class="table w-full">
+                <thead>
+                  <tr>
+                    <th class="w-12">Rank</th>
+                    <th>Student</th>
+                    <th>Group</th>
+                    <th class="text-right">Funds</th>
+                    <th class="text-right">AUM</th>
+                    <th class="text-right">Cash</th>
+                    <th class="text-right">Return</th>
+                    <th class="text-center">Explain</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(student, i) in leaderboardIndividuals" :key="student.id" class="hover">
+                    <td>
+                      <span class="badge badge-lg" :class="i === 0 ? 'badge-warning' : 'badge-ghost'">{{ i + 1 }}</span>
+                    </td>
+                    <td class="font-semibold">{{ student.name }}</td>
+                    <td>
+                      <span v-if="student.groupName" class="badge badge-sm badge-outline whitespace-nowrap">{{ student.groupName }}</span>
+                      <span v-else class="text-xs text-base-content/40">—</span>
+                    </td>
+                    <td class="text-right text-sm text-base-content/60">{{ student.fundCount }}</td>
+                    <td class="text-right font-mono text-sm font-semibold">${{ formatMoney(student.totalValue) }}</td>
+                    <td class="text-right font-mono text-sm text-base-content/60">${{ formatMoney(student.cash) }}</td>
+                    <td class="text-right font-mono text-sm font-semibold" :class="student.returnPct >= 0 ? 'text-success' : 'text-error'">
+                      {{ student.returnPct >= 0 ? '+' : '' }}{{ student.returnPct.toFixed(2) }}%
+                    </td>
+                    <td class="text-center">
+                      <button type="button" class="btn btn-ghost btn-xs text-[10px] text-primary" @click="openAttributionModal(student)">
+                        Explain
+                      </button>
+                    </td>
+                  </tr>
+                  <tr v-if="leaderboardIndividuals.length === 0">
+                    <td colspan="8" class="text-center text-base-content/50 py-8">No individual portfolios yet</td>
                   </tr>
                 </tbody>
               </table>
@@ -781,6 +829,7 @@ const teacher = useTeacherStore()
 const loading = ref(true)
 const rankedGroups = ref([])
 const leaderboardGroups = ref([])
+const leaderboardIndividuals = ref([])
 const leaderboardStats = ref({ pctStudentsBeating: 0, pctGroupsBeating: 0, pctFundsBeating: 0, studentsBeating: 0, studentsTotal: 0, groupsBeating: 0, groupsTotal: 0, fundsBeating: 0, fundsTotal: 0, maxAlpha: 0, minAlpha: 0, avgAlpha: 0, aggregateBenchmarkReturnPct: 0 })
 const leaderboardLoading = ref(false)
 const leaderboardError = ref('')
@@ -1349,6 +1398,7 @@ async function loadDashboard() {
       const data = await res.json().catch(() => ({}))
       if (res.ok && data.groups) {
         leaderboardGroups.value = data.groups
+        leaderboardIndividuals.value = data.individuals || []
         if (data.stats) leaderboardStats.value = data.stats
       } else {
         leaderboardError.value = data.error || 'Failed to load leaderboard'
