@@ -260,6 +260,10 @@ export default async function handler(req) {
       const userPortfolios = portfolioPerformance.filter(p => p.owner_id === userId && p.owner_type === 'user')
       if (!userPortfolios.length) continue
 
+      // Only include students who have actually invested (have at least one holding)
+      const hasInvested = userPortfolios.some(p => (holdingsByPortfolio[p.id] || []).length > 0)
+      if (!hasInvested) continue
+
       let totalValue = 0
       let totalStartingCash = 0
       let totalCash = 0

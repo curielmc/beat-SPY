@@ -157,8 +157,8 @@
       <div class="card bg-base-100 shadow border border-base-200">
         <div class="card-body p-5 xl:p-6">
           <div class="tabs tabs-bordered mb-4">
-            <a class="tab" :class="{ 'tab-active': activeTab === 'leaderboard' }" @click="activeTab = 'leaderboard'">Group Leaderboard</a>
             <a class="tab" :class="{ 'tab-active': activeTab === 'individuals' }" @click="activeTab = 'individuals'">Individual Leaderboard</a>
+            <a class="tab" :class="{ 'tab-active': activeTab === 'leaderboard' }" @click="activeTab = 'leaderboard'">Group Leaderboard</a>
             <a class="tab" :class="{ 'tab-active': activeTab === 'benchmark' }" @click="activeTab = 'benchmark'">vs S&P 500</a>
           </div>
 
@@ -341,6 +341,83 @@
                       <td colspan="5" class="text-center text-base-content/50 py-12">
                         <div class="text-2xl mb-2">🔍</div>
                         No groups found matching filters
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Individual-level benchmark -->
+            <div class="mb-10">
+              <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-4">
+                <div>
+                  <h3 class="font-bold text-lg mb-1">By Individual</h3>
+                  <p class="text-xs text-base-content/50">Each student's aggregate return compared to the S&P 500 since they started investing.</p>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                  <div class="relative">
+                    <input v-model="individualSearch" type="text" placeholder="Search student or group..." class="input input-bordered input-sm w-full sm:w-64 pl-8" />
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 absolute left-2.5 top-2 text-base-content/40" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                  </div>
+                  <select v-model="individualStatusFilter" class="select select-bordered select-sm">
+                    <option value="all">All Status</option>
+                    <option value="beating">Beating Only</option>
+                    <option value="trailing">Trailing Only</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="overflow-x-auto">
+                <table class="table w-full">
+                  <thead>
+                    <tr>
+                      <th class="cursor-pointer hover:bg-base-200 transition-colors" @click="toggleIndividualSort('name')">
+                        Student <span class="text-[10px] ml-1 opacity-50">{{ getSortIcon('name', individualSortKey, individualSortOrder) }}</span>
+                      </th>
+                      <th class="cursor-pointer hover:bg-base-200 transition-colors" @click="toggleIndividualSort('groupName')">
+                        Group <span class="text-[10px] ml-1 opacity-50">{{ getSortIcon('groupName', individualSortKey, individualSortOrder) }}</span>
+                      </th>
+                      <th class="text-right cursor-pointer hover:bg-base-200 transition-colors" @click="toggleIndividualSort('returnPct')">
+                        Return <span class="text-[10px] ml-1 opacity-50">{{ getSortIcon('returnPct', individualSortKey, individualSortOrder) }}</span>
+                      </th>
+                      <th class="text-right cursor-pointer hover:bg-base-200 transition-colors" @click="toggleIndividualSort('benchmarkReturnPct')">
+                        S&P 500 <span class="text-[10px] ml-1 opacity-50">{{ getSortIcon('benchmarkReturnPct', individualSortKey, individualSortOrder) }}</span>
+                      </th>
+                      <th class="text-right cursor-pointer hover:bg-base-200 transition-colors" @click="toggleIndividualSort('alpha')">
+                        Alpha <span class="text-[10px] ml-1 opacity-50">{{ getSortIcon('alpha', individualSortKey, individualSortOrder) }}</span>
+                      </th>
+                      <th class="text-center">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="student in benchmarkIndividualsSorted" :key="student.id" class="hover">
+                      <td class="font-semibold text-sm">{{ student.name }}</td>
+                      <td class="text-sm">
+                        <span v-if="student.groupName" class="badge badge-sm badge-outline whitespace-nowrap">{{ student.groupName }}</span>
+                        <span v-else class="text-xs text-base-content/40">—</span>
+                      </td>
+                      <td class="text-right font-mono text-sm font-semibold" :class="student.returnPct >= 0 ? 'text-success' : 'text-error'">
+                        {{ student.returnPct >= 0 ? '+' : '' }}{{ student.returnPct.toFixed(2) }}%
+                      </td>
+                      <td class="text-right font-mono text-sm text-base-content/60">
+                        {{ (student.benchmarkReturnPct || 0) >= 0 ? '+' : '' }}{{ (student.benchmarkReturnPct || 0).toFixed(2) }}%
+                      </td>
+                      <td class="text-right font-mono text-sm font-semibold" :class="(student.returnPct - (student.benchmarkReturnPct || 0)) >= 0 ? 'text-success' : 'text-error'">
+                        {{ (student.returnPct - (student.benchmarkReturnPct || 0)) >= 0 ? '+' : '' }}{{ (student.returnPct - (student.benchmarkReturnPct || 0)).toFixed(2) }}%
+                      </td>
+                      <td class="text-center">
+                        <div class="flex flex-col items-center gap-1.5">
+                          <span v-if="student.isBeatingSP500" class="badge badge-success badge-sm gap-1">Beating</span>
+                          <span v-else class="badge badge-error badge-sm gap-1">Trailing</span>
+                          <button type="button" class="btn btn-ghost btn-xs text-[10px] text-primary" @click="openAttributionModal(student)">Explain</button>
+                        </div>
+                      </td>
+                    </tr>
+                    <tr v-if="benchmarkIndividualsSorted.length === 0">
+                      <td colspan="6" class="text-center text-base-content/50 py-12">
+                        <div class="text-2xl mb-2">🔍</div>
+                        No students found matching filters
                       </td>
                     </tr>
                   </tbody>
@@ -842,7 +919,7 @@ const showAttributionModal = ref(false)
 const selectedGroup = ref(null)
 const copiedMemberEmails = ref(false)
 const copiedClassEmails = ref(false)
-const activeTab = ref('leaderboard')
+const activeTab = ref('individuals')
 
 // Benchmark Table State
 const groupSearch = ref('')
@@ -854,6 +931,11 @@ const fundSearch = ref('')
 const fundStatusFilter = ref('all')
 const fundSortKey = ref('alpha')
 const fundSortOrder = ref('desc')
+
+const individualSearch = ref('')
+const individualStatusFilter = ref('all')
+const individualSortKey = ref('alpha')
+const individualSortOrder = ref('desc')
 
 const currentClass = computed(() => {
   const qid = route.query.class_id
@@ -994,6 +1076,48 @@ function toggleFundSort(key) {
     fundSortOrder.value = 'desc'
   }
 }
+
+function toggleIndividualSort(key) {
+  if (individualSortKey.value === key) {
+    individualSortOrder.value = individualSortOrder.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    individualSortKey.value = key
+    individualSortOrder.value = 'desc'
+  }
+}
+
+const benchmarkIndividualsSorted = computed(() => {
+  let list = [...leaderboardIndividuals.value]
+
+  if (individualSearch.value) {
+    const q = individualSearch.value.toLowerCase()
+    list = list.filter(s =>
+      (s.name || '').toLowerCase().includes(q) ||
+      (s.groupName || '').toLowerCase().includes(q)
+    )
+  }
+  if (individualStatusFilter.value === 'beating') {
+    list = list.filter(s => s.isBeatingSP500)
+  } else if (individualStatusFilter.value === 'trailing') {
+    list = list.filter(s => !s.isBeatingSP500)
+  }
+
+  list.sort((a, b) => {
+    const valA = a[individualSortKey.value]
+    const valB = b[individualSortKey.value]
+
+    if (individualSortKey.value === 'name' || individualSortKey.value === 'groupName') {
+      return individualSortOrder.value === 'asc'
+        ? (valA || '').localeCompare(valB || '')
+        : (valB || '').localeCompare(valA || '')
+    }
+
+    const multiplier = individualSortOrder.value === 'asc' ? 1 : -1
+    return ((valA || 0) - (valB || 0)) * multiplier
+  })
+
+  return list
+})
 
 function getSortIcon(key, currentKey, currentOrder) {
   if (currentKey !== key) return '↕'
