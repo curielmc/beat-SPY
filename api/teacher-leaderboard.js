@@ -97,7 +97,7 @@ export default async function handler(req) {
           cash: 0,
           fundCount: 0
         })),
-        stats: { pctStudentsBeating: 0, pctGroupsBeating: 0, pctFundsBeating: 0, maxAlpha: 0, minAlpha: 0, avgAlpha: 0 }
+        stats: { pctStudentsBeating: 0, pctGroupsBeating: 0, pctFundsBeating: 0, studentsBeating: 0, studentsTotal: 0, groupsBeating: 0, groupsTotal: 0, fundsBeating: 0, fundsTotal: 0, maxAlpha: 0, minAlpha: 0, avgAlpha: 0, aggregateBenchmarkReturnPct: 0 }
       })
     }
 
@@ -246,13 +246,35 @@ export default async function handler(req) {
     const groupPerf = groupResults
     const fundPerf = portfolioPerformance.filter(p => p.owner_type === 'group')
 
+    const studentsBeating = studentPerf.filter(p => p.isBeatingSP500).length
+    const groupsBeating = groupPerf.filter(p => p.isBeatingSP500).length
+    const fundsBeating = fundPerf.filter(p => p.isBeatingSP500).length
+
+    // Aggregate S&P 500 benchmark return across all groups in the class
+    let classStartingCash = 0
+    let classBenchmarkValue = 0
+    for (const g of groupResults) {
+      classStartingCash += g.startingCash
+      classBenchmarkValue += g.startingCash * (1 + (g.benchmarkReturnPct || 0) / 100)
+    }
+    const aggregateBenchmarkReturnPct = classStartingCash > 0
+      ? ((classBenchmarkValue - classStartingCash) / classStartingCash) * 100
+      : 0
+
     const stats = {
-      pctStudentsBeating: studentPerf.length ? (studentPerf.filter(p => p.isBeatingSP500).length / studentPerf.length) * 100 : 0,
-      pctGroupsBeating: groupPerf.length ? (groupPerf.filter(p => p.isBeatingSP500).length / groupPerf.length) * 100 : 0,
-      pctFundsBeating: fundPerf.length ? (fundPerf.filter(p => p.isBeatingSP500).length / fundPerf.length) * 100 : 0,
+      studentsBeating,
+      studentsTotal: studentPerf.length,
+      groupsBeating,
+      groupsTotal: groupPerf.length,
+      fundsBeating,
+      fundsTotal: fundPerf.length,
+      pctStudentsBeating: studentPerf.length ? (studentsBeating / studentPerf.length) * 100 : 0,
+      pctGroupsBeating: groupPerf.length ? (groupsBeating / groupPerf.length) * 100 : 0,
+      pctFundsBeating: fundPerf.length ? (fundsBeating / fundPerf.length) * 100 : 0,
       maxAlpha: portfolioPerformance.length ? Math.max(...portfolioPerformance.map(p => p.alpha)) : 0,
       minAlpha: portfolioPerformance.length ? Math.min(...portfolioPerformance.map(p => p.alpha)) : 0,
-      avgAlpha: portfolioPerformance.length ? portfolioPerformance.reduce((sum, p) => sum + p.alpha, 0) / portfolioPerformance.length : 0
+      avgAlpha: portfolioPerformance.length ? portfolioPerformance.reduce((sum, p) => sum + p.alpha, 0) / portfolioPerformance.length : 0,
+      aggregateBenchmarkReturnPct: Math.round(aggregateBenchmarkReturnPct * 100) / 100
     }
 
     // Sort by return % descending

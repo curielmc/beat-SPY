@@ -16,7 +16,7 @@
     </div>
 
     <template v-else>
-      <div class="grid grid-cols-2 xl:grid-cols-5 gap-3">
+      <div class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-4 gap-3">
         <div class="card bg-base-100 shadow border border-base-200">
           <div class="card-body p-4">
             <div class="text-xs uppercase tracking-wide text-base-content/50">Groups</div>
@@ -31,9 +31,31 @@
         </div>
         <div class="card bg-base-100 shadow border border-base-200">
           <div class="card-body p-4">
+            <div class="text-xs uppercase tracking-wide text-base-content/50">Funds</div>
+            <div class="text-3xl font-bold text-accent">{{ leaderboardStats.fundsTotal }}</div>
+          </div>
+        </div>
+        <div class="card bg-base-100 shadow border border-base-200">
+          <div class="card-body p-4">
             <div class="text-xs uppercase tracking-wide text-base-content/50">Aggregate Return</div>
             <div class="text-3xl font-bold" :class="dashboardSummary.returnPct >= 0 ? 'text-success' : 'text-error'">
               {{ dashboardSummary.returnPct >= 0 ? '+' : '' }}{{ dashboardSummary.returnPct.toFixed(2) }}%
+            </div>
+          </div>
+        </div>
+        <div class="card bg-base-100 shadow border border-base-200">
+          <div class="card-body p-4">
+            <div class="text-xs uppercase tracking-wide text-base-content/50">S&P 500 Return</div>
+            <div class="text-3xl font-bold" :class="leaderboardStats.aggregateBenchmarkReturnPct >= 0 ? 'text-success' : 'text-error'">
+              {{ leaderboardStats.aggregateBenchmarkReturnPct >= 0 ? '+' : '' }}{{ leaderboardStats.aggregateBenchmarkReturnPct.toFixed(2) }}%
+            </div>
+          </div>
+        </div>
+        <div class="card bg-base-100 shadow border border-base-200">
+          <div class="card-body p-4">
+            <div class="text-xs uppercase tracking-wide text-base-content/50">Alpha</div>
+            <div class="text-3xl font-bold" :class="(dashboardSummary.returnPct - leaderboardStats.aggregateBenchmarkReturnPct) >= 0 ? 'text-success' : 'text-error'">
+              {{ (dashboardSummary.returnPct - leaderboardStats.aggregateBenchmarkReturnPct) >= 0 ? '+' : '' }}{{ (dashboardSummary.returnPct - leaderboardStats.aggregateBenchmarkReturnPct).toFixed(2) }}%
             </div>
           </div>
         </div>
@@ -57,7 +79,7 @@
           <div class="card-body p-4">
             <div class="text-[10px] uppercase tracking-wider text-base-content/50 leading-tight">Students Beating<br>S&P 500</div>
             <div class="text-2xl font-bold mt-1" :class="leaderboardStats.pctStudentsBeating > 50 ? 'text-success' : 'text-base-content'">
-              {{ Math.round(leaderboardStats.pctStudentsBeating) }}%
+              {{ leaderboardStats.studentsBeating }} <span class="text-sm font-semibold text-base-content/60">({{ Math.round(leaderboardStats.pctStudentsBeating) }}%)</span>
             </div>
           </div>
         </div>
@@ -65,7 +87,7 @@
           <div class="card-body p-4">
             <div class="text-[10px] uppercase tracking-wider text-base-content/50 leading-tight">Groups Beating<br>S&P 500</div>
             <div class="text-2xl font-bold mt-1" :class="leaderboardStats.pctGroupsBeating > 50 ? 'text-success' : 'text-base-content'">
-              {{ Math.round(leaderboardStats.pctGroupsBeating) }}%
+              {{ leaderboardStats.groupsBeating }} <span class="text-sm font-semibold text-base-content/60">({{ Math.round(leaderboardStats.pctGroupsBeating) }}%)</span>
             </div>
           </div>
         </div>
@@ -73,7 +95,7 @@
           <div class="card-body p-4">
             <div class="text-[10px] uppercase tracking-wider text-base-content/50 leading-tight">Funds Beating<br>S&P 500</div>
             <div class="text-2xl font-bold mt-1" :class="leaderboardStats.pctFundsBeating > 50 ? 'text-success' : 'text-base-content'">
-              {{ Math.round(leaderboardStats.pctFundsBeating) }}%
+              {{ leaderboardStats.fundsBeating }} <span class="text-sm font-semibold text-base-content/60">({{ Math.round(leaderboardStats.pctFundsBeating) }}%)</span>
             </div>
           </div>
         </div>
@@ -759,7 +781,7 @@ const teacher = useTeacherStore()
 const loading = ref(true)
 const rankedGroups = ref([])
 const leaderboardGroups = ref([])
-const leaderboardStats = ref({ pctStudentsBeating: 0, pctGroupsBeating: 0, pctFundsBeating: 0, maxAlpha: 0, minAlpha: 0, avgAlpha: 0 })
+const leaderboardStats = ref({ pctStudentsBeating: 0, pctGroupsBeating: 0, pctFundsBeating: 0, studentsBeating: 0, studentsTotal: 0, groupsBeating: 0, groupsTotal: 0, fundsBeating: 0, fundsTotal: 0, maxAlpha: 0, minAlpha: 0, avgAlpha: 0, aggregateBenchmarkReturnPct: 0 })
 const leaderboardLoading = ref(false)
 const leaderboardError = ref('')
 const sortKey = ref('returnPct')
