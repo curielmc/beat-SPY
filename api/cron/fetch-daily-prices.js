@@ -37,9 +37,8 @@ async function fmpHistoricalDaily(ticker, from, to, retries = 2) {
 }
 
 export default async function handler(req) {
-  // Verify this is a cron request (would have x-vercel-cron header in production)
-  // For local testing, allow POST
-  if (req.method !== 'POST') {
+  // Vercel scheduled crons invoke this via GET; manual triggers use POST.
+  if (req.method !== 'GET' && req.method !== 'POST') {
     return new Response('Method not allowed', { status: 405 })
   }
 
@@ -100,8 +99,11 @@ export default async function handler(req) {
           adj_close_price: h.adjClose || h.close
         }))
 
-        // Upsert: insert or update if conflict on (ticker, price_date)
-        await sbFetch(`/daily_prices`, {
+        // Upsert: insert or update if conflict on (ticker, price_date).
+        // on_conflict query param is required because the table also has a
+        // primary key (id), and PostgREST defaults to PK as the conflict
+        // target unless told otherwise.
+        await sbFetch(`/daily_prices?on_conflict=ticker,price_date`, {
           method: 'POST',
           headers: {
             Prefer: 'resolution=merge-duplicates'
