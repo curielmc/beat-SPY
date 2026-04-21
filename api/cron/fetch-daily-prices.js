@@ -99,8 +99,11 @@ export default async function handler(req) {
           adj_close_price: h.adjClose || h.close
         }))
 
-        // Upsert: insert or update if conflict on (ticker, price_date)
-        await sbFetch(`/daily_prices`, {
+        // Upsert: insert or update if conflict on (ticker, price_date).
+        // on_conflict query param is required because the table also has a
+        // primary key (id), and PostgREST defaults to PK as the conflict
+        // target unless told otherwise.
+        await sbFetch(`/daily_prices?on_conflict=ticker,price_date`, {
           method: 'POST',
           headers: {
             Prefer: 'resolution=merge-duplicates'
