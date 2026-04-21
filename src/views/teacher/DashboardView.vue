@@ -157,9 +157,10 @@
       <div class="card bg-base-100 shadow border border-base-200">
         <div class="card-body p-5 xl:p-6">
           <div class="tabs tabs-bordered mb-4">
-            <a class="tab" :class="{ 'tab-active': activeTab === 'individuals' }" @click="activeTab = 'individuals'">Individual Leaderboard</a>
             <a class="tab" :class="{ 'tab-active': activeTab === 'leaderboard' }" @click="activeTab = 'leaderboard'">Group Leaderboard</a>
             <a class="tab" :class="{ 'tab-active': activeTab === 'benchmark' }" @click="activeTab = 'benchmark'">vs S&P 500</a>
+            <a class="tab" :class="{ 'tab-active': activeTab === 'positions' }" @click="activeTab = 'positions'">Position Leaderboard</a>
+            <a class="tab" :class="{ 'tab-active': activeTab === 'individuals' }" @click="activeTab = 'individuals'">Individual Leaderboard</a>
           </div>
 
           <div v-if="leaderboardError" class="text-xs text-error mb-2">{{ leaderboardError }}</div>
@@ -210,6 +211,74 @@
                   </tr>
                   <tr v-if="leaderboardGroups.length === 0">
                     <td colspan="8" class="text-center text-base-content/50 py-8">No groups yet</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </template>
+
+          <!-- Position Leaderboard Tab -->
+          <template v-else-if="activeTab === 'positions'">
+            <div class="flex flex-col md:flex-row md:items-end justify-between gap-3 mb-3">
+              <p class="text-xs text-base-content/50">Individual stock positions ranked by unrealized return (current price vs. average cost).</p>
+              <div class="relative">
+                <input v-model="positionSearch" type="text" placeholder="Search ticker, group, or student..." class="input input-bordered input-sm w-full sm:w-72 pl-8" />
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 absolute left-2.5 top-2 text-base-content/40" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+              </div>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="table w-full">
+                <thead>
+                  <tr>
+                    <th class="w-12">Rank</th>
+                    <th class="cursor-pointer hover:bg-base-200 transition-colors" @click="togglePositionSort('ticker')">
+                      Position <span class="text-[10px] ml-1 opacity-50">{{ getSortIcon('ticker', positionSortKey, positionSortOrder) }}</span>
+                    </th>
+                    <th class="cursor-pointer hover:bg-base-200 transition-colors" @click="togglePositionSort('groupName')">
+                      Group <span class="text-[10px] ml-1 opacity-50">{{ getSortIcon('groupName', positionSortKey, positionSortOrder) }}</span>
+                    </th>
+                    <th>Fund / Student</th>
+                    <th class="text-right cursor-pointer hover:bg-base-200 transition-colors" @click="togglePositionSort('shares')">
+                      Shares <span class="text-[10px] ml-1 opacity-50">{{ getSortIcon('shares', positionSortKey, positionSortOrder) }}</span>
+                    </th>
+                    <th class="text-right cursor-pointer hover:bg-base-200 transition-colors" @click="togglePositionSort('avgCost')">
+                      Avg Cost <span class="text-[10px] ml-1 opacity-50">{{ getSortIcon('avgCost', positionSortKey, positionSortOrder) }}</span>
+                    </th>
+                    <th class="text-right cursor-pointer hover:bg-base-200 transition-colors" @click="togglePositionSort('currentPrice')">
+                      Price <span class="text-[10px] ml-1 opacity-50">{{ getSortIcon('currentPrice', positionSortKey, positionSortOrder) }}</span>
+                    </th>
+                    <th class="text-right cursor-pointer hover:bg-base-200 transition-colors" @click="togglePositionSort('marketValue')">
+                      Market Value <span class="text-[10px] ml-1 opacity-50">{{ getSortIcon('marketValue', positionSortKey, positionSortOrder) }}</span>
+                    </th>
+                    <th class="text-right cursor-pointer hover:bg-base-200 transition-colors" @click="togglePositionSort('returnPct')">
+                      Return <span class="text-[10px] ml-1 opacity-50">{{ getSortIcon('returnPct', positionSortKey, positionSortOrder) }}</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(pos, i) in sortedPositions" :key="pos.id" class="hover">
+                    <td>
+                      <span class="badge badge-lg" :class="i === 0 && positionSortKey === 'returnPct' && positionSortOrder === 'desc' ? 'badge-warning' : 'badge-ghost'">{{ i + 1 }}</span>
+                    </td>
+                    <td class="font-semibold font-mono">{{ pos.ticker }}</td>
+                    <td>
+                      <span v-if="pos.groupName" class="badge badge-sm badge-outline whitespace-nowrap">{{ pos.groupName }}</span>
+                      <span v-else class="text-xs text-base-content/40">—</span>
+                    </td>
+                    <td class="text-sm">
+                      <span v-if="pos.ownerType === 'user'">{{ pos.studentName || '—' }}</span>
+                      <span v-else class="text-base-content/60">{{ pos.fundName }}</span>
+                    </td>
+                    <td class="text-right font-mono text-sm text-base-content/70">{{ pos.shares.toLocaleString('en-US', { maximumFractionDigits: 4 }) }}</td>
+                    <td class="text-right font-mono text-sm text-base-content/60">${{ pos.avgCost.toFixed(2) }}</td>
+                    <td class="text-right font-mono text-sm">${{ pos.currentPrice.toFixed(2) }}</td>
+                    <td class="text-right font-mono text-sm font-semibold">${{ formatMoney(pos.marketValue) }}</td>
+                    <td class="text-right font-mono text-sm font-semibold" :class="pos.returnPct >= 0 ? 'text-success' : 'text-error'">
+                      {{ pos.returnPct >= 0 ? '+' : '' }}{{ pos.returnPct.toFixed(2) }}%
+                    </td>
+                  </tr>
+                  <tr v-if="sortedPositions.length === 0">
+                    <td colspan="9" class="text-center text-base-content/50 py-8">No open positions</td>
                   </tr>
                 </tbody>
               </table>
@@ -907,6 +976,7 @@ const loading = ref(true)
 const rankedGroups = ref([])
 const leaderboardGroups = ref([])
 const leaderboardIndividuals = ref([])
+const leaderboardPositions = ref([])
 const leaderboardStats = ref({ pctStudentsBeating: 0, pctGroupsBeating: 0, pctFundsBeating: 0, studentsBeating: 0, studentsTotal: 0, groupsBeating: 0, groupsTotal: 0, fundsBeating: 0, fundsTotal: 0, maxAlpha: 0, minAlpha: 0, avgAlpha: 0, aggregateBenchmarkReturnPct: 0 })
 const leaderboardLoading = ref(false)
 const leaderboardError = ref('')
@@ -919,7 +989,7 @@ const showAttributionModal = ref(false)
 const selectedGroup = ref(null)
 const copiedMemberEmails = ref(false)
 const copiedClassEmails = ref(false)
-const activeTab = ref('individuals')
+const activeTab = ref('leaderboard')
 
 // Benchmark Table State
 const groupSearch = ref('')
@@ -936,6 +1006,10 @@ const individualSearch = ref('')
 const individualStatusFilter = ref('all')
 const individualSortKey = ref('alpha')
 const individualSortOrder = ref('desc')
+
+const positionSearch = ref('')
+const positionSortKey = ref('returnPct')
+const positionSortOrder = ref('desc')
 
 const currentClass = computed(() => {
   const qid = route.query.class_id
@@ -1085,6 +1159,45 @@ function toggleIndividualSort(key) {
     individualSortOrder.value = 'desc'
   }
 }
+
+function togglePositionSort(key) {
+  if (positionSortKey.value === key) {
+    positionSortOrder.value = positionSortOrder.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    positionSortKey.value = key
+    positionSortOrder.value = 'desc'
+  }
+}
+
+const sortedPositions = computed(() => {
+  let list = [...leaderboardPositions.value]
+
+  if (positionSearch.value) {
+    const q = positionSearch.value.toLowerCase()
+    list = list.filter(p =>
+      (p.ticker || '').toLowerCase().includes(q) ||
+      (p.groupName || '').toLowerCase().includes(q) ||
+      (p.studentName || '').toLowerCase().includes(q) ||
+      (p.fundName || '').toLowerCase().includes(q)
+    )
+  }
+
+  list.sort((a, b) => {
+    const valA = a[positionSortKey.value]
+    const valB = b[positionSortKey.value]
+
+    if (['ticker', 'groupName', 'studentName', 'fundName'].includes(positionSortKey.value)) {
+      return positionSortOrder.value === 'asc'
+        ? (valA || '').localeCompare(valB || '')
+        : (valB || '').localeCompare(valA || '')
+    }
+
+    const multiplier = positionSortOrder.value === 'asc' ? 1 : -1
+    return ((valA || 0) - (valB || 0)) * multiplier
+  })
+
+  return list
+})
 
 const benchmarkIndividualsSorted = computed(() => {
   let list = [...leaderboardIndividuals.value]
@@ -1523,6 +1636,7 @@ async function loadDashboard() {
       if (res.ok && data.groups) {
         leaderboardGroups.value = data.groups
         leaderboardIndividuals.value = data.individuals || []
+        leaderboardPositions.value = data.positions || []
         if (data.stats) leaderboardStats.value = data.stats
       } else {
         leaderboardError.value = data.error || 'Failed to load leaderboard'

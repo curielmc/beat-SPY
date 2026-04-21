@@ -98,6 +98,7 @@ export default async function handler(req) {
           fundCount: 0
         })),
         individuals: [],
+        positions: [],
         stats: { pctStudentsBeating: 0, pctGroupsBeating: 0, pctFundsBeating: 0, studentsBeating: 0, studentsTotal: 0, groupsBeating: 0, groupsTotal: 0, fundsBeating: 0, fundsTotal: 0, maxAlpha: 0, minAlpha: 0, avgAlpha: 0, aggregateBenchmarkReturnPct: 0 }
       })
     }
@@ -328,6 +329,48 @@ export default async function handler(req) {
     }
     individualResults.sort((a, b) => b.returnPct - a.returnPct)
 
+    // Build position-level leaderboard: one row per (portfolio, ticker).
+    const positionResults = []
+    for (const p of allPortfolios) {
+      const pHoldings = holdingsByPortfolio[p.id] || []
+      if (!pHoldings.length) continue
+
+      let groupName = null
+      let studentName = null
+      if (p.owner_type === 'group') {
+        groupName = groupNamesById.get(p.owner_id) || null
+      } else if (p.owner_type === 'user') {
+        const info = studentInfoById.get(p.owner_id)
+        groupName = info?.groupName || null
+        studentName = info?.name || null
+      }
+      const fundName = p.fund_name || `Fund ${p.fund_number || 1}`
+
+      for (const h of pHoldings) {
+        const shares = Number(h.shares || 0)
+        if (shares <= 0) continue
+        const avgCost = Number(h.avg_cost || 0)
+        const currentPrice = priceMap[h.ticker] || avgCost
+        const marketValue = shares * currentPrice
+        const returnPct = avgCost > 0 ? ((currentPrice - avgCost) / avgCost) * 100 : 0
+
+        positionResults.push({
+          id: `${p.id}:${h.ticker}`,
+          ticker: h.ticker,
+          groupName,
+          studentName,
+          fundName,
+          ownerType: p.owner_type,
+          shares: Math.round(shares * 10000) / 10000,
+          avgCost: Math.round(avgCost * 100) / 100,
+          currentPrice: Math.round(currentPrice * 100) / 100,
+          marketValue: Math.round(marketValue * 100) / 100,
+          returnPct: Math.round(returnPct * 100) / 100
+        })
+      }
+    }
+    positionResults.sort((a, b) => b.returnPct - a.returnPct)
+
     // Calculate Summary Stats
     const studentPerf = portfolioPerformance.filter(p => p.owner_type === 'user')
     const groupPerf = groupResults
@@ -367,7 +410,7 @@ export default async function handler(req) {
     // Sort by return % descending
     groupResults.sort((a, b) => b.returnPct - a.returnPct)
 
-    const res = jsonResponse({ groups: groupResults, individuals: individualResults, stats })
+    const res = jsonResponse({ groups: groupResults, individuals: individualResults, positions: positionResults, stats })
     res.headers.set('X-Debug-Portfolios', allPortfolios.length.toString())
     res.headers.set('X-Debug-Groups', (groupPortfolios || []).length.toString())
     res.headers.set('X-Debug-Students', (studentPortfolios || []).length.toString())
