@@ -17,6 +17,25 @@ async function fmpBatchQuotes(tickers) {
   return map
 }
 
+async function fmpBatchProfiles(tickers) {
+  if (!tickers.length || !FMP_KEY) return {}
+  const csv = tickers.join(',')
+  const res = await fetch(`${FMP_BASE}/profile/${csv}?apikey=${FMP_KEY}`)
+  if (!res.ok) return {}
+  const data = await res.json()
+  const map = {}
+  for (const p of (data || [])) {
+    if (p.symbol) {
+      map[p.symbol] = {
+        companyName: p.companyName || '',
+        sector: p.sector || '',
+        industry: p.industry || ''
+      }
+    }
+  }
+  return map
+}
+
 async function fmpHistoricalClose(ticker, date) {
   if (!ticker || !date || !FMP_KEY) return null
   const res = await fetch(`${FMP_BASE}/historical-price-full/${ticker}?from=${date}&to=${date}&apikey=${FMP_KEY}`)
@@ -124,7 +143,11 @@ export default async function handler(req) {
       ...(holdings || []).map(h => h.ticker).filter(Boolean),
       'SPY'
     ])]
-    const priceMap = await fmpBatchQuotes(allTickers)
+    const holdingTickers = allTickers.filter(t => t !== 'SPY')
+    const [priceMap, profileMap] = await Promise.all([
+      fmpBatchQuotes(allTickers),
+      fmpBatchProfiles(holdingTickers)
+    ])
 
     // 5b. Fetch historical benchmark prices for each portfolio's start date
     const benchmarkDates = new Map() // "TICKER:DATE" -> price
@@ -354,9 +377,13 @@ export default async function handler(req) {
         const marketValue = shares * currentPrice
         const returnPct = avgCost > 0 ? ((currentPrice - avgCost) / avgCost) * 100 : 0
 
+        const prof = profileMap[h.ticker] || {}
         positionResults.push({
           id: `${p.id}:${h.ticker}`,
           ticker: h.ticker,
+          companyName: prof.companyName || '',
+          sector: prof.sector || '',
+          industry: prof.industry || '',
           groupName,
           studentName,
           fundName,

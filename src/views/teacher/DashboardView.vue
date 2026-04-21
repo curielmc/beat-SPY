@@ -253,6 +253,7 @@
                     <th class="text-right cursor-pointer hover:bg-base-200 transition-colors" @click="togglePositionSort('returnPct')">
                       Return <span class="text-[10px] ml-1 opacity-50">{{ getSortIcon('returnPct', positionSortKey, positionSortOrder) }}</span>
                     </th>
+                    <th class="text-center">Profile</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -260,7 +261,11 @@
                     <td>
                       <span class="badge badge-lg" :class="i === 0 && positionSortKey === 'returnPct' && positionSortOrder === 'desc' ? 'badge-warning' : 'badge-ghost'">{{ i + 1 }}</span>
                     </td>
-                    <td class="font-semibold font-mono">{{ pos.ticker }}</td>
+                    <td>
+                      <div class="font-semibold font-mono">{{ pos.ticker }}</div>
+                      <div v-if="pos.companyName" class="text-xs text-base-content/60 font-normal mt-0.5 line-clamp-1">{{ pos.companyName }}</div>
+                      <div v-if="pos.sector" class="mt-1"><SectorLabel :sector="pos.sector" size="xs" /></div>
+                    </td>
                     <td>
                       <span v-if="pos.groupName" class="badge badge-sm badge-outline whitespace-nowrap">{{ pos.groupName }}</span>
                       <span v-else class="text-xs text-base-content/40">—</span>
@@ -276,9 +281,12 @@
                     <td class="text-right font-mono text-sm font-semibold" :class="pos.returnPct >= 0 ? 'text-success' : 'text-error'">
                       {{ pos.returnPct >= 0 ? '+' : '' }}{{ pos.returnPct.toFixed(2) }}%
                     </td>
+                    <td class="text-center">
+                      <button type="button" class="btn btn-ghost btn-xs text-[10px] text-primary" @click="openProfileModal(pos)">Profile</button>
+                    </td>
                   </tr>
                   <tr v-if="sortedPositions.length === 0">
-                    <td colspan="9" class="text-center text-base-content/50 py-8">No open positions</td>
+                    <td colspan="10" class="text-center text-base-content/50 py-8">No open positions</td>
                   </tr>
                 </tbody>
               </table>
@@ -953,6 +961,77 @@
       </div>
       <form method="dialog" class="modal-backdrop" @click="showQuickMessageModal = false"><button>close</button></form>
     </dialog>
+    <!-- Company Profile Modal -->
+    <dialog class="modal" :class="{ 'modal-open': showProfileModal }">
+      <div class="modal-box max-w-2xl">
+        <div v-if="profileLoading" class="flex justify-center py-12">
+          <span class="loading loading-spinner loading-lg"></span>
+        </div>
+        <template v-else-if="selectedProfileData">
+          <div class="flex items-start gap-4 mb-4">
+            <img v-if="selectedProfileData.image" :src="selectedProfileData.image" alt="" class="h-14 w-14 rounded-lg bg-base-200 object-contain p-1 flex-shrink-0" @error="$event.target.style.display='none'" />
+            <div class="flex-1 min-w-0">
+              <h3 class="font-bold text-lg leading-tight">{{ selectedProfileData.companyName || selectedProfilePosition?.ticker }}</h3>
+              <p class="text-sm text-base-content/60 mt-0.5">
+                <span class="font-mono">{{ selectedProfilePosition?.ticker }}</span>
+                <span v-if="selectedProfileData.exchangeShortName"> · {{ selectedProfileData.exchangeShortName }}</span>
+              </p>
+              <div class="flex flex-wrap gap-1 mt-2">
+                <SectorLabel v-if="selectedProfileData.sector" :sector="selectedProfileData.sector" size="xs" />
+                <span v-if="selectedProfileData.industry" class="badge badge-xs badge-outline opacity-70">{{ selectedProfileData.industry }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4 text-xs">
+            <div v-if="selectedProfileData.price">
+              <div class="uppercase tracking-wide text-base-content/50">Price</div>
+              <div class="font-mono font-semibold text-sm">${{ Number(selectedProfileData.price).toFixed(2) }}</div>
+            </div>
+            <div v-if="selectedProfileData.mktCap">
+              <div class="uppercase tracking-wide text-base-content/50">Market Cap</div>
+              <div class="font-mono font-semibold text-sm">${{ formatMoney(selectedProfileData.mktCap) }}</div>
+            </div>
+            <div v-if="selectedProfileData.ceo">
+              <div class="uppercase tracking-wide text-base-content/50">CEO</div>
+              <div class="font-semibold text-sm line-clamp-1">{{ selectedProfileData.ceo }}</div>
+            </div>
+            <div v-if="selectedProfileData.fullTimeEmployees">
+              <div class="uppercase tracking-wide text-base-content/50">Employees</div>
+              <div class="font-mono font-semibold text-sm">{{ Number(selectedProfileData.fullTimeEmployees).toLocaleString('en-US') }}</div>
+            </div>
+            <div v-if="selectedProfileData.country">
+              <div class="uppercase tracking-wide text-base-content/50">Country</div>
+              <div class="font-semibold text-sm">{{ selectedProfileData.country }}</div>
+            </div>
+            <div v-if="selectedProfileData.ipoDate">
+              <div class="uppercase tracking-wide text-base-content/50">IPO Date</div>
+              <div class="font-mono font-semibold text-sm">{{ selectedProfileData.ipoDate }}</div>
+            </div>
+          </div>
+
+          <div v-if="selectedProfileData.description" class="prose prose-sm max-w-none bg-base-200/50 rounded-lg p-4 max-h-72 overflow-y-auto">
+            <p class="text-sm text-base-content/80 leading-relaxed">{{ selectedProfileData.description }}</p>
+          </div>
+
+          <div v-if="selectedProfileData.website" class="mt-4">
+            <a :href="selectedProfileData.website" target="_blank" rel="noopener" class="link link-primary text-sm">
+              {{ selectedProfileData.website }} ↗
+            </a>
+          </div>
+        </template>
+        <div v-else class="text-center py-12 text-base-content/60">
+          <div class="text-4xl mb-2">📊</div>
+          <p>No profile data available for <span class="font-mono">{{ selectedProfilePosition?.ticker }}</span>.</p>
+        </div>
+
+        <div class="modal-action">
+          <button class="btn btn-ghost" @click="showProfileModal = false">Close</button>
+        </div>
+      </div>
+      <form method="dialog" class="modal-backdrop" @click="showProfileModal = false"><button>close</button></form>
+    </dialog>
+
     <GroupAttributionModal
       :group="selectedGroup"
       :isOpen="showAttributionModal"
@@ -969,9 +1048,11 @@ import { supabase } from '../../lib/supabase'
 import { downloadPDF, downloadDOCX } from '../../lib/notesExport'
 import GroupAttributionModal from '../../components/GroupAttributionModal.vue'
 import SectorLabel from '../../components/SectorLabel.vue'
+import { useMarketDataStore } from '../../stores/marketData'
 
 const route = useRoute()
 const teacher = useTeacherStore()
+const market = useMarketDataStore()
 const loading = ref(true)
 const rankedGroups = ref([])
 const leaderboardGroups = ref([])
@@ -1157,6 +1238,24 @@ function toggleIndividualSort(key) {
   } else {
     individualSortKey.value = key
     individualSortOrder.value = 'desc'
+  }
+}
+
+const showProfileModal = ref(false)
+const selectedProfilePosition = ref(null)
+const selectedProfileData = ref(null)
+const profileLoading = ref(false)
+
+async function openProfileModal(position) {
+  selectedProfilePosition.value = position
+  selectedProfileData.value = null
+  showProfileModal.value = true
+  profileLoading.value = true
+  try {
+    const profiles = await market.fetchBatchProfiles([position.ticker])
+    selectedProfileData.value = profiles[position.ticker] || null
+  } finally {
+    profileLoading.value = false
   }
 }
 

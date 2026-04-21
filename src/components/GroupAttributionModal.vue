@@ -420,19 +420,29 @@ async function loadAttribution() {
         let stockReturn = 0
         let weightInFund = 0
 
+        // Realized proceeds from sells during the period get added to cash, so
+        // attribution for positions that were closed (fully or partially)
+        // during the period needs to include those proceeds — otherwise
+        // Francisco's "bought then sold everything" case shows every ticker at
+        // -100% and gets filtered out as having no current value.
+        const sellDollars = analysis.tradesInPeriod
+          .filter(t => t.ticker === ticker && t.side === 'sell')
+          .reduce((sum, t) => sum + Number(t.dollars || 0), 0)
+        const buyDollars = analysis.tradesInPeriod
+          .filter(t => t.ticker === ticker && t.side === 'buy')
+          .reduce((sum, t) => sum + Number(t.dollars || 0), 0)
+
         if (startShares > 0) {
           weightInFund = (startShares * sp) / fundStartValue
-          stockReturn = sp > 0 ? ((ep / sp) - 1) * 100 : 0
-        } else {
-          // New position during period
-          const costBasis = analysis.tradesInPeriod
-            .filter(t => t.ticker === ticker && t.side === 'buy')
-            .reduce((sum, t) => sum + Number(t.dollars), 0)
-          
-          if (costBasis > 0) {
-            weightInFund = costBasis / fundStartValue
-            stockReturn = (((endShares * ep) / costBasis) - 1) * 100
-          }
+          const startValue = startShares * sp
+          const invested = startValue + buyDollars
+          const endValue = endShares * ep
+          stockReturn = invested > 0 ? (((endValue + sellDollars) / invested) - 1) * 100 : 0
+        } else if (buyDollars > 0) {
+          // New position opened during the period
+          weightInFund = buyDollars / fundStartValue
+          const endValue = endShares * ep
+          stockReturn = (((endValue + sellDollars) / buyDollars) - 1) * 100
         }
 
         if (!aggregateTickers[ticker]) {
@@ -468,7 +478,10 @@ async function loadAttribution() {
         currentValue: data.currentValue
       }
     })
-    .filter(a => a.currentValue > 0)
+    // Include closed-out positions (currentValue === 0) when they were
+    // actually traded during the period — otherwise a student who bought and
+    // sold everything looks like they had no activity at all.
+    .filter(a => a.currentValue > 0 || a.startValue > 0)
     .sort((a, b) => b.contribution - a.contribution)
 
     attributions.value = finalAttributions
