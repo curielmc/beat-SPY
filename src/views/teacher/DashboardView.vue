@@ -19,6 +19,18 @@
       <div class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-4 gap-3">
         <div class="card bg-base-100 shadow border border-base-200">
           <div class="card-body p-4">
+            <div class="text-xs uppercase tracking-wide text-base-content/50">Start Date</div>
+            <div class="text-2xl font-bold mt-1">{{ firstFundDateLabel }}</div>
+          </div>
+        </div>
+        <div class="card bg-base-100 shadow border border-base-200">
+          <div class="card-body p-4">
+            <div class="text-xs uppercase tracking-wide text-base-content/50">Days Since Start</div>
+            <div class="text-3xl font-bold">{{ daysSinceStart !== null ? daysSinceStart : '—' }}</div>
+          </div>
+        </div>
+        <div class="card bg-base-100 shadow border border-base-200">
+          <div class="card-body p-4">
             <div class="text-xs uppercase tracking-wide text-base-content/50">Groups</div>
             <div class="text-3xl font-bold text-primary">{{ classGroups.length }}</div>
           </div>
@@ -1125,6 +1137,33 @@ const classGroups = computed(() =>
 const classStudents = computed(() =>
   teacher.students.filter(student => student.class_id === currentClass.value?.id)
 )
+
+const firstFundDate = computed(() => {
+  const times = []
+  for (const g of leaderboardGroups.value) {
+    for (const f of (g.funds || [])) {
+      if (f.created_at) times.push(new Date(f.created_at).getTime())
+    }
+  }
+  for (const s of leaderboardIndividuals.value) {
+    for (const f of (s.funds || [])) {
+      if (f.created_at) times.push(new Date(f.created_at).getTime())
+    }
+  }
+  if (!times.length) return null
+  return new Date(Math.min(...times))
+})
+
+const firstFundDateLabel = computed(() => {
+  if (!firstFundDate.value) return '—'
+  return firstFundDate.value.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+})
+
+const daysSinceStart = computed(() => {
+  if (!firstFundDate.value) return null
+  const diffMs = Date.now() - firstFundDate.value.getTime()
+  return Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)))
+})
 
 const dashboardSummary = computed(() => {
   const groups = leaderboardGroups.value
