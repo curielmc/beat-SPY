@@ -37,9 +37,8 @@ async function fmpHistoricalDaily(ticker, from, to, retries = 2) {
 }
 
 export default async function handler(req) {
-  // Verify this is a cron request (would have x-vercel-cron header in production)
-  // For local testing, allow POST
-  if (req.method !== 'POST') {
+  // Vercel scheduled crons invoke this via GET; manual triggers use POST.
+  if (req.method !== 'GET' && req.method !== 'POST') {
     return new Response('Method not allowed', { status: 405 })
   }
 
