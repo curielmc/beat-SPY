@@ -54,6 +54,7 @@ const router = createRouter({
         { path: 'fund-analytics', name: 'teacher-fund-analytics', component: () => import('../views/teacher/FundAnalyticsView.vue') },
         { path: 'tutorials', name: 'teacher-tutorials', component: () => import('../views/teacher/TrainingManageView.vue') },
         { path: 'messages', name: 'teacher-messages', component: () => import('../views/teacher/MessagesView.vue') },
+        { path: 'newsletter', name: 'teacher-newsletter', component: () => import('../views/teacher/NewsletterView.vue') },
         { path: 'stocks/:ticker', name: 'teacher-stock-detail', component: () => import('../views/app/StockDetailView.vue') },
         { path: 'portfolio', name: 'teacher-portfolio', component: () => import('../views/app/HomeView.vue') },
         { path: 'stocks', name: 'teacher-stocks', component: () => import('../views/app/StocksView.vue') },
@@ -74,6 +75,11 @@ const router = createRouter({
       path: '/terms',
       name: 'terms',
       component: () => import('../views/public/TermsView.vue')
+    },
+    {
+      path: '/newsletter/subscribe/:slug',
+      name: 'newsletter-subscribe',
+      component: () => import('../views/public/NewsletterSignup.vue')
     },
     {
       path: '/admin',

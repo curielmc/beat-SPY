@@ -34,6 +34,7 @@
               <li><RouterLink to="/teacher/restrictions">Rules & Settings</RouterLink></li>
               <li><RouterLink to="/teacher/fund-analytics">Fund Analytics</RouterLink></li>
               <li><RouterLink to="/teacher/tutorials">Tutorials</RouterLink></li>
+              <li><RouterLink to="/teacher/newsletter">Newsletter</RouterLink></li>
             </ul>
           </div>
         </div>
