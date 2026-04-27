@@ -25,6 +25,10 @@
     {
       "path": "/api/cron/fetch-daily-prices",
       "schedule": "15 20 * * *"
+    },
+    {
+      "path": "/api/newsletter-reminder-check",
+      "schedule": "0 14 * * *"
     }
   ]
 }
