@@ -9,10 +9,16 @@ function escapeHtml(s) {
     .replace(/"/g, '&quot;')
 }
 
+function formatEndDate(s) {
+  if (!s) return ''
+  const d = new Date(s + 'T00:00:00Z')
+  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' })
+}
+
 function pct(n) {
   const v = Number(n || 0)
   const sign = v >= 0 ? '+' : ''
-  return `${sign}${v.toFixed(2)}%`
+  return `${sign}${v.toFixed(1)}%`
 }
 
 function color(returnPct, spy) {
@@ -65,11 +71,16 @@ export function renderNewsletterHtml({ subject, introHtml, payload, unsubscribeU
       <h1 style="color:#ffffff;margin:0;font-size:22px;">${escapeHtml(subject)}</h1>
     </div>
     <div style="padding:24px;border:1px solid #e5e7eb;border-top:0;border-radius:0 0 12px 12px;">
+      ${payload.daysRemaining != null ? `
+      <div style="background:#eef2ff;border:1px solid #c7d2fe;padding:14px;border-radius:8px;margin-bottom:18px;text-align:center;">
+        <p style="margin:0;font-size:13px;color:#3730a3;">Class ends ${escapeHtml(formatEndDate(payload.endDate))}</p>
+        <p style="margin:4px 0 0;font-size:22px;font-weight:700;color:#3730a3;">${payload.daysRemaining} ${payload.daysRemaining === 1 ? 'day' : 'days'} remaining</p>
+      </div>` : ''}
       <div style="font-size:15px;color:#111827;line-height:1.55;">${introHtml || ''}</div>
 
-      ${renderWindow('All-time', payload.allTime, nameMap)}
-      ${renderWindow('Last 3 months', payload.threeMonth, nameMap)}
       ${renderWindow('Last 1 month', payload.oneMonth, nameMap)}
+      ${renderWindow('Last 3 months', payload.threeMonth, nameMap)}
+      ${renderWindow('All-time', payload.allTime, nameMap)}
 
       <hr style="border:0;border-top:1px solid #e5e7eb;margin:28px 0 16px;" />
       ${classSignupUrl ? `<p style="font-size:12px;color:#6b7280;margin:0 0 8px;">Parents: <a href="${escapeHtml(classSignupUrl)}" style="color:#6366f1;">subscribe to receive these updates</a>.</p>` : ''}

@@ -52,14 +52,30 @@ export default async function handler(req) {
   const { class_id } = await req.json().catch(() => ({}))
   if (!class_id) return jsonResponse({ error: 'class_id required' }, 400)
 
-  const cls = await sbFetch(`/classes?id=eq.${class_id}&select=id,class_name,teacher_id,public_slug`)
+  const cls = await sbFetch(`/classes?id=eq.${class_id}&select=id,class_name,teacher_id,public_slug,end_date`)
   const klass = cls?.[0]
   if (!klass) return jsonResponse({ error: 'Class not found' }, 404)
   if (role !== 'admin' && klass.teacher_id !== user.id) return jsonResponse({ error: 'Forbidden' }, 403)
 
   try {
+    // All-time = oldest portfolio in the class (when investing actually started).
+    // Falls back to class created_at, then 1 year ago, if no portfolios exist yet.
+    const classGroups = await sbFetch(`/groups?class_id=eq.${class_id}&select=id`)
+    const groupIdCsv = (classGroups || []).map(g => encodeURIComponent(g.id)).join(',')
+    let allTimeStart = null
+    if (groupIdCsv) {
+      const oldest = await sbFetch(
+        `/portfolios?owner_type=eq.group&owner_id=in.(${groupIdCsv})&select=created_at&order=created_at.asc&limit=1`
+      )
+      allTimeStart = oldest?.[0]?.created_at
+    }
+    if (!allTimeStart) {
+      const cRow = await sbFetch(`/classes?id=eq.${class_id}&select=created_at`)
+      allTimeStart = cRow?.[0]?.created_at || daysAgoIso(365)
+    }
+
     const [allTime, threeMonth, oneMonth] = await Promise.all([
-      computeLeaderboard({ classId: class_id, windowStart: '2000-01-01T00:00:00Z' }),
+      computeLeaderboard({ classId: class_id, windowStart: allTimeStart }),
       computeLeaderboard({ classId: class_id, windowStart: daysAgoIso(90) }),
       computeLeaderboard({ classId: class_id, windowStart: daysAgoIso(30) })
     ])
@@ -71,7 +87,12 @@ export default async function handler(req) {
     const today = new Date()
     const subject = `${klass.class_name} — Investing Update ${today.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
 
-    const payload = { allTime, threeMonth, oneMonth, generatedAt: today.toISOString() }
+    let daysRemaining = null
+    if (klass.end_date) {
+      const end = new Date(klass.end_date + 'T23:59:59Z')
+      daysRemaining = Math.max(0, Math.ceil((end - today) / (1000 * 60 * 60 * 24)))
+    }
+    const payload = { allTime, threeMonth, oneMonth, endDate: klass.end_date || null, daysRemaining, generatedAt: today.toISOString() }
     const introHtml = `<p>${escapeHtml(introText.trim()).replace(/\n+/g, '</p><p>')}</p>`
 
     const inserted = await sbFetch(`/newsletters`, {

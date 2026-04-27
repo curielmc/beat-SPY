@@ -28,12 +28,24 @@ async function fmpBatchQuotes(tickers) {
   return map
 }
 
+// Fetch the close on `date`, or the most recent close before it. We query a
+// 10-day window ending on `date` to handle weekends/holidays gracefully.
 async function fmpHistoricalClose(ticker, date) {
   if (!ticker || !date || !FMP_KEY) return null
-  const res = await fetch(`${FMP_BASE}/historical-price-full/${ticker}?from=${date}&to=${date}&apikey=${FMP_KEY}`).catch(() => null)
+  const to = new Date(date)
+  const from = new Date(to)
+  from.setUTCDate(from.getUTCDate() - 10)
+  const fromStr = from.toISOString().split('T')[0]
+  const toStr = to.toISOString().split('T')[0]
+  const res = await fetch(`${FMP_BASE}/historical-price-full/${ticker}?from=${fromStr}&to=${toStr}&apikey=${FMP_KEY}`).catch(() => null)
   if (!res || !res.ok) return null
   const data = await res.json().catch(() => null)
-  return data?.historical?.[0]?.close || null
+  // FMP returns historical sorted desc (newest first). Pick the entry at-or-before `date`.
+  const rows = data?.historical || []
+  for (const row of rows) {
+    if (row?.date && row.date <= toStr && row.close) return row.close
+  }
+  return null
 }
 
 // Find the snapshot row at-or-before windowStart. Returns null if none.

@@ -39,7 +39,7 @@ async function submit() {
     <div class="card bg-base-100 shadow-lg max-w-md w-full">
       <div class="card-body">
         <h1 class="card-title text-2xl">Beat the S&amp;P 500 — Parent Newsletter</h1>
-        <p class="text-sm opacity-70">Sign up to receive monthly performance updates from your student's class.</p>
+        <p class="text-sm opacity-70">Sign up to receive periodic performance updates from your student's class.</p>
 
         <div v-if="status === 'success'" class="alert alert-success mt-4">
           <span>Check your email — we sent a confirmation link to {{ email }}. You'll start receiving newsletters once you confirm.</span>

@@ -11,6 +11,8 @@ const currentClassId = computed(() => route.query.class_id || auth.activeClassId
 
 const className = ref('')
 const publicSlug = ref('')
+const endDate = ref('')
+const savingEndDate = ref(false)
 const generating = ref(false)
 const sending = ref(false)
 const sendingTest = ref(false)
@@ -27,11 +29,19 @@ const signupUrl = computed(() => publicSlug.value ? `${window.location.origin}/n
 
 async function loadClass() {
   if (!currentClassId.value) return
-  const { data } = await supabase.from('classes').select('class_name, public_slug').eq('id', currentClassId.value).single()
+  const { data } = await supabase.from('classes').select('class_name, public_slug, end_date').eq('id', currentClassId.value).single()
   if (data) {
     className.value = data.class_name
     publicSlug.value = data.public_slug
+    endDate.value = data.end_date || ''
   }
+}
+
+async function saveEndDate() {
+  if (!currentClassId.value) return
+  savingEndDate.value = true
+  await supabase.from('classes').update({ end_date: endDate.value || null }).eq('id', currentClassId.value)
+  savingEndDate.value = false
 }
 
 async function loadHistory() {
@@ -140,7 +150,7 @@ function copySignupUrl() {
 
 function pct(n) {
   const v = Number(n || 0)
-  return `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`
+  return `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`
 }
 
 function nameMapFor(payload) {
@@ -169,6 +179,18 @@ onMounted(() => {
     <h1 class="text-2xl font-bold mb-1">Newsletter</h1>
     <p class="text-sm opacity-70 mb-6">{{ className }}</p>
 
+    <!-- Class end date -->
+    <div class="card bg-base-100 shadow mb-4">
+      <div class="card-body py-4 flex-row items-center gap-3">
+        <span class="text-sm font-semibold">Class end date</span>
+        <input v-model="endDate" type="date" class="input input-bordered input-sm" />
+        <button class="btn btn-sm" :disabled="savingEndDate" @click="saveEndDate">
+          {{ savingEndDate ? 'Saving…' : 'Save' }}
+        </button>
+        <span class="text-xs opacity-60">Newsletter shows a countdown to this date.</span>
+      </div>
+    </div>
+
     <!-- Parent signup link -->
     <div v-if="signupUrl" class="alert mb-6">
       <div class="flex-1">
@@ -195,6 +217,10 @@ onMounted(() => {
       <div class="card-body">
         <h2 class="card-title">Preview &amp; edit</h2>
 
+        <div v-if="draft.payload?.daysRemaining != null" class="alert alert-info mt-2">
+          <span><strong>{{ draft.payload.daysRemaining }} {{ draft.payload.daysRemaining === 1 ? 'day' : 'days' }} remaining</strong> until class ends ({{ draft.payload.endDate }})</span>
+        </div>
+
         <label class="label"><span class="label-text font-semibold">Subject</span></label>
         <input v-model="subject" class="input input-bordered w-full" />
 
@@ -205,7 +231,7 @@ onMounted(() => {
         <div class="divider"></div>
 
         <!-- Rankings preview -->
-        <div v-for="(win, key) in { allTime: 'All-time', threeMonth: 'Last 3 months', oneMonth: 'Last 1 month' }" :key="key" class="mb-6">
+        <div v-for="(win, key) in { oneMonth: 'Last 1 month', threeMonth: 'Last 3 months', allTime: 'All-time' }" :key="key" class="mb-6">
           <h3 class="font-bold text-lg">{{ win }}</h3>
           <p class="text-xs opacity-70 mb-2">S&amp;P 500: <strong>{{ pct(draft.payload[key]?.spyReturnPct) }}</strong></p>
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
