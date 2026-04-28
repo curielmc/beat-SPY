@@ -13,6 +13,18 @@ import { MATERIAL_FIELDS, detectMaterialChanges } from '../../../src/lib/competi
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
+const PATCHABLE_FIELDS = [
+  'name', 'description', 'sponsor', 'sponsor_logo_url',
+  'benchmark_ticker', 'starting_cash',
+  'registration_open', 'registration_close', 'start_date', 'end_date',
+  'status', 'rules', 'is_public',
+  'slug', 'share_token', 'universe', 'email_domain_allowlist',
+  'prize_pool_amount', 'prize_pool_currency', 'prize_allocation',
+  'unfilled_bucket_policy', 'payout_provider', 'payout_mode', 'default_charity',
+  'convert_to_individual_on_complete', 'show_real_names', 'sms_enabled',
+  'late_join_allowed', 'digest_frequency'
+]
+
 function authHeaders(extra = {}) {
   return {
     apikey: SUPABASE_SERVICE_KEY,
@@ -55,7 +67,13 @@ export default async function handler(req) {
   }
 
   const body = await req.json().catch(() => ({}))
-  const updates = body.updates || {}
+  const rawUpdates = body.updates || {}
+  const updates = Object.fromEntries(
+    Object.entries(rawUpdates).filter(([k]) => PATCHABLE_FIELDS.includes(k))
+  )
+  if (Object.keys(updates).length === 0) {
+    return jsonResponse({ error: 'no_patchable_fields' }, 400)
+  }
   const reason = body.reason || null
 
   // Load current row
