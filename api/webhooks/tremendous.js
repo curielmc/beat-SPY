@@ -5,6 +5,9 @@ import {
   SUPABASE_SERVICE_KEY,
   sbFetch
 } from '../_lib/supabase.js'
+import { writeAudit } from '../_lib/auditLog.js'
+
+const TERMINAL_STATUSES = new Set(['delivered', 'paid_manually', 'canceled'])
 
 // Tremendous webhook receiver.
 //
@@ -94,7 +97,7 @@ export default async function handler(req) {
 
   // Look up the matching payout row by provider_payout_id.
   const rows = await sbFetch(
-    `/competition_payouts?provider_payout_id=eq.${encodeURIComponent(rewardId)}&select=id,status&limit=1`
+    `/competition_payouts?provider_payout_id=eq.${encodeURIComponent(rewardId)}&select=id,competition_id,user_id,status,paid_at,error&limit=1`
   )
   const row = rows?.[0]
   if (!row) {
@@ -104,9 +107,17 @@ export default async function handler(req) {
     })
   }
 
-  // Don't downgrade terminal states.
+  // Terminal-state guard FIRST so out-of-order events can't downgrade
+  // an already-terminal payout (e.g. a stale FAILED arriving after DELIVERED).
+  if (TERMINAL_STATUSES.has(row.status)) {
+    return new Response(JSON.stringify({ ok: true, terminal: true }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    })
+  }
   if (row.status === newStatus) {
     return new Response(JSON.stringify({ ok: true, unchanged: true }), {
+      status: 200,
       headers: { 'Content-Type': 'application/json' }
     })
   }
