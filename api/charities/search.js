@@ -33,8 +33,11 @@ export default async function handler(req) {
 
   const url = new URL(req.url)
   const q = (url.searchParams.get('q') || '').trim()
+  if (q.length > 100) {
+    return jsonResponse({ error: 'query_too_long', max: 100 }, 400)
+  }
 
-  if (TREMENDOUS_KEY) {
+  if (TREMENDOUS_KEY && q !== '') {
     try {
       const tr = await fetch(`${TREMENDOUS_BASE}/charities?search=${encodeURIComponent(q)}`, {
         headers: { Authorization: `Bearer ${TREMENDOUS_KEY}`, Accept: 'application/json' }
