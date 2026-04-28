@@ -447,10 +447,16 @@ async function completeSignup() {
       parent_language: needsParent.value ? parentLanguage.value : 'en',
       parental_consent_status: needsParent.value ? 'pending' : 'not_required'
     }
-    await supabase.from('profiles').update(updates).eq('id', auth.currentUser.id)
+    const { error: profileErr } = await supabase.from('profiles').update(updates).eq('id', auth.currentUser.id)
+    if (profileErr) {
+      groupError.value = `Could not save your profile: ${profileErr.message}. Please try again.`
+      submitting.value = false
+      return
+    }
   } catch (e) {
-    // Non-fatal; user can update from settings
-    console.warn('Profile DOB update failed:', e)
+    groupError.value = `Could not save your profile: ${e.message || e}. Please try again.`
+    submitting.value = false
+    return
   }
 
   // 5. Trigger parent consent email if under-18
