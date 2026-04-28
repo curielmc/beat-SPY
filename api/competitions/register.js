@@ -59,11 +59,13 @@ export default async function handler(req) {
   // 3. Roster
   const rosterRows = await sbFetch(`/competition_roster?competition_id=eq.${comp.id}&limit=1`)
   if (rosterRows?.length) {
-    const match = await sbFetch(
-      `/competition_roster?competition_id=eq.${comp.id}&email=ilike.${encodeURIComponent(user.email)}&status=eq.invited&limit=1`
+    const emailLower = (user.email || '').toLowerCase()
+    const matches = await sbFetch(
+      `/competition_roster?competition_id=eq.${comp.id}&status=eq.invited&select=id,email,matched_user_id,status`
     )
-    if (!match?.length) return jsonResponse({ error: 'not_on_roster' }, 403)
-    await fetch(`${SUPABASE_URL}/rest/v1/competition_roster?id=eq.${match[0].id}`, {
+    const match = (matches || []).find((r) => (r.email || '').toLowerCase() === emailLower)
+    if (!match) return jsonResponse({ error: 'not_on_roster' }, 403)
+    await fetch(`${SUPABASE_URL}/rest/v1/competition_roster?id=eq.${match.id}`, {
       method: 'PATCH',
       headers: authHeaders(),
       body: JSON.stringify({
