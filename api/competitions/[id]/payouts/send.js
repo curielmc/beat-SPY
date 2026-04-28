@@ -138,7 +138,12 @@ export default async function handler(req) {
       })
 
       try {
-        const claimUrl = rewardId ? `https://tremendous.com/rewards/${rewardId}` : null
+        // Derive the claim host from TREMENDOUS_BASE_URL so sandbox/staging
+        // users land on the correct domain (testflight vs production).
+        const tremendousHost = (process.env.TREMENDOUS_BASE_URL || 'https://www.tremendous.com/api/v2')
+          .replace(/\/api\/v2\/?$/, '')
+          .replace(/\/$/, '')
+        const claimUrl = rewardId ? `${tremendousHost}/rewards/${rewardId}` : null
         await sendChallengeNotification('won_payout', competitionId, p.user_id, {
           amount: p.amount,
           competitionName: comp.name,
