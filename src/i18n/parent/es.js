@@ -1,3 +1,4 @@
+export default
 {
   "consent_text_version": "v1-2026-04-27",
   "page": {
