@@ -64,7 +64,7 @@ export default async function handler(req) {
   if (existing.status === 'removed') return jsonResponse({ error: 'already_removed' }, 422)
 
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/competition_entries?id=eq.${entry_id}`,
+    `${SUPABASE_URL}/rest/v1/competition_entries?id=eq.${entry_id}&competition_id=eq.${competitionId}`,
     {
       method: 'PATCH',
       headers: authHeaders({ Prefer: 'return=representation' }),
