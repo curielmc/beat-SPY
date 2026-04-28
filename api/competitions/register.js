@@ -65,15 +65,18 @@ export default async function handler(req) {
     )
     const match = (matches || []).find((r) => (r.email || '').toLowerCase() === emailLower)
     if (!match) return jsonResponse({ error: 'not_on_roster' }, 403)
-    await fetch(`${SUPABASE_URL}/rest/v1/competition_roster?id=eq.${match.id}`, {
+    const patchRes = await fetch(`${SUPABASE_URL}/rest/v1/competition_roster?id=eq.${match.id}`, {
       method: 'PATCH',
-      headers: authHeaders(),
+      headers: authHeaders({ Prefer: 'return=minimal' }),
       body: JSON.stringify({
         status: 'registered',
         matched_user_id: profile.id,
         registered_at: new Date().toISOString()
       })
     })
+    if (!patchRes.ok) {
+      return jsonResponse({ error: 'roster_update_failed' }, 500)
+    }
   }
 
   // 4. Already registered?
