@@ -97,18 +97,26 @@
           </div>
         </div>
 
-        <!-- Prizes -->
+        <!-- Prize Allocation Builder -->
         <div class="border border-base-300 rounded-lg p-3 space-y-2">
-          <div class="flex items-center justify-between">
-            <p class="font-semibold text-sm">Prizes</p>
-            <button class="btn btn-ghost btn-xs" @click="addPrize">+ Add Prize</button>
-          </div>
-          <div v-for="(prize, i) in form.prizes" :key="i" class="flex items-center gap-2">
-            <span class="badge badge-sm">{{ prize.place }}</span>
-            <input v-model="prize.description" type="text" class="input input-bordered input-sm flex-1" :placeholder="`Prize for #${prize.place}`" />
-            <button class="btn btn-ghost btn-xs text-error" @click="form.prizes.splice(i, 1)">&#10005;</button>
-          </div>
+          <p class="font-semibold text-sm">Prize Pool & Allocation</p>
+          <PrizeAllocationBuilder
+            :pool="form.prize_pool_amount"
+            :currency="form.prize_pool_currency"
+            :buckets="form.prize_allocation"
+            :unfilledPolicy="form.unfilled_bucket_policy"
+            @update:pool="(v) => form.prize_pool_amount = v"
+            @update:currency="(v) => form.prize_pool_currency = v"
+            @update:buckets="(v) => form.prize_allocation = v"
+            @update:unfilledPolicy="(v) => form.unfilled_bucket_policy = v"
+          />
         </div>
+
+        <!-- Organizers -->
+        <OrganizersPanel v-if="editingId" :competition-id="editingId" />
+
+        <!-- Manage participants (active competitions) -->
+        <ManageParticipants v-if="editingId && form.status === 'active'" :competition-id="editingId" />
 
         <label class="label cursor-pointer justify-start gap-2">
           <input type="checkbox" v-model="form.is_public" class="checkbox checkbox-sm" />
@@ -153,6 +161,7 @@
                 Roster CSV
                 <input type="file" accept=".csv,text/csv" class="hidden" @change="(e) => uploadRoster(comp, e)" />
               </label>
+              <button class="btn btn-ghost btn-xs" @click="router.push(`/admin/competitions/${comp.id}/audit`)">Audit</button>
               <button v-if="comp.status === 'active'" class="btn btn-warning btn-xs" @click="finalize(comp)">Finalize</button>
             </div>
           </div>
@@ -167,8 +176,17 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useCompetitionsStore } from '../../stores/competitions'
+import { useAuthStore } from '../../stores/auth'
 import { getAccessToken } from '../../lib/supabase'
+import { MATERIAL_FIELDS, detectMaterialChanges } from '../../lib/competitionFields'
+import PrizeAllocationBuilder from '../../components/admin/PrizeAllocationBuilder.vue'
+import OrganizersPanel from '../../components/admin/OrganizersPanel.vue'
+import ManageParticipants from '../../components/admin/ManageParticipants.vue'
+
+const router = useRouter()
+const authStore = useAuthStore()
 
 const store = useCompetitionsStore()
 const rosterStatus = reactive({})
@@ -264,8 +282,14 @@ const form = reactive({
   status: 'draft',
   rules: { require_thesis: false, min_stocks: null, max_position_pct: null },
   prizes: [],
+  prize_pool_amount: 0,
+  prize_pool_currency: 'USD',
+  prize_allocation: [],
+  unfilled_bucket_policy: 'redistribute',
   is_public: true
 })
+
+const editingOriginal = ref(null) // snapshot of competition before edit, for diff
 
 const canSave = computed(() => form.name.trim() && form.benchmark_ticker.trim() && form.start_date && form.end_date)
 
@@ -292,9 +316,14 @@ function resetForm() {
   form.status = 'draft'
   form.rules = { require_thesis: false, min_stocks: null, max_position_pct: null }
   form.prizes = []
+  form.prize_pool_amount = 0
+  form.prize_pool_currency = 'USD'
+  form.prize_allocation = []
+  form.unfilled_bucket_policy = 'redistribute'
   form.is_public = true
   restrictedTickersInput.value = ''
   formError.value = ''
+  editingOriginal.value = null
 }
 
 function editComp(comp) {
@@ -313,8 +342,13 @@ function editComp(comp) {
   form.status = comp.status
   form.rules = { require_thesis: false, min_stocks: null, max_position_pct: null, ...(comp.rules || {}) }
   form.prizes = [...(comp.prizes || [])]
+  form.prize_pool_amount = Number(comp.prize_pool_amount || 0)
+  form.prize_pool_currency = comp.prize_pool_currency || 'USD'
+  form.prize_allocation = Array.isArray(comp.prize_allocation) ? JSON.parse(JSON.stringify(comp.prize_allocation)) : []
+  form.unfilled_bucket_policy = comp.unfilled_bucket_policy || 'redistribute'
   form.is_public = comp.is_public
   restrictedTickersInput.value = (comp.rules?.restricted_tickers || []).join(', ')
+  editingOriginal.value = JSON.parse(JSON.stringify(comp))
 }
 
 async function save() {
@@ -342,13 +376,48 @@ async function save() {
     registration_close: form.registration_close || null,
     status: form.status,
     rules,
-    prizes: form.prizes.filter(p => p.description.trim()),
+    prizes: form.prizes.filter(p => p.description?.trim?.()),
+    prize_pool_amount: Number(form.prize_pool_amount) || 0,
+    prize_pool_currency: form.prize_pool_currency || 'USD',
+    prize_allocation: form.prize_allocation || [],
+    unfilled_bucket_policy: form.unfilled_bucket_policy || 'redistribute',
     is_public: form.is_public
+  }
+
+  // Mid-challenge edit: confirm material changes against participants.
+  let reason = null
+  if (editingId.value && editingOriginal.value && form.status === 'active') {
+    const changes = detectMaterialChanges(editingOriginal.value, payload)
+    const fields = Object.keys(changes)
+    if (fields.length) {
+      const r = window.prompt(
+        `This change touches material field(s) [${fields.join(', ')}]. ` +
+        `It will be logged in the audit trail and will notify all participants. ` +
+        `Optional reason (will be included in the notification):`,
+        ''
+      )
+      if (r === null) { saving.value = false; return } // cancelled
+      reason = r.trim() || null
+    }
   }
 
   let result
   if (editingId.value) {
-    result = await store.updateCompetition(editingId.value, payload)
+    // Use server-side update endpoint when editing an existing competition so
+    // material changes get audited + notifications dispatched server-side.
+    try {
+      const token = await getAccessToken()
+      const res = await fetch(`/api/competitions/${editingId.value}/update`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ updates: payload, reason })
+      })
+      const body = await res.json()
+      if (!res.ok) result = { error: body.error || 'Update failed' }
+      else result = { success: true, competition: body.competition }
+    } catch (e) {
+      result = { error: e.message }
+    }
   } else {
     result = await store.createCompetition(payload)
   }
