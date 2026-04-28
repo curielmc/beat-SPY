@@ -104,6 +104,7 @@ const router = createRouter({
         { path: 'portfolios', name: 'admin-portfolios', component: () => import('../views/admin/PortfoliosView.vue') },
         { path: 'settings', name: 'admin-settings', component: () => import('../views/admin/SettingsView.vue') },
         { path: 'competitions', name: 'admin-competitions', component: () => import('../views/admin/CompetitionsAdminView.vue') },
+        { path: 'competitions/:id/audit', name: 'admin-competition-audit', component: () => import('../views/admin/CompetitionAuditView.vue') },
         { path: 'tutorials', name: 'admin-tutorials', component: () => import('../views/admin/TutorialsAdminView.vue') },
         { path: 'tutorials/new', name: 'admin-tutorial-new', component: () => import('../views/admin/TutorialEditorView.vue') },
         { path: 'tutorials/edit/:id', name: 'admin-tutorial-edit', component: () => import('../views/admin/TutorialEditorView.vue') },
