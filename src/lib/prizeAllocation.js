@@ -63,10 +63,16 @@ function splitAmount(bucket, bucketAmount, candidates) {
   }
   if (bucket.split === 'weighted_by_rank') {
     const weights = bucket.weights || []
-    const totalW = weights.slice(0, candidates.length).reduce((a, b) => a + b, 0)
+    const effectiveWeights = candidates.map((_, i) => Number(weights[i] ?? 0))
+    const totalW = effectiveWeights.reduce((a, b) => a + b, 0)
+    if (totalW === 0) {
+      // No usable weights — degrade to equal split
+      const each = round2(bucketAmount / candidates.length)
+      return candidates.map(c => ({ user_id: c.user_id, amount: each }))
+    }
     return candidates.map((c, i) => ({
       user_id: c.user_id,
-      amount: round2((weights[i] / totalW) * bucketAmount)
+      amount: round2((effectiveWeights[i] / totalW) * bucketAmount)
     }))
   }
   // equal_split

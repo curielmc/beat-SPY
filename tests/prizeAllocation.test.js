@@ -46,6 +46,27 @@ test('hybrid 25/25/50', () => {
   assert.equal(m.u4, 500)
 })
 
+test('weighted_by_rank degrades to equal split when weights are missing', () => {
+  const out = resolvePrizeBuckets(
+    [{ eligibility: 'top_n', n: 3, allocation: { type: 'percent_of_pool', value: 100 }, split: 'weighted_by_rank' /* no weights */ }],
+    ranking, 1000)
+  // 3 candidates, no weights → equal split of 1000
+  assert.equal(out.payouts.length, 3)
+  out.payouts.forEach(p => assert.equal(p.amount, 333.33))
+})
+
+test('weighted_by_rank handles fewer weights than candidates', () => {
+  const out = resolvePrizeBuckets(
+    [{ eligibility: 'top_n', n: 3, allocation: { type: 'percent_of_pool', value: 100 }, split: 'weighted_by_rank', weights: [70, 30] }],
+    ranking, 1000)
+  // 3 candidates, 2 weights — 3rd gets 0
+  const m = Object.fromEntries(out.payouts.map(p => [p.user_id, p.amount]))
+  assert.equal(m.u1, 700)
+  assert.equal(m.u2, 300)
+  // u3 either gets 0 or is omitted — accept either
+  if (m.u3 !== undefined) assert.equal(m.u3, 0)
+})
+
 test('unfilled bucket reported', () => {
   const noOneBeat = ranking.map(r => ({ ...r, beat_benchmark: false }))
   const out = resolvePrizeBuckets(
