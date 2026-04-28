@@ -230,12 +230,22 @@
                 <input v-model="approvalCode" type="text" class="input input-bordered input-sm w-full uppercase font-mono" placeholder="Enter code" />
               </div>
 
+              <!-- Challenge universe constraint -->
+              <div v-if="challenge" class="alert alert-info text-xs py-2 mb-2">
+                <span>
+                  This challenge ({{ challenge.name }}) allows {{ challengeUniverseLabel }}.
+                </span>
+              </div>
+              <div v-if="challenge && !canTradeInChallenge" class="alert alert-warning text-xs py-2 mb-2">
+                <span>{{ ticker }} is not allowed in this challenge.</span>
+              </div>
+
               <!-- Execute Button -->
               <div class="pt-2">
                 <button
                   class="btn btn-block shadow-lg"
                   :class="tradeMode === 'buy' ? 'btn-success' : 'btn-error'"
-                  :disabled="!canTrade || executing || educatorTradingDisabled"
+                  :disabled="!canTrade || executing || educatorTradingDisabled || (challenge && !canTradeInChallenge)"
                   @click="executeTrade"
                 >
                   <span v-if="executing" class="loading loading-spinner loading-sm"></span>
@@ -412,6 +422,7 @@ import TakeCard from '../../components/TakeCard.vue'
 import SectorLabel from '../../components/SectorLabel.vue'
 import { isMarketOpen, getMarketHoursMessage } from '../../utils/marketHours'
 import { getAvailableCashForQueuedBuys } from '../../lib/tradePricing'
+import { useChallengeContext, universeLabel, tickerAllowedInChallenge } from '../../composables/useChallengeContext.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -460,6 +471,20 @@ const postingTake = ref(false)
 const activeCompEntry = ref(null)
 const activeComp = ref(null)
 const compRuleErrors = ref([])
+
+// Challenge / universe context for the active portfolio
+const activePortfolioIdRef = computed(() => portfolioStore.portfolio?.id || null)
+const { challenge } = useChallengeContext(activePortfolioIdRef)
+// For UI-side disable on non-SPY modes, we can decide locally. For sp500_via_spy
+// we surface a warning but defer the hard check to the server (which has the
+// full snapshot) to avoid loading ~500 tickers client-side just for one screen.
+const canTradeInChallenge = computed(() => {
+  if (!challenge.value) return true
+  const mode = challenge.value.universe?.mode
+  if (mode === 'sp500_via_spy') return true // server-side enforces
+  return tickerAllowedInChallenge(challenge.value, ticker, new Set())
+})
+const challengeUniverseLabel = computed(() => universeLabel(challenge.value?.universe))
 const switchingPortfolio = ref(false)
 const groupFunds = ref([])
 

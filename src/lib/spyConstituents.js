@@ -3,16 +3,24 @@
 import { sbFetch } from '../../api/_lib/supabase.js'
 
 const cache = new Map() // as_of_date -> { fetchedAt, set }
+const inflight = new Map() // as_of_date -> Promise<Set>
 const TTL_MS = 5 * 60 * 1000
 
 export async function loadSpyConstituentsAsOf(asOfDate) {
   const key = asOfDate
   const hit = cache.get(key)
   if (hit && Date.now() - hit.fetchedAt < TTL_MS) return hit.set
-  const rows = await sbFetch(`/spy_constituents?as_of_date=eq.${key}&select=ticker`)
-  const set = new Set((rows || []).map(r => String(r.ticker).toUpperCase()))
-  cache.set(key, { fetchedAt: Date.now(), set })
-  return set
+  if (inflight.has(key)) return inflight.get(key)
+  const p = sbFetch(`/spy_constituents?as_of_date=eq.${key}&select=ticker`)
+    .then(rows => {
+      const set = new Set((rows || []).map(r => String(r.ticker).toUpperCase()))
+      cache.set(key, { fetchedAt: Date.now(), set })
+      inflight.delete(key)
+      return set
+    })
+    .catch(e => { inflight.delete(key); throw e })
+  inflight.set(key, p)
+  return p
 }
 
 export async function loadLatestSpyConstituents() {

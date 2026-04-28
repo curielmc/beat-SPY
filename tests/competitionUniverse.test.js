@@ -34,3 +34,10 @@ test('exclude_list rejects listed tickers, allows others', () => {
 test('case-insensitive ticker match', () => {
   assert.equal(assertTickerAllowed({ mode: 'sp500_via_spy' }, 'aapl', sp500Set), true)
 })
+
+test('unknown mode throws UniverseError', () => {
+  assert.throws(
+    () => assertTickerAllowed({ mode: 'future_mode' }, 'AAPL', sp500Set),
+    /Unknown universe mode/
+  )
+})

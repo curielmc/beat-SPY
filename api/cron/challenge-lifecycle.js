@@ -16,18 +16,21 @@ export default async function handler(req) {
 }
 
 async function snapshotUniversesForStartingChallenges(nowIso) {
-  // Find competitions in registration/active status with sp500_via_spy universe.
-  // We snapshot once start_date has passed and no snapshot_date is set.
-  const due = await sbFetch(
-    `/competitions?status=in.(registration,active)&select=id,start_date,universe,status&universe->>mode=eq.sp500_via_spy`
+  // Find competitions in registration/active status. Filter sp500_via_spy in JS
+  // because the PostgREST `universe->>mode=eq.X` filter can be silently ignored
+  // on some Supabase versions.
+  const all = await sbFetch(
+    `/competitions?status=in.(registration,active)&select=id,start_date,universe,status`
   )
-  if (!due?.length) return { snapshotted: 0 }
+  const due = (all || []).filter(c => c.universe?.mode === 'sp500_via_spy')
+  if (!due.length) return { snapshotted: 0, failed: 0 }
 
   const latestRow = (await sbFetch(`/spy_constituents?select=as_of_date&order=as_of_date.desc&limit=1`))?.[0]
-  if (!latestRow) return { snapshotted: 0, warning: 'no_spy_constituents_yet' }
+  if (!latestRow) return { snapshotted: 0, failed: 0, warning: 'no_spy_constituents_yet' }
   const snapshotDate = latestRow.as_of_date
 
   let snapshotted = 0
+  let failed = 0
   for (const c of due) {
     if (c.universe?.snapshot_date) continue
     if (c.start_date && c.start_date > nowIso) continue
@@ -45,7 +48,12 @@ async function snapshotUniversesForStartingChallenges(nowIso) {
       },
       body: JSON.stringify(patchBody)
     })
-    if (res.ok) snapshotted += 1
+    if (res.ok) {
+      snapshotted += 1
+    } else {
+      failed += 1
+      console.error(`[lifecycle] PATCH failed for competition ${c.id}: ${res.status} ${await res.text()}`)
+    }
   }
-  return { snapshotted, snapshot_date: snapshotDate }
+  return { snapshotted, failed, snapshot_date: snapshotDate }
 }
