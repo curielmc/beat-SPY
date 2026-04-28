@@ -59,11 +59,6 @@ export default async function handler(req) {
 
   if (req.method !== 'POST') return jsonResponse({ error: 'method_not_allowed' }, 405)
 
-  const out = await loadTokenAndProfile(consentToken)
-  if (out.error) return jsonResponse({ error: out.error }, out.status)
-  const { token: tk, profile } = out
-  if (!profile) return jsonResponse({ error: 'profile_not_found' }, 404)
-
   const body = await req.json().catch(() => ({}))
   const {
     parent_name,
@@ -82,6 +77,31 @@ export default async function handler(req) {
     return jsonResponse({ error: 'participation_consent_required' }, 422)
   }
   const locale = consent_locale === 'es' ? 'es' : 'en'
+
+  // Atomic claim of the token — fails (returns []) if already used or expired.
+  // PostgREST compare-and-swap: PATCH only matches rows where used_at IS NULL
+  // and expires_at is in the future.
+  const claimRes = await fetch(`${SUPABASE_URL}/rest/v1/parental_consent_tokens?token=eq.${encodeURIComponent(consentToken)}&used_at=is.null&expires_at=gt.${encodeURIComponent(new Date().toISOString())}`, {
+    method: 'PATCH',
+    headers: authHeaders({ Prefer: 'return=representation' }),
+    body: JSON.stringify({ used_at: new Date().toISOString() })
+  })
+  const claimed = await claimRes.json().catch(() => [])
+  if (!Array.isArray(claimed) || claimed.length === 0) {
+    return jsonResponse({ error: 'token_unavailable' }, 410)
+  }
+  const tk = claimed[0]
+
+  // Load profile for this user
+  const profiles = await sbFetch(
+    `/profiles?id=eq.${tk.user_id}&select=id,full_name,email,parent_language,parental_consent_status&limit=1`
+  )
+  const profile = profiles?.[0]
+  if (!profile) return jsonResponse({ error: 'profile_not_found' }, 404)
+  // NOTE: Known eventual-consistency edge: if the consent insert or profile
+  // patch below fails after the CAS above, the token is consumed without a
+  // matching parental_consents row. Acceptable for v1.
+  // TODO(v2): wrap in a transactional retry / Postgres function.
 
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null
   const ua = req.headers.get('user-agent') || null
@@ -141,12 +161,7 @@ export default async function handler(req) {
     }).catch(() => {})
   }
 
-  // 4. Mark token used
-  await fetch(`${SUPABASE_URL}/rest/v1/parental_consent_tokens?token=eq.${encodeURIComponent(consentToken)}`, {
-    method: 'PATCH',
-    headers: authHeaders({ Prefer: 'return=minimal' }),
-    body: JSON.stringify({ used_at: nowIso })
-  })
+  // 4. Token already marked used by atomic CAS at the top of POST.
 
   // 5. Receipt email
   try {
