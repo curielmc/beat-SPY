@@ -33,6 +33,10 @@
     {
       "path": "/api/cron/fetch-spy-constituents",
       "schedule": "0 22 * * 1-5"
+    },
+    {
+      "path": "/api/cron/challenge-lifecycle",
+      "schedule": "5 13 * * *"
     }
   ]
 }
