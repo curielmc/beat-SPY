@@ -64,6 +64,40 @@
           Save Changes
         </button>
       </div>
+
+      <!-- SMS notifications -->
+      <div class="card border border-base-300 bg-base-100 mt-6">
+        <div class="card-body p-4 space-y-3">
+          <h2 class="font-semibold text-base">Text-message notifications</h2>
+          <p class="text-xs text-base-content/60">
+            Get critical challenge alerts (start/end reminders, prize wins, removals) via SMS.
+            Msg &amp; data rates may apply. Reply STOP to opt out at any time.
+          </p>
+
+          <div class="form-control">
+            <label class="label py-1"><span class="label-text text-sm">Mobile phone (E.164, e.g. +15551234567)</span></label>
+            <input v-model="smsForm.phone" type="tel" class="input input-bordered w-full" placeholder="+15551234567" :disabled="smsSaving" />
+          </div>
+
+          <label class="label cursor-pointer justify-start gap-2">
+            <input type="checkbox" v-model="smsForm.optIn" class="checkbox checkbox-sm" :disabled="smsSaving" />
+            <span class="label-text text-sm">I agree to receive automated texts from beat-SPY at this number.</span>
+          </label>
+
+          <div v-if="smsError" class="text-error text-sm">{{ smsError }}</div>
+          <div v-if="smsSuccess" class="text-success text-sm">{{ smsSuccess }}</div>
+
+          <div class="flex gap-2">
+            <button class="btn btn-primary btn-sm" :disabled="smsSaving || !smsForm.phone || !smsForm.optIn" @click="saveSms">
+              <span v-if="smsSaving" class="loading loading-spinner loading-xs"></span>
+              Save &amp; opt in
+            </button>
+            <button v-if="auth.profile?.sms_opt_in" class="btn btn-ghost btn-sm" :disabled="smsSaving" @click="optOutSms">
+              Opt out
+            </button>
+          </div>
+        </div>
+      </div>
     </template>
   </div>
 </template>
@@ -71,7 +105,7 @@
 <script setup>
 import { reactive, ref, computed, onMounted, watch } from 'vue'
 import { useAuthStore } from '../../stores/auth'
-import { uploadAvatar } from '../../lib/supabase'
+import { uploadAvatar, supabase } from '../../lib/supabase'
 
 const auth = useAuthStore()
 
@@ -178,5 +212,67 @@ async function save() {
   original = { ...form }
   success.value = true
   setTimeout(() => { success.value = false }, 3000)
+}
+
+// ---------- SMS opt-in ----------
+const smsForm = reactive({ phone: '', optIn: false })
+const smsSaving = ref(false)
+const smsError = ref('')
+const smsSuccess = ref('')
+
+watch(() => auth.profile, (p) => {
+  if (!p) return
+  smsForm.phone = p.phone_e164 || ''
+  smsForm.optIn = !!p.sms_opt_in
+}, { immediate: true })
+
+async function postSmsApi(body) {
+  const { data: sess } = await supabase.auth.getSession()
+  const token = sess?.session?.access_token
+  const res = await fetch('/api/profile/sms-optin', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(body)
+  })
+  const json = await res.json().catch(() => ({}))
+  return { ok: res.ok, json }
+}
+
+async function saveSms() {
+  smsError.value = ''
+  smsSuccess.value = ''
+  if (!/^\+[1-9]\d{6,14}$/.test(smsForm.phone)) {
+    smsError.value = 'Phone must be in E.164 format (e.g. +15551234567).'
+    return
+  }
+  smsSaving.value = true
+  const { ok, json } = await postSmsApi({ phone_e164: smsForm.phone, sms_opt_in: true })
+  smsSaving.value = false
+  if (!ok) {
+    smsError.value = json.error === 'invalid_phone'
+      ? 'That phone number doesn\'t look valid. Try another.'
+      : (json.error || 'Failed to save.')
+    return
+  }
+  smsSuccess.value = "You're opted in. We sent a confirmation text."
+  if (auth.profile) {
+    auth.profile.phone_e164 = smsForm.phone
+    auth.profile.sms_opt_in = true
+  }
+}
+
+async function optOutSms() {
+  smsError.value = ''
+  smsSuccess.value = ''
+  smsSaving.value = true
+  const { ok, json } = await postSmsApi({ sms_opt_in: false })
+  smsSaving.value = false
+  if (!ok) {
+    smsError.value = json.error || 'Failed to opt out.'
+    return
+  }
+  smsSuccess.value = "You're opted out of texts."
+  smsForm.optIn = false
+  if (auth.profile) auth.profile.sms_opt_in = false
 }
 </script>
