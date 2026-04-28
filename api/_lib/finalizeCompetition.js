@@ -130,14 +130,18 @@ export async function finalizeCompetition({ competitionId, actorId, source = 'ma
         row.status = 'failed'
         row.error = 'no_charity_resolved'
       }
+      // UNIQUE (competition_id, user_id) on competition_payouts protects against
+      // duplicate inserts when two finalize calls race past the terminal-status
+      // guard. ignore-duplicates means the second caller silently no-ops.
       const res = await fetch(`${SUPABASE_URL}/rest/v1/competition_payouts`, {
         method: 'POST',
-        headers: svcHeaders({ Prefer: 'return=representation' }),
+        headers: svcHeaders({ Prefer: 'return=representation,resolution=ignore-duplicates' }),
         body: JSON.stringify(row)
       })
       if (res.ok) {
-        const out = await res.json()
-        if (out?.[0]) createdPayouts.push(out[0])
+        const out = await res.json().catch(() => null)
+        if (Array.isArray(out) && out[0]) createdPayouts.push(out[0])
+        else console.warn('[finalize] payout insert returned no row (likely duplicate)', { user_id: p.user_id })
       } else {
         console.error('[finalize] payout insert failed', res.status, await res.text())
       }
