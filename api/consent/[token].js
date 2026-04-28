@@ -110,8 +110,11 @@ export default async function handler(req) {
     return jsonResponse({ error: 'consent_insert_failed', detail: err }, 500)
   }
 
-  // 2. Update profile
-  const expiresAt = new Date(Date.now() + 365 * 86400 * 1000).toISOString()
+  // 2. Update profile (consent valid for 12 calendar months)
+  const consentedAt = new Date()
+  const expires = new Date(consentedAt)
+  expires.setUTCMonth(expires.getUTCMonth() + 12)
+  const expiresAt = expires.toISOString()
   await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${profile.id}`, {
     method: 'PATCH',
     headers: authHeaders({ Prefer: 'return=minimal' }),
