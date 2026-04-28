@@ -149,8 +149,15 @@
             </div>
             <div class="flex gap-1">
               <button class="btn btn-ghost btn-xs" @click="editComp(comp)">Edit</button>
+              <label class="btn btn-ghost btn-xs">
+                Roster CSV
+                <input type="file" accept=".csv,text/csv" class="hidden" @change="(e) => uploadRoster(comp, e)" />
+              </label>
               <button v-if="comp.status === 'active'" class="btn btn-warning btn-xs" @click="finalize(comp)">Finalize</button>
             </div>
+          </div>
+          <div v-if="rosterStatus[comp.id]" class="text-xs mt-2" :class="rosterStatus[comp.id].error ? 'text-error' : 'text-success'">
+            {{ rosterStatus[comp.id].message }}
           </div>
         </div>
       </div>
@@ -161,8 +168,58 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useCompetitionsStore } from '../../stores/competitions'
+import { getAccessToken } from '../../lib/supabase'
 
 const store = useCompetitionsStore()
+const rosterStatus = reactive({})
+
+async function uploadRoster(comp, event) {
+  const file = event.target.files?.[0]
+  if (!file) return
+  rosterStatus[comp.id] = { message: 'Parsing CSV…' }
+  try {
+    const text = await file.text()
+    const rows = parseCsv(text)
+    if (!rows.length) {
+      rosterStatus[comp.id] = { message: 'CSV is empty', error: true }
+      return
+    }
+    const token = await getAccessToken()
+    const res = await fetch('/api/competitions/upload-roster', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ competition_id: comp.id, rows })
+    })
+    const body = await res.json()
+    if (!res.ok) {
+      rosterStatus[comp.id] = { message: body.error || 'Upload failed', error: true }
+      return
+    }
+    rosterStatus[comp.id] = { message: `Uploaded ${body.upserted} entries (${body.skipped || 0} skipped)` }
+  } catch (e) {
+    rosterStatus[comp.id] = { message: e.message, error: true }
+  } finally {
+    event.target.value = ''
+  }
+}
+
+function parseCsv(text) {
+  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
+  if (!lines.length) return []
+  const header = lines[0].toLowerCase().split(',').map((s) => s.trim())
+  const emailIdx = header.indexOf('email')
+  const nameIdx = header.indexOf('full_name')
+  const startIdx = (emailIdx === -1 && nameIdx === -1) ? 0 : 1
+  const rows = []
+  for (let i = startIdx; i < lines.length; i++) {
+    const parts = lines[i].split(',').map((s) => s.trim())
+    let email, full_name
+    if (emailIdx >= 0) { email = parts[emailIdx]; full_name = nameIdx >= 0 ? parts[nameIdx] : '' }
+    else { email = parts[0]; full_name = parts[1] || '' }
+    if (email && /@/.test(email)) rows.push({ email, full_name })
+  }
+  return rows
+}
 
 const showForm = ref(false)
 const editingId = ref(null)
