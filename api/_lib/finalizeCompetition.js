@@ -161,6 +161,36 @@ export async function finalizeCompetition({ competitionId, actorId, source = 'ma
     }
   }
 
+  // 6b. Partial-payout guard: if some inserts didn't land, don't flip to
+  // 'finalized' — surface as 'pending_organizer_decision' so the dashboard
+  // shows the failure and an organizer can intervene.
+  if (!needsOrganizer && createdPayouts.length < payouts.length) {
+    await fetch(`${SUPABASE_URL}/rest/v1/competitions?id=eq.${competitionId}`, {
+      method: 'PATCH',
+      headers: svcHeaders({ Prefer: 'return=minimal' }),
+      body: JSON.stringify({
+        status: 'pending_organizer_decision',
+        spy_return_pct: spyReturnPct
+      })
+    })
+    await writeAudit({
+      competitionId,
+      actorId,
+      action: 'finalize_partial_failure',
+      after: {
+        expected: payouts.length,
+        created: createdPayouts.length,
+        source
+      }
+    })
+    return {
+      ok: false,
+      error: 'partial_payouts',
+      expected: payouts.length,
+      created: createdPayouts.length
+    }
+  }
+
   // 7. Status update
   const newStatus = needsOrganizer ? 'pending_organizer_decision' : 'finalized'
   await fetch(`${SUPABASE_URL}/rest/v1/competitions?id=eq.${competitionId}`, {
