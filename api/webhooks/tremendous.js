@@ -141,6 +141,19 @@ export default async function handler(req) {
     return new Response('patch failed', { status: 500 })
   }
 
+  // Best-effort audit entry — actor is null because Tremendous (not a human) drove this.
+  try {
+    await writeAudit({
+      competitionId: row.competition_id,
+      actorId: null,
+      action: 'payout_status_changed',
+      before: { status: row.status, paid_at: row.paid_at, error: row.error },
+      after: { status: newStatus, event_type: eventType, provider_payout_id: rewardId }
+    })
+  } catch (e) {
+    console.error('[tremendous-webhook] audit log failed', e)
+  }
+
   return new Response(JSON.stringify({ ok: true, status: newStatus }), {
     headers: { 'Content-Type': 'application/json' }
   })
