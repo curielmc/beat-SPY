@@ -7,6 +7,7 @@
 import { SUPABASE_URL, SUPABASE_SERVICE_KEY, sbFetch } from './supabase.js'
 import { resolvePrizeBuckets } from '../../src/lib/prizeAllocation.js'
 import { resolveCharityDestination } from '../../src/lib/charityResolver.js'
+import { assignRanks } from '../../src/lib/competitionRanking.js'
 import { writeAudit } from './auditLog.js'
 import { sendChallengeNotification } from '../../src/notifications/dispatch.js'
 
@@ -67,7 +68,7 @@ export async function finalizeCompetition({ competitionId, actorId, source = 'ma
 
   // 3. Rank
   enriched.sort((a, b) => b.final_return_pct - a.final_return_pct)
-  enriched.forEach((e, i) => { e.final_rank = i + 1 })
+  assignRanks(enriched)
   for (const e of enriched) {
     await fetch(`${SUPABASE_URL}/rest/v1/competition_entries?id=eq.${e.entry_id}`, {
       method: 'PATCH',
