@@ -29,6 +29,10 @@
     {
       "path": "/api/newsletter-reminder-check",
       "schedule": "0 14 * * *"
+    },
+    {
+      "path": "/api/cron/fetch-spy-constituents",
+      "schedule": "0 22 * * 1-5"
     }
   ]
 }
