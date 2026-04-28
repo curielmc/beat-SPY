@@ -84,6 +84,16 @@ export default async function handler(req) {
     ? langOverride
     : (profile?.parent_language || 'en')
 
+  // Idempotency: if already revoked, short-circuit to the success page so
+  // re-clicking the email link doesn't write duplicate rows / re-trigger
+  // notifications.
+  if (profile?.parental_consent_status === 'revoked') {
+    return htmlResponse(htmlPage({
+      title: t(lang, 'revoke.page_title'),
+      body: t(lang, 'revoke.page_body', { student_name: profile.full_name || '' })
+    }))
+  }
+
   // Pull the most recent consent for this user (to copy parent_name etc).
   const recent = (await sbFetch(
     `/parental_consents?user_id=eq.${tk.user_id}&order=consented_at.desc&limit=1`
