@@ -87,8 +87,8 @@
 
         <button
           class="btn btn-outline btn-block"
-          :class="{ 'btn-primary': charityChoice === null && useOrganizerDefault }"
-          @click="useOrganizerDefault = true; charityChoice = null"
+          :class="{ 'btn-primary': pickedOption === 'organizer_default' }"
+          @click="pickedOption = 'organizer_default'; useOrganizerDefault = true; charityChoice = null"
         >
           Let the organizer pick<span v-if="challengeMeta?.default_charity?.name"> (donates to {{ challengeMeta.default_charity.name }})</span>
         </button>
@@ -110,8 +110,8 @@
             v-for="c in charityResults"
             :key="c.ein"
             class="btn btn-ghost btn-sm btn-block justify-start"
-            :class="{ 'btn-primary': charityChoice?.ein === c.ein }"
-            @click="charityChoice = c; useOrganizerDefault = false"
+            :class="{ 'btn-primary': pickedOption === 'specific_charity' && charityChoice?.ein === c.ein }"
+            @click="pickedOption = 'specific_charity'; charityChoice = c; useOrganizerDefault = false"
           >
             <div class="text-left">
               <div class="font-semibold">{{ c.name }}</div>
@@ -120,15 +120,26 @@
           </button>
         </div>
 
-        <p v-if="charityChoice && !useOrganizerDefault" class="text-sm text-success">
+        <p v-if="pickedOption === 'specific_charity' && charityChoice" class="text-sm text-success">
           Selected: <strong>{{ charityChoice.name }}</strong>
         </p>
+
+        <template v-if="challengeMeta?.payout_mode === 'charity_or_cash'">
+          <div class="divider text-xs">OR</div>
+          <button
+            class="btn btn-outline btn-block"
+            :class="{ 'btn-primary': pickedOption === 'self' }"
+            @click="pickedOption = 'self'; charityChoice = null; useOrganizerDefault = false"
+          >
+            Keep prize for myself if I win
+          </button>
+        </template>
 
         <div class="flex gap-2">
           <button class="btn btn-ghost flex-1" @click="step = 2">Back</button>
           <button
             class="btn btn-primary flex-1"
-            :disabled="!useOrganizerDefault && !charityChoice"
+            :disabled="pickedOption === 'specific_charity' && !charityChoice"
             @click="step = 3"
           >
             Continue
@@ -224,6 +235,8 @@ const charityQuery = ref('')
 const charityResults = ref([])
 const charityChoice = ref(null)
 const useOrganizerDefault = ref(false)
+// 'organizer_default' | 'specific_charity' | 'self'
+const pickedOption = ref('organizer_default')
 let _charitySearchTimer = null
 
 // DOB + parent fields
@@ -462,7 +475,8 @@ async function completeSignup() {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           slug: challengeSlug.value,
-          charity_choice: useOrganizerDefault.value ? null : charityChoice.value
+          charity_choice: pickedOption.value === 'self' ? null : (pickedOption.value === 'organizer_default' ? null : charityChoice.value),
+          payout_destination: pickedOption.value === 'self' ? 'self' : undefined
         })
       })
       const body = await res.json().catch(() => ({}))

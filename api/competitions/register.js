@@ -38,7 +38,7 @@ export default async function handler(req) {
   if (!profile) return jsonResponse({ error: 'profile_not_found' }, 404)
 
   const body = await req.json().catch(() => ({}))
-  const { slug, thesis, charity_choice } = body
+  const { slug, thesis, charity_choice, payout_destination: requestedPayoutDestination } = body
   if (!slug) return jsonResponse({ error: 'slug_required' }, 400)
 
   const comps = await sbFetch(`/competitions?slug=eq.${encodeURIComponent(slug)}&select=*&limit=1`)
@@ -103,8 +103,8 @@ export default async function handler(req) {
     resolvedCharity = charity_choice || comp.default_charity || null
     if (!resolvedCharity) return jsonResponse({ error: 'default_charity_unavailable' }, 422)
   } else if (payoutMode === 'charity_or_cash') {
-    // If charity_choice has shape { ein, name } → charity. Else if explicit { destination: 'self' } → self.
-    if (charity_choice && charity_choice.destination === 'self') {
+    // Explicit payout_destination from client wins; else infer from charity_choice.
+    if (requestedPayoutDestination === 'self' || (charity_choice && charity_choice.destination === 'self')) {
       payoutDestination = 'self'
       resolvedCharity = null
     } else if (charity_choice && charity_choice.ein) {
@@ -116,6 +116,11 @@ export default async function handler(req) {
       resolvedCharity = comp.default_charity || null
       if (!resolvedCharity) return jsonResponse({ error: 'default_charity_unavailable' }, 422)
     }
+  }
+
+  // Reject explicit cash-for-self when mode requires charity
+  if (requestedPayoutDestination === 'self' && payoutMode === 'charity_required') {
+    return jsonResponse({ error: 'cash_payout_not_allowed' }, 422)
   }
 
   // 7. Create dedicated portfolio + entry
