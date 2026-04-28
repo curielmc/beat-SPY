@@ -81,13 +81,11 @@ export default async function handler(req) {
   if (existing?.length) return jsonResponse({ error: 'already_registered', entry: existing[0] }, 409)
 
   // 5. Parental consent for under-18
-  if (isUnder18(profile.date_of_birth)) {
-    const status = profile.parental_consent_status
-    if (status === 'pending' || status === 'expired' || status === 'not_required') {
-      // not_required only happens if DOB updated after signup; treat conservatively
-      if (status !== 'consented') return jsonResponse({ error: 'consent_required' }, 422)
+  if (isUnder18(profile.date_of_birth) && profile.parental_consent_status !== 'consented') {
+    if (profile.parental_consent_status === 'revoked') {
+      return jsonResponse({ error: 'consent_revoked' }, 403)
     }
-    if (status === 'revoked') return jsonResponse({ error: 'consent_revoked' }, 403)
+    return jsonResponse({ error: 'consent_required' }, 422)
   }
 
   // 6. Charity / payout destination resolution
