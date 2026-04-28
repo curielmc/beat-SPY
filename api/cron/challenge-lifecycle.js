@@ -2,6 +2,7 @@ export const config = { runtime: 'edge' }
 
 import { SUPABASE_URL, SUPABASE_SERVICE_KEY, sbFetch, jsonResponse } from '../_lib/supabase.js'
 import { sendChallengeNotification } from '../../src/notifications/dispatch.js'
+import { finalizeCompetition } from '../_lib/finalizeCompetition.js'
 
 const APP_BASE = process.env.PUBLIC_BASE_URL || process.env.APP_BASE_URL || 'https://beat-snp.com'
 
@@ -24,6 +25,7 @@ export default async function handler(req) {
   const started = await emitStartedNotifications(now)
   const endReminders = await emitEndReminders(now)
   const digests = await emitDigests(now)
+  const finalized = await autoFinalize(now)
 
   return jsonResponse({
     ok: true,
@@ -31,8 +33,40 @@ export default async function handler(req) {
     start_reminders: startReminders,
     started,
     end_reminders: endReminders,
-    digests
+    digests,
+    finalized
   })
+}
+
+// Auto-finalize: any active competition whose end_date has passed.
+async function autoFinalize(now) {
+  const nowIso = now.toISOString()
+  const due = await sbFetch(
+    `/competitions?status=eq.active&end_date=lte.${nowIso}&select=id,name`
+  )
+  let finalized = 0
+  let pendingDecision = 0
+  const errors = []
+  for (const c of (due || [])) {
+    try {
+      const r = await finalizeCompetition({
+        competitionId: c.id,
+        actorId: null,
+        source: 'cron'
+      })
+      if (!r.ok) {
+        errors.push({ id: c.id, error: r.error })
+        continue
+      }
+      if (r.idempotent) continue
+      if (r.status === 'pending_organizer_decision') pendingDecision += 1
+      else finalized += 1
+    } catch (err) {
+      console.error('[lifecycle] auto-finalize failed', c.id, err)
+      errors.push({ id: c.id, error: String(err?.message || err) })
+    }
+  }
+  return { finalized, pending_decision: pendingDecision, errors: errors.length ? errors : undefined }
 }
 
 async function snapshotUniversesForStartingChallenges(nowIso) {
