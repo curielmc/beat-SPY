@@ -82,6 +82,20 @@ missing, `sendSms` no-ops with `{skipped: true}` — the rest of the app keeps
 working. `lookupPhone` returns `{valid: null}` and the SMS opt-in API accepts
 phone numbers without validation.
 
+## Production Deploy Checklist
+
+- [ ] **`TWILIO_WEBHOOK_SKIP_VERIFY` MUST NOT be set in production.** This env
+      var bypasses Twilio's `X-Twilio-Signature` HMAC verification on inbound
+      webhooks (STOP/START handling). It exists for local development and
+      replay testing only. Setting it in production allows anyone to forge
+      inbound SMS webhooks, opt users in/out, and abuse the carrier-side STOP
+      handling. The webhook handler logs a `[SECURITY]` error every time the
+      bypass kicks in — alert on that log line.
+- [ ] `TWILIO_AUTH_TOKEN` (or `TWILIO_WEBHOOK_AUTH_TOKEN`) is set so signature
+      verification can run.
+- [ ] Inbound webhook URL in Twilio console points at
+      `https://<host>/api/webhooks/twilio-status` (HTTPS only).
+
 ## After launch
 
 - Monitor Twilio console for delivery failures, especially `30007`

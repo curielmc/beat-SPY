@@ -26,6 +26,9 @@ export default async function handler(req) {
   if (!ok && process.env.TWILIO_WEBHOOK_SKIP_VERIFY !== 'true') {
     return jsonResponse({ error: 'invalid_signature' }, 403)
   }
+  if (!ok && process.env.TWILIO_WEBHOOK_SKIP_VERIFY === 'true') {
+    console.error('[SECURITY] Twilio webhook signature verification BYPASSED — TWILIO_WEBHOOK_SKIP_VERIFY is set. Do NOT use in production.')
+  }
 
   const from = params.From
   const body = String(params.Body || '').trim().toUpperCase()
