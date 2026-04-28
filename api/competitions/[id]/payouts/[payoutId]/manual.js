@@ -12,6 +12,7 @@ import { writeAudit } from '../../../../_lib/auditLog.js'
 import { sendChallengeNotification } from '../../../../../src/notifications/dispatch.js'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const TERMINAL_STATUSES = new Set(['delivered', 'paid_manually', 'canceled'])
 
 function svcHeaders(extra = {}) {
   return {
@@ -59,6 +60,12 @@ export default async function handler(req) {
   )
   const before = rows?.[0]
   if (!before) return jsonResponse({ error: 'not_found' }, 404)
+
+  // Refuse to overwrite a terminal status (e.g. delivered via webhook,
+  // already paid_manually, or canceled). Manual fallback is for unresolved rows only.
+  if (TERMINAL_STATUSES.has(before.status)) {
+    return jsonResponse({ error: 'already_terminal', status: before.status }, 422)
+  }
 
   const patch = {
     status: 'paid_manually',
