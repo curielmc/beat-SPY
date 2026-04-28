@@ -9,6 +9,7 @@ import {
   loadProfile
 } from '../../_lib/supabase.js'
 import { writeAudit } from '../../_lib/auditLog.js'
+import { sendChallengeNotification } from '../../../src/notifications/dispatch.js'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -89,15 +90,17 @@ export default async function handler(req) {
     after: updated
   })
 
-  // Notification dispatch — Plan 5 will implement notification #9 (participant removed).
-  if (process.env.NOTIFY_RULE_CHANGES === 'true') {
-    // TODO(plan-5): call sendChallengeNotification(competitionId, 'participant_removed',
-    //   { user_id: existing.user_id, reason: removed_reason })
-    console.log('[notify TODO] participant_removed', {
-      competitionId,
-      user_id: existing.user_id,
-      reason: removed_reason
+  // Notification #9 — participant removed. CRITICAL: bypasses opt-out.
+  try {
+    const comp = (await sbFetch(
+      `/competitions?id=eq.${competitionId}&select=name&limit=1`
+    ))?.[0]
+    await sendChallengeNotification('removed', competitionId, existing.user_id, {
+      competitionName: comp?.name || 'a challenge',
+      reason: String(removed_reason).trim()
     })
+  } catch (e) {
+    console.error('[remove-entry] notification failed', e)
   }
 
   return jsonResponse({ ok: true, entry: updated })

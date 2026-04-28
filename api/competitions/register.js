@@ -8,6 +8,9 @@ import {
   fetchUserFromToken,
   loadProfile
 } from '../_lib/supabase.js'
+import { sendChallengeNotification } from '../../src/notifications/dispatch.js'
+
+const APP_BASE = process.env.PUBLIC_BASE_URL || process.env.APP_BASE_URL || 'https://beat-snp.com'
 
 function authHeaders(extra = {}) {
   return {
@@ -170,5 +173,19 @@ export default async function handler(req) {
     return jsonResponse({ error: 'entry_create_failed', detail: err }, 500)
   }
 
-  return jsonResponse({ ok: true, entry: (await entryRes.json())[0] })
+  const entry = (await entryRes.json())[0]
+
+  // Notification #1 — entry registered. Failures must not block the mutation.
+  try {
+    await sendChallengeNotification('registered', comp.id, profile.id, {
+      competitionName: comp.name,
+      startDate: comp.start_date,
+      competitionUrl: `${APP_BASE}/competitions/${comp.id}`,
+      lang: profile.parent_language || 'en'
+    })
+  } catch (e) {
+    console.error('[register] notification failed', e)
+  }
+
+  return jsonResponse({ ok: true, entry })
 }

@@ -10,6 +10,9 @@ import {
 } from '../../_lib/supabase.js'
 import { writeAudit } from '../../_lib/auditLog.js'
 import { MATERIAL_FIELDS, detectMaterialChanges } from '../../../src/lib/competitionFields.js'
+import { sendChallengeNotification } from '../../../src/notifications/dispatch.js'
+
+const APP_BASE = process.env.PUBLIC_BASE_URL || process.env.APP_BASE_URL || 'https://beat-snp.com'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -107,15 +110,30 @@ export default async function handler(req) {
     after
   })
 
-  // Notification dispatch (Plan 5 will implement). For now, log a placeholder
-  // so the wiring is visible. Gate behind NOTIFY_RULE_CHANGES env flag.
+  // Notification #8 — mid-challenge rule change. Gated by NOTIFY_RULE_CHANGES so
+  // we don't spam during routine status flips. Notify each active entrant.
   if (isMaterialMidChallenge && process.env.NOTIFY_RULE_CHANGES === 'true') {
-    // TODO(plan-5): call sendChallengeNotification(competitionId, 'rule_change', { changes: materialChanges, reason })
-    console.log('[notify TODO] rule_change', {
-      competitionId,
-      fields: Object.keys(materialChanges),
-      reason
-    })
+    try {
+      const entrants = await sbFetch(
+        `/competition_entries?competition_id=eq.${competitionId}&status=eq.active&select=user_id`
+      )
+      const compName = after?.name || before.name
+      const changedFields = Object.keys(materialChanges)
+      for (const e of (entrants || [])) {
+        try {
+          await sendChallengeNotification('rule_change', competitionId, e.user_id, {
+            competitionName: compName,
+            changedFields,
+            reason: reason || null,
+            competitionUrl: `${APP_BASE}/competitions/${competitionId}`
+          })
+        } catch (err) {
+          console.error('[update] rule_change notification failed', err)
+        }
+      }
+    } catch (err) {
+      console.error('[update] rule_change fan-out failed', err)
+    }
   }
 
   return jsonResponse({ ok: true, competition: after, material_changes: Object.keys(materialChanges) })
