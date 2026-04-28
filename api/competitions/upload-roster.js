@@ -34,6 +34,11 @@ export default async function handler(req) {
     return jsonResponse({ error: 'invalid_input' }, 400)
   }
 
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  if (!UUID_RE.test(competition_id)) {
+    return jsonResponse({ error: 'invalid_competition_id' }, 400)
+  }
+
   // Authorization: admin OR competition organizer/owner
   if (profile.role !== 'admin') {
     const orgs = await sbFetch(
