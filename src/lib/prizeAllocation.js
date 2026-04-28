@@ -57,9 +57,15 @@ function selectCandidates(bucket, ranking) {
 
 function splitAmount(bucket, bucketAmount, candidates) {
   if (bucket.split === 'winner_take_all') {
-    if (candidates.length === 1) return [{ user_id: candidates[0].user_id, amount: bucketAmount }]
-    const each = round2(bucketAmount / candidates.length)
-    return candidates.map(c => ({ user_id: c.user_id, amount: each }))
+    // Among tied top-rank candidates, equal split. Otherwise winner takes all.
+    if (candidates.length === 0) return []
+    const topRank = candidates[0].final_rank
+    const tied = candidates.filter(c => c.final_rank === topRank)
+    if (tied.length > 1) {
+      const each = round2(bucketAmount / tied.length)
+      return tied.map(c => ({ user_id: c.user_id, amount: each }))
+    }
+    return [{ user_id: candidates[0].user_id, amount: bucketAmount }]
   }
   if (bucket.split === 'weighted_by_rank') {
     const weights = bucket.weights || []

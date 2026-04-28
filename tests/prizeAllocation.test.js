@@ -46,6 +46,28 @@ test('hybrid 25/25/50', () => {
   assert.equal(m.u4, 500)
 })
 
+test('winner_take_all gives top rank everything even with multiple candidates', () => {
+  const out = resolvePrizeBuckets(
+    [{ eligibility: 'top_n', n: 3, allocation: { type: 'percent_of_pool', value: 100 }, split: 'winner_take_all' }],
+    ranking, 1000)
+  assert.equal(out.payouts.length, 1)
+  assert.equal(out.payouts[0].user_id, 'u1')
+  assert.equal(out.payouts[0].amount, 1000)
+})
+
+test('winner_take_all splits among tied top-rank candidates', () => {
+  const tied = [
+    { user_id: 'a', final_rank: 1, final_return_pct: 10, beat_benchmark: true },
+    { user_id: 'b', final_rank: 1, final_return_pct: 10, beat_benchmark: true },
+    { user_id: 'c', final_rank: 3, final_return_pct: 5, beat_benchmark: true }
+  ]
+  const out = resolvePrizeBuckets(
+    [{ eligibility: 'top_n', n: 3, allocation: { type: 'percent_of_pool', value: 100 }, split: 'winner_take_all' }],
+    tied, 1000)
+  assert.equal(out.payouts.length, 2)
+  out.payouts.forEach(p => assert.equal(p.amount, 500))
+})
+
 test('weighted_by_rank degrades to equal split when weights are missing', () => {
   const out = resolvePrizeBuckets(
     [{ eligibility: 'top_n', n: 3, allocation: { type: 'percent_of_pool', value: 100 }, split: 'weighted_by_rank' /* no weights */ }],
