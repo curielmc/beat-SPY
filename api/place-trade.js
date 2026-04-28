@@ -3,6 +3,15 @@ export const config = { runtime: 'edge' }
 import { getImmediateExecutionPrice } from '../src/lib/tradePricing.js'
 import { SUPABASE_URL, SUPABASE_SERVICE_KEY, FMP_KEY, sbFetch, jsonResponse, fetchUserFromToken, loadProfile } from './_lib/supabase.js'
 import { OWNER_EMAIL } from './_lib/constants.js'
+import { assertTickerAllowed, UniverseError } from '../src/lib/competitionUniverse.js'
+import { loadSpyConstituentsAsOf } from '../src/lib/spyConstituents.js'
+
+async function loadCompetitionForPortfolio(portfolioId) {
+  const rows = await sbFetch(
+    `/competition_entries?portfolio_id=eq.${portfolioId}&select=competition_id,competitions(id,universe,status)`
+  )
+  return rows?.[0]?.competitions || null
+}
 
 async function fetchLivePrice(ticker) {
   if (!FMP_KEY) return null
@@ -148,6 +157,24 @@ export default async function handler(req) {
     }
 
     actorProfile = loadedActorProfile
+  }
+
+  // Universe enforcement — if the portfolio belongs to an active competition with a
+  // restricted universe, reject trades against tickers outside that universe.
+  try {
+    const comp = await loadCompetitionForPortfolio(portfolio_id)
+    if (comp && comp.status === 'active' && comp.universe?.mode && comp.universe.mode !== 'app_all') {
+      let sp500Set = new Set()
+      if (comp.universe.mode === 'sp500_via_spy') {
+        const date = comp.universe.snapshot_date
+        if (!date) return jsonResponse({ error: 'universe_not_snapshotted' }, 503)
+        sp500Set = await loadSpyConstituentsAsOf(date)
+      }
+      assertTickerAllowed(comp.universe, ticker, sp500Set)
+    }
+  } catch (e) {
+    if (e instanceof UniverseError) return jsonResponse({ error: e.message }, 422)
+    throw e
   }
 
   // Fetch live price server-side (the key security fix)
