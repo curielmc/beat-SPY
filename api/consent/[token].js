@@ -24,14 +24,16 @@ async function loadTokenAndProfile(token) {
   const rows = await sbFetch(`/parental_consent_tokens?token=eq.${encodeURIComponent(token)}&select=*&limit=1`)
   const tk = rows?.[0]
   if (!tk) return { error: 'not_found', status: 404 }
-  if (tk.used_at) return { error: 'used', status: 410, token: tk }
-  if (new Date(tk.expires_at).getTime() < Date.now()) {
-    return { error: 'expired', status: 410, token: tk }
-  }
+  // Always look up profile so error responses can include the student name.
   const profiles = await sbFetch(
     `/profiles?id=eq.${tk.user_id}&select=id,full_name,email,parent_language,parental_consent_status&limit=1`
   )
-  return { token: tk, profile: profiles?.[0] || null }
+  const profile = profiles?.[0] || null
+  if (tk.used_at) return { error: 'used', status: 410, token: tk, profile }
+  if (new Date(tk.expires_at).getTime() < Date.now()) {
+    return { error: 'expired', status: 410, token: tk, profile }
+  }
+  return { token: tk, profile }
 }
 
 export default async function handler(req) {
@@ -45,7 +47,7 @@ export default async function handler(req) {
     const out = await loadTokenAndProfile(consentToken)
     if (out.error) {
       return jsonResponse(
-        { error: out.error, student_name: out.token ? null : null },
+        { error: out.error, student_name: out.profile?.full_name || null },
         out.status
       )
     }
