@@ -8,6 +8,7 @@ import {
 } from '../_lib/supabase.js'
 import { sendEmail } from '../../src/lib/email.js'
 import { t, consentTextVersion } from '../../src/i18n/parent/index.js'
+import { lookupPhone } from '../../src/lib/twilio.js'
 
 const APP_BASE = process.env.PUBLIC_BASE_URL || process.env.APP_BASE_URL || 'https://beat-snp.com'
 
@@ -79,6 +80,14 @@ export default async function handler(req) {
     return jsonResponse({ error: 'participation_consent_required' }, 422)
   }
   const locale = consent_locale === 'es' ? 'es' : 'en'
+
+  // Twilio phone validation. valid===null when Twilio not configured (accept).
+  if (parent_phone) {
+    const lookup = await lookupPhone(parent_phone)
+    if (lookup.valid === false) {
+      return jsonResponse({ error: 'invalid_phone' }, 422)
+    }
+  }
 
   // Atomic claim of the token — fails (returns []) if already used or expired.
   // PostgREST compare-and-swap: PATCH only matches rows where used_at IS NULL

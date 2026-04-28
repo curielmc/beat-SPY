@@ -33,5 +33,14 @@ export default
     "request_body": "Hola,\n\n{student_name} se registró en beat-SPY y solicitó su consentimiento. Haga clic abajo para revisar y dar su consentimiento:\n\n{consent_url}\n\nEste enlace expira en 14 días.\n\n— beat-SPY",
     "receipt_subject": "Consentimiento recibido para {student_name}",
     "receipt_body": "Hola,\n\nGracias por dar su consentimiento para la participación de {student_name} en beat-SPY. Para revocar en cualquier momento:\n\n{revoke_url}\n\n— beat-SPY"
+  },
+  "revoke": {
+    "page_title": "Consentimiento revocado",
+    "page_body": "Ha revocado el consentimiento para {student_name}. Su cuenta ha sido congelada y se han eliminado las inscripciones activas en desafíos. Si fue un error, contacte con soporte.",
+    "not_found_title": "Enlace no encontrado",
+    "not_found_body": "No pudimos encontrar este enlace de revocación. Es posible que ya se haya utilizado."
+  },
+  "sms": {
+    "optin_confirm": "Estás suscrito a los mensajes de beat-SPY. Responde STOP para darte de baja. Pueden aplicarse tarifas de mensajes y datos."
   }
 }

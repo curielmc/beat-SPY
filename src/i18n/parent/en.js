@@ -33,5 +33,14 @@ export default
     "request_body": "Hi,\n\n{student_name} signed up for beat-SPY and asked you to provide consent. Click below to review and consent:\n\n{consent_url}\n\nThis link expires in 14 days.\n\n— beat-SPY",
     "receipt_subject": "Consent received for {student_name}",
     "receipt_body": "Hi,\n\nThank you for consenting to {student_name}'s participation in beat-SPY. To revoke at any time:\n\n{revoke_url}\n\n— beat-SPY"
+  },
+  "revoke": {
+    "page_title": "Consent revoked",
+    "page_body": "You have revoked consent for {student_name}. Their account has been frozen and any active challenge entries have been removed. If this was a mistake, please contact support.",
+    "not_found_title": "Link not found",
+    "not_found_body": "We couldn't find this revocation link. It may already have been used."
+  },
+  "sms": {
+    "optin_confirm": "You're opted in to beat-SPY texts. Reply STOP to opt out. Msg & data rates may apply."
   }
 }
