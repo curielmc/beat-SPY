@@ -70,9 +70,7 @@ export default async function handler(req) {
       headers: authHeaders({ Prefer: 'return=representation' }),
       body: JSON.stringify({
         status: 'removed',
-        removed_reason: String(removed_reason).trim(),
-        removed_at: new Date().toISOString(),
-        removed_by: profile.id
+        removed_reason: String(removed_reason).trim()
       })
     }
   )
