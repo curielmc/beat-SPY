@@ -76,7 +76,8 @@ export default async function handler(req) {
   )
   if (!res.ok) {
     const txt = await res.text()
-    return jsonResponse({ error: 'update_failed', detail: txt }, 500)
+    console.error('[remove-entry] update_failed', txt)
+    return jsonResponse({ error: 'update_failed' }, 500)
   }
   const updated = (await res.json())?.[0] || null
 

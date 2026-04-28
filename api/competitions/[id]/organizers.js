@@ -56,49 +56,33 @@ export default async function handler(req) {
     if (!user_id || !UUID_RE.test(user_id)) return jsonResponse({ error: 'invalid_user_id' }, 400)
     if (!['owner', 'organizer', 'viewer'].includes(role)) return jsonResponse({ error: 'invalid_role' }, 400)
 
-    // Look up existing row
+    // Look up existing row (for audit before snapshot)
     const existing = await sbFetch(
       `/competition_organizers?competition_id=eq.${competitionId}&user_id=eq.${user_id}&select=*&limit=1`
     )
     const before = existing?.[0] || null
 
-    let action
-    let after
-    if (before) {
-      // Role change
-      if (before.role === role) {
-        return jsonResponse({ ok: true, organizer: before, unchanged: true })
-      }
-      const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/competition_organizers?competition_id=eq.${competitionId}&user_id=eq.${user_id}`,
-        {
-          method: 'PATCH',
-          headers: authHeaders({ Prefer: 'return=representation' }),
-          body: JSON.stringify({ role })
-        }
-      )
-      if (!res.ok) {
-        const txt = await res.text()
-        return jsonResponse({ error: 'update_failed', detail: txt }, 500)
-      }
-      const updated = await res.json()
-      after = updated?.[0] || null
-      action = 'organizer_role_changed'
-    } else {
-      // Add
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/competition_organizers`, {
-        method: 'POST',
-        headers: authHeaders({ Prefer: 'return=representation' }),
-        body: JSON.stringify({ competition_id: competitionId, user_id, role })
-      })
-      if (!res.ok) {
-        const txt = await res.text()
-        return jsonResponse({ error: 'insert_failed', detail: txt }, 500)
-      }
-      const inserted = await res.json()
-      after = inserted?.[0] || null
-      action = 'organizer_added'
+    if (before && before.role === role) {
+      return jsonResponse({ ok: true, organizer: before, unchanged: true })
     }
+
+    // Upsert via on_conflict to atomically add-or-update.
+    const upsertRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/competition_organizers?on_conflict=competition_id,user_id`,
+      {
+        method: 'POST',
+        headers: authHeaders({ Prefer: 'resolution=merge-duplicates,return=representation' }),
+        body: JSON.stringify({ competition_id: competitionId, user_id, role })
+      }
+    )
+    if (!upsertRes.ok) {
+      const txt = await upsertRes.text()
+      console.error('[organizers] upsert_failed', txt)
+      return jsonResponse({ error: 'upsert_failed' }, 500)
+    }
+    const upserted = await upsertRes.json()
+    const after = upserted?.[0] || null
+    const action = before ? 'organizer_role_changed' : 'organizer_added'
 
     await writeAudit({
       competitionId,
@@ -131,7 +115,8 @@ export default async function handler(req) {
     )
     if (!res.ok) {
       const txt = await res.text()
-      return jsonResponse({ error: 'delete_failed', detail: txt }, 500)
+      console.error('[organizers] delete_failed', txt)
+      return jsonResponse({ error: 'delete_failed' }, 500)
     }
 
     await writeAudit({

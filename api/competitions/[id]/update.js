@@ -88,7 +88,8 @@ export default async function handler(req) {
   })
   if (!res.ok) {
     const txt = await res.text()
-    return jsonResponse({ error: 'update_failed', detail: txt }, 500)
+    console.error('[competition update] update_failed', txt)
+    return jsonResponse({ error: 'update_failed' }, 500)
   }
   const updated = await res.json()
   const after = updated?.[0] || null
