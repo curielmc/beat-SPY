@@ -47,10 +47,92 @@
           <label class="label"><span class="label-text">Password</span></label>
           <input v-model="password" type="password" placeholder="Min 6 characters" class="input input-bordered w-full" />
         </div>
+        <div class="form-control">
+          <label class="label"><span class="label-text">Date of Birth</span></label>
+          <input v-model="dateOfBirth" type="date" class="input input-bordered w-full" />
+        </div>
+
+        <template v-if="needsParent">
+          <div class="alert alert-warning text-sm py-2">
+            <span>Because you're under 18, we need a parent/guardian email to request consent.</span>
+          </div>
+          <div class="form-control">
+            <label class="label"><span class="label-text">Parent / Guardian Email</span></label>
+            <input v-model="parentEmail" type="email" placeholder="parent@example.com" class="input input-bordered w-full" />
+          </div>
+          <div class="form-control">
+            <label class="label"><span class="label-text">Parent's Preferred Language</span></label>
+            <select v-model="parentLanguage" class="select select-bordered w-full">
+              <option value="en">English</option>
+              <option value="es">Español</option>
+            </select>
+          </div>
+        </template>
+
         <p v-if="infoError" class="text-error text-sm">{{ infoError }}</p>
         <div class="flex gap-2">
           <button class="btn btn-ghost flex-1" @click="step = 1">Back</button>
           <button class="btn btn-primary flex-1" @click="validateInfo">Continue</button>
+        </div>
+      </div>
+
+      <!-- Step 2.5: Charity picker (only when joining a challenge with charity-required mode) -->
+      <div v-if="step === 25" class="space-y-4">
+        <h3 class="font-semibold">Choose your charity</h3>
+        <p class="text-sm text-base-content/70">If you win prize money in this challenge, where should it be donated?</p>
+
+        <div v-if="challengeMeta?.default_charity?.name" class="alert alert-info text-sm py-2">
+          <span>Organizer's pick: <strong>{{ challengeMeta.default_charity.name }}</strong></span>
+        </div>
+
+        <button
+          class="btn btn-outline btn-block"
+          :class="{ 'btn-primary': charityChoice === null && useOrganizerDefault }"
+          @click="useOrganizerDefault = true; charityChoice = null"
+        >
+          Let the organizer pick<span v-if="challengeMeta?.default_charity?.name"> (donates to {{ challengeMeta.default_charity.name }})</span>
+        </button>
+
+        <div class="divider text-xs">OR PICK YOUR OWN</div>
+
+        <div class="form-control">
+          <input
+            v-model="charityQuery"
+            type="text"
+            placeholder="Search 501(c)(3) charities..."
+            class="input input-bordered w-full"
+            @input="onCharitySearch"
+          />
+        </div>
+
+        <div v-if="charityResults.length" class="space-y-1 max-h-64 overflow-y-auto">
+          <button
+            v-for="c in charityResults"
+            :key="c.ein"
+            class="btn btn-ghost btn-sm btn-block justify-start"
+            :class="{ 'btn-primary': charityChoice?.ein === c.ein }"
+            @click="charityChoice = c; useOrganizerDefault = false"
+          >
+            <div class="text-left">
+              <div class="font-semibold">{{ c.name }}</div>
+              <div class="text-xs opacity-60">EIN {{ c.ein }}</div>
+            </div>
+          </button>
+        </div>
+
+        <p v-if="charityChoice && !useOrganizerDefault" class="text-sm text-success">
+          Selected: <strong>{{ charityChoice.name }}</strong>
+        </p>
+
+        <div class="flex gap-2">
+          <button class="btn btn-ghost flex-1" @click="step = 2">Back</button>
+          <button
+            class="btn btn-primary flex-1"
+            :disabled="!useOrganizerDefault && !charityChoice"
+            @click="step = 3"
+          >
+            Continue
+          </button>
         </div>
       </div>
 
@@ -123,14 +205,74 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
-import { RouterLink, useRouter } from 'vue-router'
+import { ref, computed, watch, onMounted } from 'vue'
+import { RouterLink, useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
-import { supabase } from '../../lib/supabase'
+import { supabase, getAccessToken } from '../../lib/supabase'
 import LogoIcon from '../../components/LogoIcon.vue'
 
 const router = useRouter()
+const route = useRoute()
 const auth = useAuthStore()
+
+// Pre-loaded challenge meta (when arriving from /c/<slug>)
+const challengeSlug = ref(route.query.challenge_slug || null)
+const challengeMeta = ref(null)
+
+// Charity picker
+const charityQuery = ref('')
+const charityResults = ref([])
+const charityChoice = ref(null)
+const useOrganizerDefault = ref(false)
+let _charitySearchTimer = null
+
+// DOB + parent fields
+const dateOfBirth = ref('')
+const parentEmail = ref('')
+const parentLanguage = ref((typeof navigator !== 'undefined' && navigator.language?.startsWith('es')) ? 'es' : 'en')
+
+function isUnder18(dob) {
+  if (!dob) return false
+  const d = new Date(dob)
+  const cutoff = new Date()
+  cutoff.setFullYear(cutoff.getFullYear() - 18)
+  return d > cutoff
+}
+
+const needsParent = computed(() => isUnder18(dateOfBirth.value))
+
+const needsCharityStep = computed(() => {
+  const m = challengeMeta.value?.payout_mode
+  return m && m !== 'cash_required'
+})
+
+async function loadChallengeMeta() {
+  if (!challengeSlug.value) return
+  const { data } = await supabase
+    .from('competitions')
+    .select('id, slug, name, payout_mode, default_charity')
+    .eq('slug', challengeSlug.value)
+    .maybeSingle()
+  challengeMeta.value = data || null
+}
+
+async function onCharitySearch() {
+  clearTimeout(_charitySearchTimer)
+  const q = charityQuery.value.trim()
+  if (!q) { charityResults.value = []; return }
+  _charitySearchTimer = setTimeout(async () => {
+    try {
+      const res = await fetch(`/api/charities/search?q=${encodeURIComponent(q)}`)
+      if (!res.ok) { charityResults.value = []; return }
+      const body = await res.json()
+      charityResults.value = body.results || []
+    } catch {
+      charityResults.value = []
+    }
+  }, 250)
+}
+
+onMounted(loadChallengeMeta)
 
 const step = ref(1)
 const teacherCode = ref('')
@@ -199,7 +341,22 @@ function validateInfo() {
   if (!name.value.trim()) { infoError.value = 'Name is required'; return }
   if (!email.value.includes('@')) { infoError.value = 'Enter a valid email'; return }
   if (password.value.length < 6) { infoError.value = 'Password must be at least 6 characters'; return }
+  if (!dateOfBirth.value) { infoError.value = 'Date of birth is required'; return }
+  if (needsParent.value) {
+    if (!parentEmail.value.includes('@')) { infoError.value = 'Parent email is required'; return }
+    if (parentEmail.value.toLowerCase() === email.value.toLowerCase()) {
+      infoError.value = 'Parent email must be different from your email'
+      return
+    }
+  }
   infoError.value = ''
+
+  // Branch: charity step required when joining a challenge that uses charity payouts
+  if (needsCharityStep.value) {
+    step.value = 25
+    return
+  }
+
   step.value = 3
 
   // Load groups if needed
@@ -266,6 +423,57 @@ async function completeSignup() {
       groupError.value = joinResult.error
       submitting.value = false
       return
+    }
+  }
+
+  // 4. Persist DOB + parent fields on profile
+  try {
+    const updates = {
+      date_of_birth: dateOfBirth.value,
+      parent_email: needsParent.value ? parentEmail.value : null,
+      parent_language: needsParent.value ? parentLanguage.value : 'en',
+      parental_consent_status: needsParent.value ? 'pending' : 'not_required'
+    }
+    await supabase.from('profiles').update(updates).eq('id', auth.currentUser.id)
+  } catch (e) {
+    // Non-fatal; user can update from settings
+    console.warn('Profile DOB update failed:', e)
+  }
+
+  // 5. Trigger parent consent email if under-18
+  if (needsParent.value) {
+    try {
+      const token = await getAccessToken()
+      await fetch('/api/consent/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
+      })
+    } catch (e) {
+      console.warn('Consent request failed:', e)
+    }
+  }
+
+  // 6. Auto-register for challenge if slug present
+  if (challengeSlug.value) {
+    try {
+      const token = await getAccessToken()
+      const res = await fetch('/api/competitions/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          slug: challengeSlug.value,
+          charity_choice: useOrganizerDefault.value ? null : charityChoice.value
+        })
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok && body.error === 'consent_required') {
+        groupError.value = 'Account created. Your parent has been emailed to provide consent before you can join the challenge.'
+        submitting.value = false
+        setTimeout(() => router.push('/leaderboard'), 2500)
+        return
+      }
+    } catch (e) {
+      console.warn('Auto-register failed:', e)
     }
   }
 
