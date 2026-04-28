@@ -8,6 +8,7 @@ import {
   loadProfile
 } from '../_lib/supabase.js'
 import { lookupPhone, sendSms } from '../../src/lib/twilio.js'
+import { t } from '../../src/i18n/parent/index.js'
 
 const E164_RE = /^\+[1-9]\d{6,14}$/
 
@@ -70,8 +71,9 @@ export default async function handler(req) {
   }
 
   // Confirmation SMS — required by TCPA. Don't fail the request if Twilio errors.
+  const lang = profile.parent_language === 'es' ? 'es' : 'en'
   try {
-    await sendSms(phone_e164, "You're opted in to beat-SPY texts. Reply STOP to opt out. Msg & data rates may apply.")
+    await sendSms(phone_e164, t(lang, 'sms.optin_confirm'))
   } catch (e) {
     console.error('[sms-optin] confirmation send failed', e)
   }

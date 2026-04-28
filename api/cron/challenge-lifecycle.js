@@ -81,10 +81,20 @@ async function loadActiveEntrants(competitionId) {
   )) || []
 }
 
+// Build a deps object for sendChallengeNotification that returns the
+// already-fetched competition without re-querying. Cuts ~half the queries
+// in the per-entrant emit loop. (TODO: the deeper N+1 — loading each
+// entrant's profile one at a time — is a bigger refactor; defer.)
+function depsWithComp(comp) {
+  return {
+    loadCompetition: async () => comp || null
+  }
+}
+
 // #2 — start_tomorrow. Window: 22h–26h until start.
 async function emitStartReminders(now) {
   const comps = await sbFetch(
-    `/competitions?status=in.(registration,active)&select=id,name,start_date`
+    `/competitions?status=in.(registration,active)&select=id,name,start_date,sms_enabled,digest_frequency`
   )
   let sent = 0
   for (const c of (comps || [])) {
@@ -93,13 +103,14 @@ async function emitStartReminders(now) {
     const hoursUntil = (start.getTime() - now.getTime()) / 3_600_000
     if (hoursUntil > 22 && hoursUntil <= 26) {
       const entrants = await loadActiveEntrants(c.id)
+      const deps = depsWithComp(c)
       for (const e of entrants) {
         try {
           await sendChallengeNotification('start_tomorrow', c.id, e.user_id, {
             competitionName: c.name,
             startDate: c.start_date,
             competitionUrl: `${APP_BASE}/competitions/${c.id}`
-          })
+          }, deps)
           sent += 1
         } catch (err) { console.error('[lifecycle] start_tomorrow failed', err) }
       }
@@ -114,7 +125,7 @@ async function emitStartReminders(now) {
 // comparing start_date against now (within last 24h).
 async function emitStartedNotifications(now) {
   const comps = await sbFetch(
-    `/competitions?status=eq.active&select=id,name,start_date`
+    `/competitions?status=eq.active&select=id,name,start_date,sms_enabled,digest_frequency`
   )
   let sent = 0
   for (const c of (comps || [])) {
@@ -123,12 +134,13 @@ async function emitStartedNotifications(now) {
     const hoursSince = (now.getTime() - start.getTime()) / 3_600_000
     if (hoursSince >= 0 && hoursSince <= 24) {
       const entrants = await loadActiveEntrants(c.id)
+      const deps = depsWithComp(c)
       for (const e of entrants) {
         try {
           await sendChallengeNotification('started', c.id, e.user_id, {
             competitionName: c.name,
             competitionUrl: `${APP_BASE}/competitions/${c.id}`
-          })
+          }, deps)
           sent += 1
         } catch (err) { console.error('[lifecycle] started failed', err) }
       }
@@ -140,7 +152,7 @@ async function emitStartedNotifications(now) {
 // #5 — end_tomorrow. Window: 22h–26h until end.
 async function emitEndReminders(now) {
   const comps = await sbFetch(
-    `/competitions?status=eq.active&select=id,name,end_date`
+    `/competitions?status=eq.active&select=id,name,end_date,sms_enabled,digest_frequency`
   )
   let sent = 0
   for (const c of (comps || [])) {
@@ -149,13 +161,14 @@ async function emitEndReminders(now) {
     const hoursUntil = (end.getTime() - now.getTime()) / 3_600_000
     if (hoursUntil > 22 && hoursUntil <= 26) {
       const entrants = await loadActiveEntrants(c.id)
+      const deps = depsWithComp(c)
       for (const e of entrants) {
         try {
           await sendChallengeNotification('end_tomorrow', c.id, e.user_id, {
             competitionName: c.name,
             endDate: c.end_date,
             competitionUrl: `${APP_BASE}/competitions/${c.id}`
-          })
+          }, deps)
           sent += 1
         } catch (err) { console.error('[lifecycle] end_tomorrow failed', err) }
       }
@@ -182,13 +195,14 @@ async function emitDigests(now) {
       ? Math.max(0, Math.ceil((new Date(c.end_date).getTime() - now.getTime()) / (24 * 3_600_000)))
       : null
 
+    const deps = depsWithComp(c)
     for (const e of entrants) {
       try {
         await sendChallengeNotification('digest', c.id, e.user_id, {
           competitionName: c.name,
           daysRemaining,
           competitionUrl: `${APP_BASE}/competitions/${c.id}`
-        })
+        }, deps)
         sent += 1
       } catch (err) { console.error('[lifecycle] digest failed', err) }
     }
@@ -203,7 +217,7 @@ async function emitDigests(now) {
         Prefer: 'return=minimal'
       },
       body: JSON.stringify({ last_digest_sent_at: now.toISOString() })
-    }).catch(() => {})
+    }).catch(e => console.error('[lifecycle] digest timestamp PATCH failed', e))
     competitions += 1
   }
   return { sent, competitions }
