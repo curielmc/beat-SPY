@@ -285,7 +285,7 @@ const form = reactive({
   prize_pool_amount: 0,
   prize_pool_currency: 'USD',
   prize_allocation: [],
-  unfilled_bucket_policy: 'redistribute',
+  unfilled_bucket_policy: 'admin_decide',
   is_public: true
 })
 
@@ -319,7 +319,7 @@ function resetForm() {
   form.prize_pool_amount = 0
   form.prize_pool_currency = 'USD'
   form.prize_allocation = []
-  form.unfilled_bucket_policy = 'redistribute'
+  form.unfilled_bucket_policy = 'admin_decide'
   form.is_public = true
   restrictedTickersInput.value = ''
   formError.value = ''
@@ -345,7 +345,7 @@ function editComp(comp) {
   form.prize_pool_amount = Number(comp.prize_pool_amount || 0)
   form.prize_pool_currency = comp.prize_pool_currency || 'USD'
   form.prize_allocation = Array.isArray(comp.prize_allocation) ? JSON.parse(JSON.stringify(comp.prize_allocation)) : []
-  form.unfilled_bucket_policy = comp.unfilled_bucket_policy || 'redistribute'
+  form.unfilled_bucket_policy = comp.unfilled_bucket_policy || 'admin_decide'
   form.is_public = comp.is_public
   restrictedTickersInput.value = (comp.rules?.restricted_tickers || []).join(', ')
   editingOriginal.value = JSON.parse(JSON.stringify(comp))
@@ -380,7 +380,7 @@ async function save() {
     prize_pool_amount: Number(form.prize_pool_amount) || 0,
     prize_pool_currency: form.prize_pool_currency || 'USD',
     prize_allocation: form.prize_allocation || [],
-    unfilled_bucket_policy: form.unfilled_bucket_policy || 'redistribute',
+    unfilled_bucket_policy: form.unfilled_bucket_policy || 'admin_decide',
     is_public: form.is_public
   }
 

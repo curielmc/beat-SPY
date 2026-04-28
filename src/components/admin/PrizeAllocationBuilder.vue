@@ -19,8 +19,8 @@
       <div class="form-control">
         <label class="label py-1"><span class="label-text text-sm">Unfilled Bucket Policy</span></label>
         <select :value="unfilledPolicy" @change="$emit('update:unfilledPolicy', $event.target.value)" class="select select-bordered w-full">
-          <option value="redistribute">Redistribute to charity</option>
-          <option value="rollover">Rollover to next bucket</option>
+          <option value="admin_decide">Ask me at finalization</option>
+          <option value="roll_forward">Roll forward to next bucket</option>
           <option value="return_to_sponsor">Return to sponsor</option>
         </select>
       </div>
@@ -158,7 +158,7 @@ const props = defineProps({
   pool: { type: Number, default: 0 },
   currency: { type: String, default: 'USD' },
   buckets: { type: Array, default: () => [] },
-  unfilledPolicy: { type: String, default: 'redistribute' }
+  unfilledPolicy: { type: String, default: 'admin_decide' }
 })
 
 const emit = defineEmits(['update:pool', 'update:currency', 'update:buckets', 'update:unfilledPolicy'])
