@@ -85,6 +85,9 @@ export async function finalizeCompetition({ competitionId, actorId, source = 'ma
     Number(comp.prize_pool_amount || 0)
   )
 
+  // Index enriched by user_id for destination/charity/rank lookups.
+  const byUser = new Map(enriched.map(e => [e.user_id, e]))
+
   // 5. Unfilled-bucket policy
   let needsOrganizer = false
   if (unfilled.length) {
@@ -92,9 +95,22 @@ export async function finalizeCompetition({ competitionId, actorId, source = 'ma
       needsOrganizer = true
     } else if (comp.unfilled_bucket_policy === 'roll_forward') {
       const extra = unfilled.reduce((a, b) => a + Number(b.unallocated || 0), 0)
-      if (payouts.length) {
-        const each = Math.round((extra / payouts.length) * 100) / 100
-        for (const p of payouts) p.amount = Math.round((p.amount + each) * 100) / 100
+      if (payouts.length && extra > 0) {
+        // Banker's distribution: floor(cents/n) to all, +1 cent to first
+        // (rank-ordered) winners. No money lost or gained vs `extra`.
+        // Sort payouts by rank ascending so the residual cents go to top winners.
+        payouts.sort((a, b) => {
+          const ra = byUser.get(a.user_id)?.final_rank ?? Infinity
+          const rb = byUser.get(b.user_id)?.final_rank ?? Infinity
+          return ra - rb
+        })
+        const extraCents = Math.round(extra * 100)
+        const baseCents = Math.floor(extraCents / payouts.length)
+        const remainder = extraCents - baseCents * payouts.length
+        for (let i = 0; i < payouts.length; i++) {
+          const bonusCents = baseCents + (i < remainder ? 1 : 0)
+          payouts[i].amount = Math.round((payouts[i].amount + bonusCents / 100) * 100) / 100
+        }
       }
     }
     // 'return_to_sponsor' = no-op
@@ -103,9 +119,6 @@ export async function finalizeCompetition({ competitionId, actorId, source = 'ma
   // 6. Load system default charity for resolution chain
   const sysRow = await sbFetch('/system_settings?key=eq.default_charity&select=value&limit=1')
   const systemDefaultCharity = sysRow?.[0]?.value || null
-
-  // Index enriched by user_id for destination/charity lookups
-  const byUser = new Map(enriched.map(e => [e.user_id, e]))
 
   // Write payout rows in pending. Resolve destination + charity per row.
   const createdPayouts = []

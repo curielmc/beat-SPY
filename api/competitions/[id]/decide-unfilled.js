@@ -79,11 +79,24 @@ export default async function handler(req) {
   // Recompute the base allocation.
   let { payouts, unfilled } = resolvePrizeBuckets(buckets, ranking, poolAmount)
 
+  // rankByUser: ascending final_rank for each user_id; used for ordering the
+  // residual-cent recipients in banker's distribution (top winners get the +1¢).
+  const rankByUser = new Map((entries || []).map(e => [e.user_id, e.final_rank ?? Infinity]))
+  const sortByRank = (a, b) =>
+    (rankByUser.get(a.user_id) ?? Infinity) - (rankByUser.get(b.user_id) ?? Infinity)
+
   if (decision === 'roll_forward') {
     const extra = unfilled.reduce((a, b) => a + Number(b.unallocated || 0), 0)
     if (payouts.length && extra > 0) {
-      const each = Math.round((extra / payouts.length) * 100) / 100
-      payouts = payouts.map(p => ({ ...p, amount: Math.round((p.amount + each) * 100) / 100 }))
+      // Banker's distribution: residual cent goes to the top-rank winner.
+      payouts = [...payouts].sort(sortByRank)
+      const extraCents = Math.round(extra * 100)
+      const baseCents = Math.floor(extraCents / payouts.length)
+      const remainder = extraCents - baseCents * payouts.length
+      payouts = payouts.map((p, i) => {
+        const bonusCents = baseCents + (i < remainder ? 1 : 0)
+        return { ...p, amount: Math.round((p.amount + bonusCents / 100) * 100) / 100 }
+      })
     }
   } else if (decision === 'distribute_anyway') {
     // Re-resolve unfilled buckets ignoring beat_benchmark constraints.
@@ -102,8 +115,15 @@ export default async function handler(req) {
         candidates = ranking
       }
       if (!candidates.length) continue
-      const each = Math.round((bucketAmount / candidates.length) * 100) / 100
-      for (const c of candidates) fallbackPayouts.push({ user_id: c.user_id, amount: each })
+      // Banker's distribution within the bucket — residual cents to top-rank candidates.
+      const ordered = [...candidates].sort((x, y) => x.final_rank - y.final_rank)
+      const bucketCents = Math.round(bucketAmount * 100)
+      const baseCents = Math.floor(bucketCents / ordered.length)
+      const remainder = bucketCents - baseCents * ordered.length
+      ordered.forEach((c, i) => {
+        const bonusCents = baseCents + (i < remainder ? 1 : 0)
+        fallbackPayouts.push({ user_id: c.user_id, amount: Math.round(bonusCents) / 100 })
+      })
     }
     // Merge into payouts.
     const m = new Map(payouts.map(p => [p.user_id, p.amount]))
