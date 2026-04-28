@@ -82,6 +82,18 @@ const router = createRouter({
       component: () => import('../views/public/NewsletterSignup.vue')
     },
     {
+      path: '/c/:slug',
+      name: 'challenge-public',
+      component: () => import('../views/public/ChallengePublicView.vue'),
+      meta: { public: true }
+    },
+    {
+      path: '/consent/:token',
+      name: 'consent',
+      component: () => import('../views/public/ConsentView.vue'),
+      meta: { public: true }
+    },
+    {
       path: '/admin',
       component: () => import('../layouts/AdminLayout.vue'),
       meta: { requiresAuth: true, role: 'admin' },
