@@ -86,6 +86,13 @@ export default async function handler(req) {
   if (existing?.length) return jsonResponse({ error: 'already_registered', entry: existing[0] }, 409)
 
   // 5. Parental consent for under-18
+  const dob = profile.date_of_birth
+  if (dob) {
+    const d = new Date(dob)
+    if (isNaN(d) || d > new Date() || d < new Date('1900-01-01')) {
+      return jsonResponse({ error: 'invalid_date_of_birth' }, 422)
+    }
+  }
   if (isUnder18(profile.date_of_birth) && profile.parental_consent_status !== 'consented') {
     if (profile.parental_consent_status === 'revoked') {
       return jsonResponse({ error: 'consent_revoked' }, 403)
