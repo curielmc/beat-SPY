@@ -99,11 +99,12 @@ function searchProfiles() {
   clearTimeout(searchTimer)
   const term = searchTerm.value.trim()
   if (term.length < 2) { searchResults.value = []; return }
+  const safeTerm = term.replace(/[%_]/g, m => '\\' + m)
   searchTimer = setTimeout(async () => {
     const { data } = await supabase
       .from('profiles')
       .select('id, email, username, full_name')
-      .or(`email.ilike.%${term}%,username.ilike.%${term}%,full_name.ilike.%${term}%`)
+      .or(`email.ilike.%${safeTerm}%,username.ilike.%${safeTerm}%,full_name.ilike.%${safeTerm}%`)
       .limit(8)
     searchResults.value = data || []
   }, 250)
