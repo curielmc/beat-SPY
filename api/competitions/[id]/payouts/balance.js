@@ -41,6 +41,7 @@ export default async function handler(req) {
     const balance = await getFundingBalance()
     return jsonResponse({ ok: true, balance })
   } catch (e) {
-    return jsonResponse({ ok: false, error: String(e.message) }, 502)
+    console.error('[payouts/balance] tremendous balance fetch failed', e)
+    return jsonResponse({ ok: false, error: 'tremendous_balance_failed' }, 502)
   }
 }
