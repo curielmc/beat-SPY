@@ -1,5 +1,5 @@
 <template>
-  <div v-if="show" class="alert alert-warning shadow flex flex-col items-start gap-3">
+  <div class="alert alert-warning shadow flex flex-col items-start gap-3">
     <div>
       <h3 class="font-bold">Unfilled prize buckets</h3>
       <p class="text-sm">
@@ -30,8 +30,7 @@ import { ref } from 'vue'
 import { supabase } from '../../lib/supabase'
 
 const props = defineProps({
-  competitionId: { type: String, required: true },
-  show: { type: Boolean, default: true }
+  competitionId: { type: String, required: true }
 })
 const emit = defineEmits(['decided'])
 
