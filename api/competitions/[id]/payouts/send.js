@@ -78,6 +78,25 @@ export default async function handler(req) {
   const results = []
   for (const p of pending) {
     try {
+      // Atomic CAS claim — only the first concurrent send-payouts call wins.
+      // claimed_at doubles as the in-flight lock; combined with the WHERE
+      // status=pending AND claimed_at IS NULL filter, PostgREST returns the
+      // row only if THIS request transitioned it. Tremendous's
+      // external_id: payout-${p.id} provides additional idempotency at their end.
+      const claimRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/competition_payouts?id=eq.${p.id}&status=eq.pending&claimed_at=is.null`,
+        {
+          method: 'PATCH',
+          headers: svcHeaders({ Prefer: 'return=representation' }),
+          body: JSON.stringify({ claimed_at: new Date().toISOString() })
+        }
+      )
+      const claimed = await claimRes.json().catch(() => null)
+      if (!Array.isArray(claimed) || claimed.length === 0) {
+        results.push({ id: p.id, ok: false, error: 'already_claimed' })
+        continue
+      }
+
       const prof = p.profiles || {}
       // Minor routing: when self-payout and the student is consented as a minor,
       // route the cash gift to the parent's email.
@@ -134,10 +153,11 @@ export default async function handler(req) {
       results.push({ id: p.id, ok: true, rewardId, orderId })
     } catch (e) {
       console.error('[payouts/send] order failed', p.id, e)
+      // Clear claimed_at so manual retry remains possible.
       await fetch(`${SUPABASE_URL}/rest/v1/competition_payouts?id=eq.${p.id}`, {
         method: 'PATCH',
         headers: svcHeaders({ Prefer: 'return=minimal' }),
-        body: JSON.stringify({ status: 'failed', error: String(e.message).slice(0, 500) })
+        body: JSON.stringify({ status: 'failed', error: String(e.message).slice(0, 500), claimed_at: null })
       })
       results.push({ id: p.id, ok: false, error: String(e.message) })
     }
