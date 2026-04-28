@@ -95,10 +95,20 @@ export async function verifyTwilioSignature(fullUrl, params, signature) {
     )
     const sig = await crypto.subtle.sign('HMAC', key, dataBuf)
     expected = b64(String.fromCharCode(...new Uint8Array(sig)))
+    // Constant-time compare (Web Crypto / edge path).
+    const a = enc.encode(expected)
+    const b = enc.encode(signature)
+    if (a.length !== b.length) return false
+    let diff = 0
+    for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i]
+    return diff === 0
   } else {
     // Node fallback
-    const { createHmac } = await import('node:crypto')
+    const { createHmac, timingSafeEqual } = await import('node:crypto')
     expected = createHmac('sha1', token).update(data).digest('base64')
+    const a = Buffer.from(expected, 'utf8')
+    const b = Buffer.from(signature, 'utf8')
+    if (a.length !== b.length) return false
+    return timingSafeEqual(a, b)
   }
-  return expected === signature
 }
