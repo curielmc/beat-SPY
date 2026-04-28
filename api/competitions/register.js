@@ -124,7 +124,7 @@ export default async function handler(req) {
     headers: authHeaders({ Prefer: 'return=representation' }),
     body: JSON.stringify({
       owner_type: 'competition',
-      owner_id: profile.id,
+      owner_id: comp.id,
       name: `${comp.name} — ${profile.full_name || profile.email}`,
       starting_cash: comp.starting_cash,
       cash_balance: comp.starting_cash,
