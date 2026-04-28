@@ -31,6 +31,13 @@
             <li v-for="(item, i) in tr('page.what_we_do')" :key="i">{{ item }}</li>
           </ul>
 
+          <p class="text-sm">
+            {{ tr('page.legal_links_intro') }}
+            <RouterLink to="/terms" class="link link-primary">{{ tr('page.tos_link') }}</RouterLink>
+            ·
+            <RouterLink to="/privacy" class="link link-primary">{{ tr('page.privacy_link') }}</RouterLink>
+          </p>
+
           <div class="form-control">
             <label class="label cursor-pointer justify-start gap-3">
               <input v-model="checkParticipate" type="checkbox" class="checkbox checkbox-primary" />
@@ -93,7 +100,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, RouterLink } from 'vue-router'
 import { t } from '../../i18n/parent/index.js'
 
 const route = useRoute()

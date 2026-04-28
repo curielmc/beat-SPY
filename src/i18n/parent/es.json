@@ -22,7 +22,10 @@
     "parent_phone": "Su teléfono (opcional, para SMS)",
     "success": "Gracias. {student_name} ahora puede participar en beat-SPY.",
     "expired": "Este enlace de consentimiento ha caducado. Pídale a {student_name} que solicite uno nuevo.",
-    "used": "Este enlace de consentimiento ya ha sido utilizado."
+    "used": "Este enlace de consentimiento ya ha sido utilizado.",
+    "legal_links_intro": "Revise nuestras políticas:",
+    "tos_link": "Términos del servicio",
+    "privacy_link": "Política de privacidad"
   },
   "email": {
     "request_subject": "Se necesita consentimiento para que {student_name} use beat-SPY",

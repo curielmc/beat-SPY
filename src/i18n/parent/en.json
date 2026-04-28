@@ -22,7 +22,10 @@
     "parent_phone": "Your phone (optional, for SMS)",
     "success": "Thank you. {student_name} can now participate in beat-SPY.",
     "expired": "This consent link has expired. Please ask {student_name} to request a new one.",
-    "used": "This consent link has already been used."
+    "used": "This consent link has already been used.",
+    "legal_links_intro": "Review our policies:",
+    "tos_link": "Terms of Service",
+    "privacy_link": "Privacy Policy"
   },
   "email": {
     "request_subject": "Consent needed for {student_name} to use beat-SPY",
