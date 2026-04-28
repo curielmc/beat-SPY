@@ -204,21 +204,44 @@ async function uploadRoster(comp, event) {
 }
 
 function parseCsv(text) {
-  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
-  if (!lines.length) return []
-  const header = lines[0].toLowerCase().split(',').map((s) => s.trim())
+  // RFC 4180 quoted-field aware parser.
+  const rows = []
+  let cur = []
+  let field = ''
+  let inQuotes = false
+  let i = 0
+  while (i < text.length) {
+    const ch = text[i]
+    if (inQuotes) {
+      if (ch === '"' && text[i + 1] === '"') { field += '"'; i += 2; continue }
+      if (ch === '"') { inQuotes = false; i++; continue }
+      field += ch; i++; continue
+    }
+    if (ch === '"') { inQuotes = true; i++; continue }
+    if (ch === ',') { cur.push(field); field = ''; i++; continue }
+    if (ch === '\n') { cur.push(field); rows.push(cur); cur = []; field = ''; i++; continue }
+    if (ch === '\r') { i++; continue }
+    field += ch; i++
+  }
+  if (field.length || cur.length) { cur.push(field); rows.push(cur) }
+
+  // Drop fully-empty trailing rows
+  const grid = rows.filter((r) => r.some((c) => String(c).trim() !== ''))
+  if (!grid.length) return []
+
+  const header = grid[0].map((s) => String(s).trim().toLowerCase())
   const emailIdx = header.indexOf('email')
   const nameIdx = header.indexOf('full_name')
   const startIdx = (emailIdx === -1 && nameIdx === -1) ? 0 : 1
-  const rows = []
-  for (let i = startIdx; i < lines.length; i++) {
-    const parts = lines[i].split(',').map((s) => s.trim())
+  const out = []
+  for (let r = startIdx; r < grid.length; r++) {
+    const parts = grid[r].map((s) => String(s).trim())
     let email, full_name
-    if (emailIdx >= 0) { email = parts[emailIdx]; full_name = nameIdx >= 0 ? parts[nameIdx] : '' }
+    if (emailIdx >= 0) { email = parts[emailIdx]; full_name = nameIdx >= 0 ? (parts[nameIdx] || '') : '' }
     else { email = parts[0]; full_name = parts[1] || '' }
-    if (email && /@/.test(email)) rows.push({ email, full_name })
+    if (email && /@/.test(email)) out.push({ email, full_name })
   }
-  return rows
+  return out
 }
 
 const showForm = ref(false)
