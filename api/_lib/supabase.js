@@ -59,6 +59,8 @@ export async function fetchUserFromToken(token) {
 }
 
 export async function loadProfile(userId) {
-  const data = await sbFetch(`/profiles?id=eq.${userId}&select=id,role,email&limit=1`)
+  const data = await sbFetch(
+    `/profiles?id=eq.${userId}&select=id,role,email,full_name,date_of_birth,parent_email,parent_language,parental_consent_status,parental_consent_at,parental_consent_expires_at&limit=1`
+  )
   return data?.[0] || null
 }
