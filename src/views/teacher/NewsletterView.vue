@@ -16,6 +16,8 @@ const savingEndDate = ref(false)
 const generating = ref(false)
 const sending = ref(false)
 const sendingTest = ref(false)
+const savingDraft = ref(false)
+const savedAt = ref('')
 const testEmail = ref('')
 const testResult = ref('')
 const draft = ref(null) // { id, subject, intro_html, payload }
@@ -53,6 +55,48 @@ async function loadHistory() {
     .order('created_at', { ascending: false })
     .limit(20)
   history.value = data || []
+}
+
+async function openDraft(id) {
+  const { data, error } = await supabase
+    .from('newsletters')
+    .select('id, subject, intro_html, payload, status')
+    .eq('id', id)
+    .single()
+  if (error || !data) {
+    errorMsg.value = error?.message || 'Could not load newsletter'
+    return
+  }
+  draft.value = { id: data.id, subject: data.subject, intro_html: data.intro_html, payload: data.payload, readOnly: data.status === 'sent' }
+  subject.value = data.subject || ''
+  introHtml.value = stripHtml(data.intro_html)
+  errorMsg.value = ''
+  sendResult.value = null
+  savedAt.value = ''
+  if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+async function saveDraft() {
+  if (!draft.value?.id || draft.value.readOnly) return
+  savingDraft.value = true
+  errorMsg.value = ''
+  savedAt.value = ''
+  try {
+    const { error } = await supabase
+      .from('newsletters')
+      .update({
+        subject: subject.value,
+        intro_html: `<p>${escapeHtml(introHtml.value).replace(/\n+/g, '</p><p>')}</p>`
+      })
+      .eq('id', draft.value.id)
+    if (error) throw error
+    savedAt.value = new Date().toLocaleTimeString()
+    await loadHistory()
+  } catch (e) {
+    errorMsg.value = e.message
+  } finally {
+    savingDraft.value = false
+  }
 }
 
 async function generate() {
@@ -262,20 +306,28 @@ onMounted(() => {
           </div>
         </div>
 
+        <div v-if="draft.readOnly" class="alert alert-warning mt-2">
+          <span>This newsletter has already been sent and is read-only.</span>
+        </div>
+
         <div class="flex flex-wrap items-end gap-2 mt-4">
-          <div>
+          <div v-if="!draft.readOnly">
             <label class="label py-0"><span class="label-text text-xs">Test recipient (optional — defaults to you)</span></label>
             <input v-model="testEmail" type="email" placeholder="you@example.com" class="input input-bordered input-sm w-64" />
           </div>
-          <button class="btn btn-sm" :disabled="sendingTest" @click="sendTest">
+          <button v-if="!draft.readOnly" class="btn btn-sm" :disabled="sendingTest" @click="sendTest">
             {{ sendingTest ? 'Sending test…' : 'Send Test' }}
           </button>
+          <button v-if="!draft.readOnly" class="btn btn-sm" :disabled="savingDraft" @click="saveDraft">
+            {{ savingDraft ? 'Saving…' : 'Save Draft' }}
+          </button>
           <div class="flex-1"></div>
-          <button class="btn btn-primary" :disabled="sending" @click="send">
+          <button v-if="!draft.readOnly" class="btn btn-primary" :disabled="sending" @click="send">
             {{ sending ? 'Sending…' : 'Send Newsletter' }}
           </button>
-          <button class="btn btn-ghost" @click="draft = null">Discard</button>
+          <button class="btn btn-ghost" @click="draft = null">Close</button>
         </div>
+        <p v-if="savedAt" class="text-success text-sm mt-2">Draft saved at {{ savedAt }}</p>
         <p v-if="testResult" class="text-success text-sm mt-2">{{ testResult }}</p>
         <p v-if="errorMsg" class="text-error text-sm mt-2">{{ errorMsg }}</p>
       </div>
@@ -293,8 +345,8 @@ onMounted(() => {
         <table v-if="history.length" class="table table-sm">
           <thead><tr><th>Subject</th><th>Status</th><th>Recipients</th><th>Date</th></tr></thead>
           <tbody>
-            <tr v-for="h in history" :key="h.id">
-              <td>{{ h.subject }}</td>
+            <tr v-for="h in history" :key="h.id" class="hover cursor-pointer" @click="openDraft(h.id)">
+              <td class="link link-hover">{{ h.subject }}</td>
               <td><span class="badge" :class="h.status === 'sent' ? 'badge-success' : 'badge-ghost'">{{ h.status }}</span></td>
               <td>{{ h.recipients_count || '—' }}</td>
               <td>{{ new Date(h.sent_at || h.created_at).toLocaleString() }}</td>
