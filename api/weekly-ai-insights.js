@@ -88,8 +88,15 @@ async function generateAIAnalysis(prompt) {
 }
 
 export default async function handler(req) {
-  const secret = req.headers.get('x-cron-secret')
-  if (secret !== process.env.CRON_SECRET) {
+  const cronSecret = process.env.CRON_SECRET
+  const authHeader = req.headers.get('authorization')
+  const legacySecret = req.headers.get('x-cron-secret')
+  const authorized = !!cronSecret && (
+    authHeader === `Bearer ${cronSecret}` ||
+    legacySecret === cronSecret
+  )
+
+  if (!authorized) {
     return new Response('Unauthorized', { status: 401 })
   }
 

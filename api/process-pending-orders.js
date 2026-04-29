@@ -130,12 +130,15 @@ async function sendOrderNotification(order, kind, details = {}) {
 }
 
 export default async function handler(req) {
-  const auth = req.headers.get('authorization')
-  const cronSecret = req.headers.get('x-cron-secret')
-  const vercelSecret = auth?.startsWith('Bearer ') ? auth.slice(7) : null
+  const cronSecret = process.env.CRON_SECRET
+  const authHeader = req.headers.get('authorization')
+  const legacySecret = req.headers.get('x-cron-secret')
+  const authorized = !!cronSecret && (
+    authHeader === `Bearer ${cronSecret}` ||
+    legacySecret === cronSecret
+  )
 
-  // Support both standard Vercel auth and custom header
-  if (cronSecret !== process.env.CRON_SECRET && vercelSecret !== process.env.CRON_SECRET) {
+  if (!authorized) {
     return new Response('Unauthorized', { status: 401 })
   }
 
