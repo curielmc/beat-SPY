@@ -29,6 +29,14 @@ const history = ref([])
 const parentSubs = ref([])
 const studentUnsubs = ref([])
 const studentRoster = ref([])
+const addEmail = ref('')
+const addParentName = ref('')
+const addStudentName = ref('')
+const addingSub = ref(false)
+const importingCsv = ref(false)
+const addResult = ref('')
+const addError = ref('')
+const csvFileInput = ref(null)
 
 const signupUrl = computed(() => publicSlug.value ? `${window.location.origin}/newsletter/subscribe/${publicSlug.value}` : '')
 
@@ -58,6 +66,136 @@ async function loadHistory() {
     .order('created_at', { ascending: false })
     .limit(20)
   history.value = data || []
+}
+
+async function postSubscribers(subscribers) {
+  const { data: { session } } = await supabase.auth.getSession()
+  const res = await fetch('/api/newsletter-add-subscribers', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${session.access_token}`
+    },
+    body: JSON.stringify({ class_id: currentClassId.value, subscribers })
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error || 'Failed to add subscribers')
+  return data
+}
+
+function summarizeAdd(data) {
+  const parts = []
+  if (data.added) parts.push(`${data.added} added`)
+  if (data.reactivated) parts.push(`${data.reactivated} reactivated`)
+  if (data.skipped) parts.push(`${data.skipped} already confirmed`)
+  if (data.invalid) parts.push(`${data.invalid} invalid`)
+  return parts.join(' · ') || 'No changes'
+}
+
+async function addSubscriber() {
+  if (!currentClassId.value || !addEmail.value.trim()) return
+  addingSub.value = true
+  addError.value = ''
+  addResult.value = ''
+  try {
+    const data = await postSubscribers([{
+      email: addEmail.value.trim(),
+      parent_name: addParentName.value.trim() || null,
+      student_name: addStudentName.value.trim() || null
+    }])
+    addResult.value = summarizeAdd(data)
+    if (data.invalid && data.details?.invalid?.length) {
+      addError.value = data.details.invalid.map(i => `${i.email || '(blank)'}: ${i.reason}`).join('; ')
+    }
+    addEmail.value = ''
+    addParentName.value = ''
+    addStudentName.value = ''
+    await loadSubscribers()
+  } catch (e) {
+    addError.value = e.message
+  } finally {
+    addingSub.value = false
+  }
+}
+
+function parseCsv(text) {
+  // Minimal CSV: handles quoted values with commas. No multi-line quoted fields.
+  const lines = text.split(/\r?\n/).filter(l => l.trim())
+  if (lines.length === 0) return []
+  const splitLine = (line) => {
+    const out = []
+    let cur = ''
+    let inQ = false
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i]
+      if (inQ) {
+        if (c === '"' && line[i + 1] === '"') { cur += '"'; i++ }
+        else if (c === '"') { inQ = false }
+        else cur += c
+      } else {
+        if (c === '"') inQ = true
+        else if (c === ',') { out.push(cur); cur = '' }
+        else cur += c
+      }
+    }
+    out.push(cur)
+    return out.map(s => s.trim())
+  }
+  const headers = splitLine(lines[0]).map(h => h.toLowerCase().replace(/[^a-z]/g, '_'))
+  const emailIdx = headers.findIndex(h => h.includes('email'))
+  const parentIdx = headers.findIndex(h => h.includes('parent'))
+  const studentIdx = headers.findIndex(h => h.includes('student'))
+
+  // If first row doesn't look like a header (no "email" column), treat all rows as data with email in col 0.
+  const startRow = emailIdx >= 0 ? 1 : 0
+  const eIdx = emailIdx >= 0 ? emailIdx : 0
+  const pIdx = parentIdx
+  const sIdx = studentIdx
+
+  const rows = []
+  for (let i = startRow; i < lines.length; i++) {
+    const cols = splitLine(lines[i])
+    const email = (cols[eIdx] || '').trim()
+    if (!email) continue
+    rows.push({
+      email,
+      parent_name: pIdx >= 0 ? (cols[pIdx] || '').trim() : null,
+      student_name: sIdx >= 0 ? (cols[sIdx] || '').trim() : null
+    })
+  }
+  return rows
+}
+
+async function importCsv(event) {
+  const file = event.target.files?.[0]
+  if (!file || !currentClassId.value) return
+  importingCsv.value = true
+  addError.value = ''
+  addResult.value = ''
+  try {
+    const text = await file.text()
+    const rows = parseCsv(text)
+    if (!rows.length) {
+      addError.value = 'No rows with email found in CSV'
+      return
+    }
+    // Send in batches of 50 to keep edge requests small
+    let totals = { added: 0, reactivated: 0, skipped: 0, invalid: 0 }
+    for (let i = 0; i < rows.length; i += 50) {
+      const data = await postSubscribers(rows.slice(i, i + 50))
+      totals.added += data.added || 0
+      totals.reactivated += data.reactivated || 0
+      totals.skipped += data.skipped || 0
+      totals.invalid += data.invalid || 0
+    }
+    addResult.value = `${rows.length} rows processed: ${summarizeAdd(totals)}`
+    await loadSubscribers()
+  } catch (e) {
+    addError.value = e.message
+  } finally {
+    importingCsv.value = false
+    if (csvFileInput.value) csvFileInput.value.value = ''
+  }
 }
 
 async function loadSubscribers() {
@@ -312,6 +450,61 @@ onMounted(() => {
         </div>
 
         <div class="collapse collapse-arrow bg-base-200 mt-4">
+          <input type="checkbox" />
+          <div class="collapse-title text-sm font-semibold">
+            Add subscribers manually
+          </div>
+          <div class="collapse-content">
+            <p class="text-xs opacity-70 mb-3">
+              Added subscribers are marked confirmed immediately (no double opt-in email).
+              They can still unsubscribe from any newsletter they receive.
+            </p>
+
+            <form class="grid grid-cols-1 md:grid-cols-4 gap-2 items-end" @submit.prevent="addSubscriber">
+              <div>
+                <label class="label py-0"><span class="label-text text-xs">Email *</span></label>
+                <input v-model="addEmail" type="email" required placeholder="parent@example.com" class="input input-bordered input-sm w-full" />
+              </div>
+              <div>
+                <label class="label py-0"><span class="label-text text-xs">Parent name</span></label>
+                <input v-model="addParentName" type="text" class="input input-bordered input-sm w-full" />
+              </div>
+              <div>
+                <label class="label py-0"><span class="label-text text-xs">Student name</span></label>
+                <input v-model="addStudentName" type="text" class="input input-bordered input-sm w-full" />
+              </div>
+              <button type="submit" class="btn btn-sm btn-primary" :disabled="addingSub || !addEmail.trim()">
+                {{ addingSub ? 'Adding…' : 'Add' }}
+              </button>
+            </form>
+
+            <div class="divider my-3 text-xs opacity-60">or</div>
+
+            <div class="flex flex-wrap items-center gap-3">
+              <div>
+                <label class="label py-0"><span class="label-text text-xs">Bulk import from CSV</span></label>
+                <input
+                  ref="csvFileInput"
+                  type="file"
+                  accept=".csv,text/csv"
+                  class="file-input file-input-bordered file-input-sm w-full max-w-xs"
+                  :disabled="importingCsv"
+                  @change="importCsv"
+                />
+              </div>
+              <p class="text-xs opacity-70 max-w-md">
+                CSV header: <code>email,parent_name,student_name</code>.
+                Only <code>email</code> is required. Existing addresses are updated; previously unsubscribed entries are reactivated.
+              </p>
+            </div>
+
+            <p v-if="importingCsv" class="text-sm opacity-70 mt-2">Importing…</p>
+            <p v-if="addResult" class="text-success text-sm mt-2">{{ addResult }}</p>
+            <p v-if="addError" class="text-error text-sm mt-2">{{ addError }}</p>
+          </div>
+        </div>
+
+        <div class="collapse collapse-arrow bg-base-200 mt-2">
           <input type="checkbox" />
           <div class="collapse-title text-sm font-semibold">
             Confirmed parents ({{ confirmedParents.length }})
