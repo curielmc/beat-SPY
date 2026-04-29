@@ -35,6 +35,10 @@ export default async function handler(req) {
   if (!klass) return jsonResponse({ error: 'Class not found' }, 404)
   if (role !== 'admin' && klass.teacher_id !== user.id) return jsonResponse({ error: 'Forbidden' }, 403)
 
+  const teacherProfile = await sbFetch(`/profiles?id=eq.${klass.teacher_id}&select=email`)
+  const replyTo = teacherProfile?.[0]?.email || null
+  const ccList = ['martin@myecfo.com']
+
   if (nl.status === 'sent') return jsonResponse({ error: 'Newsletter already sent' }, 409)
 
   const AGENTMAIL_KEY = process.env.AGENTMAIL_API_KEY
@@ -102,12 +106,41 @@ export default async function handler(req) {
       const res = await fetch(`https://api.agentmail.to/v0/inboxes/${AGENTMAIL_INBOX}/messages/send`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${AGENTMAIL_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to: [r.email], subject: finalSubject, html })
+        body: JSON.stringify({
+          to: [r.email],
+          reply_to: replyTo ? [replyTo] : undefined,
+          subject: finalSubject,
+          html
+        })
       })
       if (res.ok) sentCount++
       else errors.push({ email: r.email, status: res.status })
     } catch (e) {
       errors.push({ email: r.email, error: e.message })
+    }
+  }
+
+  // Send a single internal copy so Martin can see what went out.
+  if (sentCount > 0) {
+    const internalHtml = renderNewsletterHtml({
+      subject: finalSubject,
+      introHtml: finalIntro,
+      payload: nl.payload,
+      unsubscribeUrl: `${APP_BASE}/api/newsletter-unsubscribe?token=internal&class_id=${nl.class_id}`,
+      classSignupUrl
+    })
+    const internalSubject = `[copy] ${finalSubject} — sent to ${sentCount} of ${recipients.length}`
+    for (const internalTo of ccList) {
+      await fetch(`https://api.agentmail.to/v0/inboxes/${AGENTMAIL_INBOX}/messages/send`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${AGENTMAIL_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: [internalTo],
+          reply_to: replyTo ? [replyTo] : undefined,
+          subject: internalSubject,
+          html: internalHtml
+        })
+      }).catch(() => null)
     }
   }
 

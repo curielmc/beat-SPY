@@ -42,6 +42,9 @@ export default async function handler(req) {
   if (!klass) return jsonResponse({ error: 'Class not found' }, 404)
   if (role !== 'admin' && klass.teacher_id !== user.id) return jsonResponse({ error: 'Forbidden' }, 403)
 
+  const teacherProfile = await sbFetch(`/profiles?id=eq.${klass.teacher_id}&select=email`)
+  const replyTo = teacherProfile?.[0]?.email || null
+
   const AGENTMAIL_KEY = process.env.AGENTMAIL_API_KEY
   if (!AGENTMAIL_KEY) return jsonResponse({ error: 'AgentMail not configured' }, 500)
 
@@ -64,7 +67,12 @@ export default async function handler(req) {
   const res = await fetch(`https://api.agentmail.to/v0/inboxes/${AGENTMAIL_INBOX}/messages/send`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${AGENTMAIL_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ to: [targetEmail], subject: finalSubject, html })
+    body: JSON.stringify({
+      to: [targetEmail],
+      reply_to: replyTo ? [replyTo] : undefined,
+      subject: finalSubject,
+      html
+    })
   })
 
   if (!res.ok) {
