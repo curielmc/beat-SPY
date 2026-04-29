@@ -26,6 +26,9 @@ const introHtml = ref('')
 const sendResult = ref(null)
 const errorMsg = ref('')
 const history = ref([])
+const parentSubs = ref([])
+const studentUnsubs = ref([])
+const studentRoster = ref([])
 
 const signupUrl = computed(() => publicSlug.value ? `${window.location.origin}/newsletter/subscribe/${publicSlug.value}` : '')
 
@@ -56,6 +59,43 @@ async function loadHistory() {
     .limit(20)
   history.value = data || []
 }
+
+async function loadSubscribers() {
+  if (!currentClassId.value) return
+  const [{ data: parents }, { data: unsubs }, { data: roster }] = await Promise.all([
+    supabase
+      .from('newsletter_parent_subscribers')
+      .select('id, email, parent_name, student_name, confirmed_at, unsubscribed_at, created_at')
+      .eq('class_id', currentClassId.value)
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('newsletter_unsubscribes')
+      .select('user_id, unsubscribed_at, profiles:profiles(email, full_name)')
+      .eq('class_id', currentClassId.value),
+    supabase
+      .from('class_memberships')
+      .select('user_id, profiles:profiles(email, full_name)')
+      .eq('class_id', currentClassId.value)
+  ])
+  parentSubs.value = parents || []
+  studentUnsubs.value = unsubs || []
+  studentRoster.value = roster || []
+}
+
+const confirmedParents = computed(() =>
+  parentSubs.value.filter(p => p.confirmed_at && !p.unsubscribed_at)
+)
+const pendingParents = computed(() =>
+  parentSubs.value.filter(p => !p.confirmed_at && !p.unsubscribed_at)
+)
+const unsubscribedParents = computed(() =>
+  parentSubs.value.filter(p => p.unsubscribed_at)
+)
+const unsubscribedStudents = computed(() => studentUnsubs.value)
+const unsubscribedStudentIds = computed(() => new Set(studentUnsubs.value.map(u => u.user_id)))
+const activeStudentRecipients = computed(() =>
+  studentRoster.value.filter(m => m.profiles?.email && !unsubscribedStudentIds.value.has(m.user_id))
+)
 
 async function openDraft(id) {
   const { data, error } = await supabase
@@ -215,6 +255,7 @@ function stripHtml(s) {
 onMounted(() => {
   loadClass()
   loadHistory()
+  loadSubscribers()
 })
 </script>
 
@@ -242,6 +283,104 @@ onMounted(() => {
         <p class="text-xs opacity-70 break-all">{{ signupUrl }}</p>
       </div>
       <button class="btn btn-sm" @click="copySignupUrl">Copy</button>
+    </div>
+
+    <!-- Recipients & subscribers -->
+    <div class="card bg-base-100 shadow mb-6">
+      <div class="card-body">
+        <h2 class="card-title">Recipients &amp; subscribers</h2>
+        <p class="text-sm opacity-70">
+          Newsletters go to every student in this class (minus unsubscribes) plus confirmed parents who signed up via the link above.
+        </p>
+
+        <div class="stats stats-vertical md:stats-horizontal shadow mt-2">
+          <div class="stat">
+            <div class="stat-title">Active students</div>
+            <div class="stat-value text-2xl">{{ activeStudentRecipients.length }}</div>
+            <div class="stat-desc">{{ studentRoster.length }} enrolled · {{ unsubscribedStudents.length }} unsubscribed</div>
+          </div>
+          <div class="stat">
+            <div class="stat-title">Confirmed parents</div>
+            <div class="stat-value text-2xl">{{ confirmedParents.length }}</div>
+            <div class="stat-desc">{{ pendingParents.length }} pending confirmation</div>
+          </div>
+          <div class="stat">
+            <div class="stat-title">Unsubscribed parents</div>
+            <div class="stat-value text-2xl">{{ unsubscribedParents.length }}</div>
+            <div class="stat-desc">Won't receive future sends</div>
+          </div>
+        </div>
+
+        <div class="collapse collapse-arrow bg-base-200 mt-4">
+          <input type="checkbox" />
+          <div class="collapse-title text-sm font-semibold">
+            Confirmed parents ({{ confirmedParents.length }})
+          </div>
+          <div class="collapse-content">
+            <table v-if="confirmedParents.length" class="table table-sm">
+              <thead><tr><th>Email</th><th>Parent</th><th>Student</th><th>Confirmed</th></tr></thead>
+              <tbody>
+                <tr v-for="p in confirmedParents" :key="p.id">
+                  <td>{{ p.email }}</td>
+                  <td>{{ p.parent_name || '—' }}</td>
+                  <td>{{ p.student_name || '—' }}</td>
+                  <td>{{ new Date(p.confirmed_at).toLocaleDateString() }}</td>
+                </tr>
+              </tbody>
+            </table>
+            <p v-else class="text-sm opacity-60">No confirmed parents yet.</p>
+          </div>
+        </div>
+
+        <div class="collapse collapse-arrow bg-base-200 mt-2">
+          <input type="checkbox" />
+          <div class="collapse-title text-sm font-semibold">
+            Pending parents ({{ pendingParents.length }})
+          </div>
+          <div class="collapse-content">
+            <p class="text-xs opacity-70 mb-2">These parents signed up but haven't clicked the confirmation email yet.</p>
+            <table v-if="pendingParents.length" class="table table-sm">
+              <thead><tr><th>Email</th><th>Parent</th><th>Student</th><th>Signed up</th></tr></thead>
+              <tbody>
+                <tr v-for="p in pendingParents" :key="p.id">
+                  <td>{{ p.email }}</td>
+                  <td>{{ p.parent_name || '—' }}</td>
+                  <td>{{ p.student_name || '—' }}</td>
+                  <td>{{ new Date(p.created_at).toLocaleDateString() }}</td>
+                </tr>
+              </tbody>
+            </table>
+            <p v-else class="text-sm opacity-60">No pending signups.</p>
+          </div>
+        </div>
+
+        <div class="collapse collapse-arrow bg-base-200 mt-2">
+          <input type="checkbox" />
+          <div class="collapse-title text-sm font-semibold">
+            Unsubscribed ({{ unsubscribedParents.length + unsubscribedStudents.length }})
+          </div>
+          <div class="collapse-content">
+            <table v-if="unsubscribedParents.length || unsubscribedStudents.length" class="table table-sm">
+              <thead><tr><th>Type</th><th>Email</th><th>Name</th><th>Unsubscribed</th></tr></thead>
+              <tbody>
+                <tr v-for="p in unsubscribedParents" :key="'p-' + p.id">
+                  <td><span class="badge badge-ghost">Parent</span></td>
+                  <td>{{ p.email }}</td>
+                  <td>{{ p.parent_name || '—' }}</td>
+                  <td>{{ new Date(p.unsubscribed_at).toLocaleDateString() }}</td>
+                </tr>
+                <tr v-for="u in unsubscribedStudents" :key="'s-' + u.user_id">
+                  <td><span class="badge badge-ghost">Student</span></td>
+                  <td>{{ u.profiles?.email || '—' }}</td>
+                  <td>{{ u.profiles?.full_name || '—' }}</td>
+                  <td>{{ new Date(u.unsubscribed_at).toLocaleDateString() }}</td>
+                </tr>
+              </tbody>
+            </table>
+            <p v-else class="text-sm opacity-60">Nobody has unsubscribed.</p>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Generate -->
