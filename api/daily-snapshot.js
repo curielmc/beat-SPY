@@ -1,6 +1,6 @@
 export const config = { runtime: 'edge' }
 
-import { FMP_KEY, sbFetch as _sbFetch } from './_lib/supabase.js'
+import { FMP_KEY, SUPABASE_URL, SUPABASE_SERVICE_KEY, sbFetch as _sbFetch } from './_lib/supabase.js'
 import { OWNER_EMAIL, AGENTMAIL_INBOX } from './_lib/constants.js'
 
 async function sbFetch(path) {
@@ -95,8 +95,8 @@ export default async function handler(req) {
       const res = await fetch(`${SUPABASE_URL}/rest/v1/portfolio_snapshots`, {
         method: 'POST',
         headers: {
-          apikey: SUPABASE_KEY,
-          Authorization: `Bearer ${SUPABASE_KEY}`,
+          apikey: SUPABASE_SERVICE_KEY,
+          Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
           'Content-Type': 'application/json',
           Prefer: 'resolution=merge-duplicates,return=minimal'
         },
