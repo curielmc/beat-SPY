@@ -215,6 +215,11 @@ export default async function handler(req) {
         p_price: executionPrice,
         p_benchmark_price: benchmarkExecutionPrice
       })
+      if (data?.status === 'failed') {
+        await sendOrderNotification(order, 'failed', { reason: data.error || 'Unknown error' })
+        results.push({ id: order.id, success: false, error: data.error })
+        continue
+      }
       if (data?.trade_id && order.placed_by_user_id && order.placed_by_role) {
         await sbFetch(`/trades?id=eq.${data.trade_id}`, {
           method: 'PATCH',
@@ -231,6 +236,17 @@ export default async function handler(req) {
       })
       results.push({ id: order.id, success: true, status: data?.status || 'executed' })
     } catch (error) {
+      // Pre-061 RPC re-raised after marking failed, rolling back the status update.
+      // Force-mark the order failed here so it stops retrying every cron tick.
+      await sbFetch(`/pending_trade_orders?id=eq.${order.id}`, {
+        method: 'PATCH',
+        headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({
+          status: 'failed',
+          processed_at: new Date().toISOString(),
+          error_message: error.message
+        })
+      }).catch(e => console.error('Failed to mark order failed:', order.id, e.message))
       await sendOrderNotification(order, 'failed', { reason: error.message })
       results.push({ id: order.id, success: false, error: error.message })
     }
