@@ -22,7 +22,7 @@ async function generateAIAnalysis(prompt) {
       body: JSON.stringify({
         model: process.env.OPENROUTER_MODEL || 'deepseek/deepseek-chat',
         messages: [{ role: 'user', content: prompt }],
-        max_tokens: 150
+        max_tokens: 320
       })
     })
     const data = await res.json()
@@ -40,7 +40,7 @@ async function generateAIAnalysis(prompt) {
       body: JSON.stringify({
         model: 'deepseek-chat',
         messages: [{ role: 'user', content: prompt }],
-        max_tokens: 150
+        max_tokens: 320
       })
     })
     const data = await res.json()
@@ -58,7 +58,7 @@ async function generateAIAnalysis(prompt) {
       body: JSON.stringify({
         model: 'moonshot-v1-8k',
         messages: [{ role: 'user', content: prompt }],
-        max_tokens: 150
+        max_tokens: 320
       })
     })
     const data = await res.json()
@@ -76,7 +76,7 @@ async function generateAIAnalysis(prompt) {
       },
       body: JSON.stringify({
         model: 'claude-3-haiku-20240307',
-        max_tokens: 150,
+        max_tokens: 320,
         messages: [{ role: 'user', content: prompt }]
       })
     })
@@ -106,6 +106,32 @@ export default async function handler(req) {
   const lessons = await sbFetch('/investment_lessons?select=*')
   let results = { processed: 0, messagesSent: 0, errors: [] }
 
+  // Window for the 30-day comparison
+  const windowEndDate = new Date()
+  const windowStart = new Date(windowEndDate)
+  windowStart.setUTCDate(windowStart.getUTCDate() - 30)
+  const windowStartIso = windowStart.toISOString()
+  const windowStartDateStr = windowStartIso.split('T')[0]
+
+  // SPY return over last 30 days (one fetch shared across all portfolios)
+  let spyReturnPct = null
+  if (FMP_KEY) {
+    const to = windowEndDate.toISOString().split('T')[0]
+    const from = new Date(windowStart); from.setUTCDate(from.getUTCDate() - 5)
+    const fromStr = from.toISOString().split('T')[0]
+    const [histRes, quoteRes] = await Promise.all([
+      fetch(`https://financialmodelingprep.com/api/v3/historical-price-full/SPY?from=${fromStr}&to=${to}&apikey=${FMP_KEY}`).then(r => r.json()).catch(() => null),
+      fetch(`https://financialmodelingprep.com/api/v3/quote/SPY?apikey=${FMP_KEY}`).then(r => r.json()).catch(() => null)
+    ])
+    const rows = histRes?.historical || []
+    let spyStart = null
+    for (const row of rows) {
+      if (row?.date && row.date <= windowStartDateStr && row.close) { spyStart = row.close; break }
+    }
+    const spyNow = quoteRes?.[0]?.price
+    if (spyStart && spyNow) spyReturnPct = ((spyNow - spyStart) / spyStart) * 100
+  }
+
   for (const portfolio of portfolios) {
     try {
       if (!portfolio.holdings || portfolio.holdings.length === 0) continue
@@ -114,12 +140,14 @@ export default async function handler(req) {
       const tickers = portfolio.holdings.map(h => h.ticker)
       let newsContext = ''
       let priceContext = ''
+      let quotes = []
 
       if (FMP_KEY && tickers.length > 0) {
-        const [news, quotes] = await Promise.all([
+        const [news, quotesRes] = await Promise.all([
           fetch(`https://financialmodelingprep.com/api/v3/stock_news?tickers=${tickers.join(',')}&limit=5&apikey=${FMP_KEY}`).then(r => r.json()).catch(() => []),
           fetch(`https://financialmodelingprep.com/api/v3/quote/${tickers.join(',')}?apikey=${FMP_KEY}`).then(r => r.json()).catch(() => [])
         ])
+        quotes = quotesRes || []
 
         if (news?.length > 0) {
           newsContext = 'Recent headlines:\n' + news.slice(0, 5).map(n =>
@@ -127,12 +155,33 @@ export default async function handler(req) {
           ).join('\n')
         }
 
-        if (quotes?.length > 0) {
-          priceContext = 'Current performance:\n' + quotes.map(q =>
-            `- ${q.symbol}: $${q.price} (${q.changesPercentage >= 0 ? '+' : ''}${q.changesPercentage?.toFixed(2)}% today, ${q.yearHigh ? 'Year high: $' + q.yearHigh : ''})`
+        if (quotes.length > 0) {
+          priceContext = 'Today\'s prices:\n' + quotes.map(q =>
+            `- ${q.symbol}: $${q.price} (${q.changesPercentage >= 0 ? '+' : ''}${q.changesPercentage?.toFixed(2)}% today)`
           ).join('\n')
         }
       }
+
+      // 30-day portfolio vs SPY performance
+      const priceMap = Object.fromEntries(quotes.map(q => [q.symbol, q.price]))
+      const cash = Number(portfolio.cash_balance || 0)
+      let currentValue = cash
+      for (const h of portfolio.holdings) {
+        const px = priceMap[h.ticker]
+        if (px) currentValue += Number(h.shares || 0) * px
+      }
+
+      const startSnaps = await sbFetch(`/portfolio_snapshots?portfolio_id=eq.${portfolio.id}&snapshot_type=eq.daily&snapshotted_at=lte.${windowStartIso}&select=total_value,snapshotted_at&order=snapshotted_at.desc&limit=1`)
+      const startValue = Number(startSnaps?.[0]?.total_value || portfolio.starting_cash || 100000)
+      const portfolioReturnPct = startValue > 0 ? ((currentValue - startValue) / startValue) * 100 : 0
+      const vsSpy = spyReturnPct == null ? null : (portfolioReturnPct - spyReturnPct)
+
+      // Top winner over the last month: best 30d-change among holdings (proxied by today's % since we lack per-ticker 30d here without extra calls)
+      const topMover = quotes.slice().sort((a,b) => (b.changesPercentage||0) - (a.changesPercentage||0))[0]
+      const monthContext = `30-day performance:
+- Your portfolio: ${portfolioReturnPct >= 0 ? '+' : ''}${portfolioReturnPct.toFixed(2)}%
+- S&P 500 (SPY): ${spyReturnPct == null ? 'n/a' : (spyReturnPct >= 0 ? '+' : '') + spyReturnPct.toFixed(2) + '%'}
+${vsSpy == null ? '' : `- vs S&P: ${vsSpy >= 0 ? '+' : ''}${vsSpy.toFixed(2)}% (${vsSpy >= 0 ? 'beating' : 'trailing'} the benchmark)`}`
 
       // Get student's preferred difficulty level
       const prefs = await sbFetch(`/user_lesson_preferences?user_id=eq.${portfolio.owner_id}&select=difficulty`)
@@ -149,7 +198,7 @@ export default async function handler(req) {
           : lessons[Math.floor(Math.random() * lessons.length)]
 
       const holdingsStr = portfolio.holdings.map(h => `${h.ticker} (${h.shares} shares)`).join(', ')
-      const prompt = `You are "Market Spy AI", a financial coach for high school students.
+      const prompt = `You are "Market Spy AI", a monthly financial coach for high school students.
 
 Portfolio holdings: ${holdingsStr}
 
@@ -157,10 +206,14 @@ ${priceContext}
 
 ${newsContext}
 
-Based on the above, explain specifically WHAT happened with their stocks this week. 
-Identify 1-2 key stocks that moved and explain WHY they moved (e.g., "VRTX surged over 8% today because of positive data for their new kidney disease drug"). 
-If there is no specific news for their stocks, explain a broader market or sector trend that affected their portfolio value. 
-Use a professional but accessible tone for a teenager. Keep it to 2-3 concise, timely sentences.`
+${monthContext}
+
+Write a short monthly update with THREE parts, each 1-2 sentences, in this order:
+1. **Today**: What stands out in today's prices — call out the biggest mover by name and % (e.g., "${topMover ? topMover.symbol + ' is ' + (topMover.changesPercentage >= 0 ? 'up' : 'down') + ' ' + Math.abs(topMover.changesPercentage).toFixed(2) + '% today' : 'a notable mover'}").
+2. **What worked & why**: Name the stock that helped most this past month and explain WHY (use the headlines or a sector/market trend if no specific news).
+3. **vs. the S&P 500**: State the 30-day portfolio return, the SPY return, and whether they're beating or trailing the benchmark — tie it to their stock picks in one line.
+
+Use a professional but accessible tone for a teenager. Keep the whole thing under ~120 words.`
 
       const analysis = await generateAIAnalysis(prompt) || "Great job managing your portfolio this week!"
 
