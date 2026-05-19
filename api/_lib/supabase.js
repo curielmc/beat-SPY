@@ -19,7 +19,9 @@ export async function sbFetch(path, options = {}) {
   }
 
   if (res.status === 204) return null
-  return res.json()
+  const text = await res.text()
+  if (!text) return null
+  return JSON.parse(text)
 }
 
 export async function sbRpc(fn, body) {
