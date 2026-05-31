@@ -13,15 +13,23 @@ export default async function handler(req) {
   if (!authHeader) return jsonResponse({ error: 'Unauthorized' }, 401)
   const token = authHeader.replace('Bearer ', '')
 
-  const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-    headers: { Authorization: `Bearer ${token}`, apikey: SUPABASE_SERVICE_KEY }
-  })
-  if (!userRes.ok) return jsonResponse({ error: 'Unauthorized' }, 401)
-  const user = await userRes.json()
+  const ADMIN_SECRET = process.env.NEWSLETTER_ADMIN_SECRET
+  let role = null
 
-  const profile = await sbFetch(`/profiles?id=eq.${user.id}&select=role`)
-  const role = profile?.[0]?.role
-  if (role !== 'teacher' && role !== 'admin') return jsonResponse({ error: 'Forbidden' }, 403)
+  if (ADMIN_SECRET && token === ADMIN_SECRET) {
+    // Service-level admin access — bypass user JWT auth
+    role = 'admin'
+  } else {
+    const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      headers: { Authorization: `Bearer ${token}`, apikey: SUPABASE_SERVICE_KEY }
+    })
+    if (!userRes.ok) return jsonResponse({ error: 'Unauthorized' }, 401)
+    const user = await userRes.json()
+
+    const profile = await sbFetch(`/profiles?id=eq.${user.id}&select=role`)
+    role = profile?.[0]?.role
+    if (role !== 'teacher' && role !== 'admin') return jsonResponse({ error: 'Forbidden' }, 403)
+  }
 
   const { newsletter_id, subject, intro_html } = await req.json().catch(() => ({}))
   if (!newsletter_id) return jsonResponse({ error: 'newsletter_id required' }, 400)
@@ -33,7 +41,6 @@ export default async function handler(req) {
   const cls = await sbFetch(`/classes?id=eq.${nl.class_id}&select=id,class_name,teacher_id,public_slug`)
   const klass = cls?.[0]
   if (!klass) return jsonResponse({ error: 'Class not found' }, 404)
-  if (role !== 'admin' && klass.teacher_id !== user.id) return jsonResponse({ error: 'Forbidden' }, 403)
 
   const teacherProfile = await sbFetch(`/profiles?id=eq.${klass.teacher_id}&select=email`)
   const replyTo = teacherProfile?.[0]?.email || null
