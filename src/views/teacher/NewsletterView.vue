@@ -336,6 +336,13 @@ async function send() {
   }
 }
 
+async function deleteDraft(id) {
+  if (!confirm('Delete this draft? This cannot be undone.')) return
+  await supabase.from('newsletters').delete().eq('id', id)
+  if (draft.value?.id === id) draft.value = null
+  await loadHistory()
+}
+
 async function sendTest() {
   if (!draft.value?.id) return
   sendingTest.value = true
@@ -675,13 +682,16 @@ onMounted(() => {
       <div class="card-body">
         <h2 class="card-title">History</h2>
         <table v-if="history.length" class="table table-sm">
-          <thead><tr><th>Subject</th><th>Status</th><th>Recipients</th><th>Date</th></tr></thead>
+          <thead><tr><th>Subject</th><th>Status</th><th>Recipients</th><th>Date</th><th></th></tr></thead>
           <tbody>
             <tr v-for="h in history" :key="h.id" class="hover cursor-pointer" @click="openDraft(h.id)">
               <td class="link link-hover">{{ h.subject }}</td>
               <td><span class="badge" :class="h.status === 'sent' ? 'badge-success' : 'badge-ghost'">{{ h.status }}</span></td>
               <td>{{ h.recipients_count || '—' }}</td>
               <td>{{ new Date(h.sent_at || h.created_at).toLocaleString() }}</td>
+              <td @click.stop>
+                <button v-if="h.status === 'draft'" class="btn btn-xs btn-ghost text-error" @click="deleteDraft(h.id)">Delete</button>
+              </td>
             </tr>
           </tbody>
         </table>
