@@ -609,7 +609,7 @@ onMounted(() => {
         <!-- Rankings preview -->
         <div v-for="(win, key) in { oneMonth: 'Last 1 month', threeMonth: 'Last 3 months', allTime: 'All-time' }" :key="key" class="mb-6">
           <h3 class="font-bold text-lg">{{ win }}</h3>
-          <p class="text-xs opacity-70 mb-2">S&amp;P 500: <strong>{{ pct(draft.payload[key]?.spyReturnPct) }}</strong></p>
+          <p class="text-xs opacity-70 mb-2">SPY (proxy for S&amp;P 500): <strong>{{ pct(draft.payload[key]?.spyReturnPct) }}</strong></p>
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <p class="font-semibold text-sm mb-1">🏆 Groups</p>

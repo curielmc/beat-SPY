@@ -45,7 +45,7 @@ function renderWindow(title, data, nameMap) {
 
   return `
     <h3 style="margin:24px 0 6px;font-size:16px;color:#111827;">${escapeHtml(title)}</h3>
-    <p style="margin:0 0 12px;font-size:13px;color:#6b7280;">S&P 500 benchmark: <strong style="color:#111827;">${pct(data.spyReturnPct)}</strong></p>
+    <p style="margin:0 0 12px;font-size:13px;color:#6b7280;">SPY (proxy for S&P 500): <strong style="color:#111827;">${pct(data.spyReturnPct)}</strong></p>
 
     <p style="margin:14px 0 4px;font-size:13px;font-weight:600;color:#374151;">🏆 Top Groups</p>
     ${renderTable(groups, data.spyReturnPct)}

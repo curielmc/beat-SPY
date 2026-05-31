@@ -131,32 +131,52 @@ export async function computeLeaderboard({ classId, windowStart }) {
   }
 
   // 6. Compute per-portfolio window return
+  // Track tickers FMP failed to price — we fall back to avg_cost (0% move on that
+  // lot), which silently distorts the return, so surface them to the caller.
+  const missingPriceTickers = new Set()
   const portfolioPerf = allPortfolios.map(p => {
     const cash = Number(p.cash_balance || 0)
     const pHoldings = holdingsByPortfolio[p.id] || []
     let invested = 0
+    let hasMissingPrice = false
     for (const h of pHoldings) {
-      const price = priceMap[h.ticker] || Number(h.avg_cost || 0)
+      let price = priceMap[h.ticker]
+      if (price == null) {
+        // FMP returned no quote — fall back to cost basis (no move on this lot).
+        if (h.ticker) missingPriceTickers.add(h.ticker)
+        hasMissingPrice = true
+        price = Number(h.avg_cost || 0)
+      }
       invested += Number(h.shares || 0) * price
     }
     const currentValue = invested + cash
 
-    // Window start value
+    // Window start value.
+    //   - snapshot:  real daily snapshot at-or-before windowStart (trustworthy).
+    //   - younger:   portfolio created after windowStart — starting cash is the
+    //                true inception base, so an inception-to-now return is correct.
+    //   - inception: portfolio predates windowStart but has NO snapshot. We fall
+    //                back to starting cash, but this is inception-to-now, NOT a
+    //                window return — it overstates/understates the real window
+    //                move. Flag it so callers don't present it as a window figure.
     const startSnap = pickStartSnapshot(snapshotsByPortfolio[p.id] || [], windowStartIso)
     const portfolioCreatedAt = p.created_at || ''
     let startValue
+    let startBasis
     if (startSnap) {
       startValue = Number(startSnap.total_value)
+      startBasis = 'snapshot'
     } else if (portfolioCreatedAt && portfolioCreatedAt > windowStartIso) {
-      // Portfolio younger than window — treat starting cash as the start.
       startValue = Number(p.fund_starting_cash || p.starting_cash || 100000)
+      startBasis = 'younger'
     } else {
-      // No snapshot but portfolio existed before window — fall back to starting cash.
       startValue = Number(p.fund_starting_cash || p.starting_cash || 100000)
+      startBasis = 'inception'
     }
 
-    const returnPct = startValue > 0 ? ((currentValue - startValue) / startValue) * 100 : 0
-    return { ...p, currentValue, startValue, returnPct }
+    let returnPct = startValue > 0 ? ((currentValue - startValue) / startValue) * 100 : 0
+    if (!isFinite(returnPct)) returnPct = 0
+    return { ...p, currentValue, startValue, returnPct, startBasis, hasMissingPrice }
   })
 
   // 7. Aggregate per group (cost-weighted % across funds)
@@ -169,12 +189,17 @@ export async function computeLeaderboard({ classId, windowStart }) {
     const gPorts = portfolioPerf.filter(p => p.owner_type === 'group' && p.owner_id === g.id)
     let startSum = 0, currentSum = 0
     for (const p of gPorts) { startSum += p.startValue; currentSum += p.currentValue }
-    const returnPct = startSum > 0 ? ((currentSum - startSum) / startSum) * 100 : 0
+    let returnPct = startSum > 0 ? ((currentSum - startSum) / startSum) * 100 : 0
+    if (!isFinite(returnPct)) returnPct = 0
     return {
       id: g.id,
       name: g.name,
       returnPct: round2(returnPct),
       fundCount: gPorts.length,
+      // True if any fund's window return is inception-based (no snapshot) — i.e.
+      // not a real window measurement. Lets the newsletter footnote it.
+      inceptionBased: gPorts.some(p => p.startBasis === 'inception'),
+      hasMissingPrice: gPorts.some(p => p.hasMissingPrice),
       memberIds: memberships.filter(m => m.group_id === g.id).map(m => m.user_id)
     }
   }).filter(g => g.fundCount > 0)
@@ -188,11 +213,14 @@ export async function computeLeaderboard({ classId, windowStart }) {
     let startSum = 0, currentSum = 0
     for (const p of uPorts) { startSum += p.startValue; currentSum += p.currentValue }
     if (startSum <= 0) continue
-    const returnPct = ((currentSum - startSum) / startSum) * 100
+    let returnPct = ((currentSum - startSum) / startSum) * 100
+    if (!isFinite(returnPct)) returnPct = 0
     individualResults.push({
       id: userId,
       name: memberByUserId.get(userId) || 'Student',
-      returnPct: round2(returnPct)
+      returnPct: round2(returnPct),
+      inceptionBased: uPorts.some(p => p.startBasis === 'inception'),
+      hasMissingPrice: uPorts.some(p => p.hasMissingPrice)
     })
   }
   individualResults.sort((a, b) => b.returnPct - a.returnPct)
@@ -205,7 +233,9 @@ export async function computeLeaderboard({ classId, windowStart }) {
       id: p.id,
       fundName: p.fund_name || `Fund ${p.fund_number || 1}`,
       groupName: groupNameById.get(p.owner_id) || '',
-      returnPct: round2(p.returnPct)
+      returnPct: round2(p.returnPct),
+      inceptionBased: p.startBasis === 'inception',
+      hasMissingPrice: p.hasMissingPrice
     }))
     .sort((a, b) => b.returnPct - a.returnPct)
 
@@ -214,6 +244,10 @@ export async function computeLeaderboard({ classId, windowStart }) {
     individuals: individualResults,
     funds: fundResults,
     spyReturnPct: round2(spyReturnPct),
+    // SPY is PRICE return only (no dividends) — see newsletter label/footnote.
+    spyReturnBasis: 'price',
+    // Tickers FMP could not price this run; their lots used cost basis (0% move).
+    missingPriceTickers: [...missingPriceTickers],
     windowStart: windowStartIso,
     windowEnd
   }

@@ -1,8 +1,12 @@
 export const config = { runtime: 'edge' }
 
-import { SUPABASE_URL, SUPABASE_SERVICE_KEY, sbFetch, jsonResponse } from './_lib/supabase.js'
+import { SUPABASE_URL, SUPABASE_SERVICE_KEY, sbFetch, jsonResponse, FMP_KEY } from './_lib/supabase.js'
 import { computeLeaderboard } from './_lib/leaderboard.js'
 import { generateAIAnalysis } from './_lib/ai.js'
+
+// Label used everywhere we reference the benchmark: SPY is the tradable ETF the
+// class actually competes against; "(proxy for S&P 500)" explains what it tracks.
+const SPY_LABEL = 'SPY (proxy for S&P 500)'
 
 function daysAgoIso(days) {
   const d = new Date()
@@ -10,26 +14,90 @@ function daysAgoIso(days) {
   return d.toISOString()
 }
 
-function topMovers(funds, limit = 3) {
-  const sorted = [...funds].sort((a, b) => Math.abs(b.returnPct) - Math.abs(a.returnPct))
-  return sorted.slice(0, limit)
+const FMP_BASE = 'https://financialmodelingprep.com/api/v3'
+const FMP_BASE_V4 = 'https://financialmodelingprep.com/api/v4'
+
+// Pull recent real market headlines so the AI intro can ground its "what drove
+// the market" sentences in actual news instead of inventing it. Best-effort:
+// returns [] on any failure, and the prompt degrades to generic macro language.
+async function fetchMarketHeadlines(limit = 12) {
+  if (!FMP_KEY) return []
+  const urls = [
+    `${FMP_BASE}/stock_news?tickers=SPY,QQQ,NVDA,MSFT&limit=${limit}&apikey=${FMP_KEY}`,
+    `${FMP_BASE_V4}/general_news?page=0&apikey=${FMP_KEY}`
+  ]
+  const titles = []
+  for (const url of urls) {
+    try {
+      const res = await fetch(url)
+      if (!res.ok) continue
+      const rows = await res.json().catch(() => [])
+      for (const r of (Array.isArray(rows) ? rows : [])) {
+        if (r?.title) titles.push(String(r.title).trim())
+      }
+    } catch { /* ignore — headlines are optional grounding */ }
+  }
+  // De-dupe, drop obvious clickbait/personal-finance noise, cap the list.
+  const seen = new Set()
+  const cleaned = []
+  for (const t of titles) {
+    const key = t.toLowerCase()
+    if (seen.has(key)) continue
+    if (/retire|i'm \d|my \$|sports car|yield.*night/i.test(t)) continue
+    seen.add(key)
+    cleaned.push(t)
+    if (cleaned.length >= 10) break
+  }
+  return cleaned
 }
 
-function buildIntroPrompt({ className, threeMonth }) {
-  const movers = topMovers(threeMonth.funds, 3)
-    .map(f => `- ${f.fundName} (${f.groupName}): ${f.returnPct >= 0 ? '+' : ''}${f.returnPct}%`)
-    .join('\n')
-  const beatingSpy = threeMonth.groups.filter(g => g.returnPct > threeMonth.spyReturnPct).length
+function topList(arr, n, fmt) {
+  return [...(arr || [])].slice(0, n).map(fmt).join('\n')
+}
+
+function buildIntroPrompt({ className, oneMonth, threeMonth, headlines }) {
+  const fundFmt = f => `- ${f.fundName} (${f.groupName}): ${f.returnPct >= 0 ? '+' : ''}${f.returnPct}%`
+  const groupFmt = g => `- ${g.name}: ${g.returnPct >= 0 ? '+' : ''}${g.returnPct}%`
+  const indFmt = s => `- ${s.name}: ${s.returnPct >= 0 ? '+' : ''}${s.returnPct}%`
+
+  const monthBeat = oneMonth.groups.filter(g => g.returnPct > oneMonth.spyReturnPct).length
+  const inceptBeat = threeMonth.groups.filter(g => g.returnPct > threeMonth.spyReturnPct).length
   const totalGroups = threeMonth.groups.length
-  return `You are writing the opening paragraph of a student investing newsletter for "${className}".
 
-Window: last 3 months
-S&P 500 (SPY) return: ${threeMonth.spyReturnPct >= 0 ? '+' : ''}${threeMonth.spyReturnPct}%
-Class results: ${beatingSpy} of ${totalGroups} groups beat the S&P 500.
-Biggest movers among the class's funds:
-${movers}
+  const newsBlock = headlines?.length
+    ? `Recent real market headlines (use these to ground what drove markets — paraphrase, do not quote verbatim, do not cite outlets):\n${headlines.map(h => `- ${h}`).join('\n')}`
+    : `No headline feed available — describe market drivers only in general terms (Fed/rates, inflation, earnings, AI/tech leadership). Do NOT invent specific events.`
 
-Write 2-3 plain sentences for high-school students. Reference what drove markets this period in a general way (rates, earnings, sectors), and frame how the class did versus the S&P. Do NOT invent specific news. No greetings, no sign-off, no markdown.`
+  return `You are writing the opening of a student investing newsletter for "${className}". Audience: high-school students and their parents. Benchmark label to use verbatim: "${SPY_LABEL}".
+
+=== BENCHMARK ===
+Last 1 month ${SPY_LABEL}: ${oneMonth.spyReturnPct >= 0 ? '+' : ''}${oneMonth.spyReturnPct}%
+Last 3 months ${SPY_LABEL}: ${threeMonth.spyReturnPct >= 0 ? '+' : ''}${threeMonth.spyReturnPct}%
+
+=== CLASS RESULTS — LAST 1 MONTH ===
+Top groups:
+${topList(oneMonth.groups, 3, groupFmt)}
+Top funds:
+${topList(oneMonth.funds, 3, fundFmt)}
+Top individual: ${oneMonth.individuals?.[0] ? indFmt(oneMonth.individuals[0]).slice(2) : 'n/a'}
+${monthBeat} of ${totalGroups} groups beat ${SPY_LABEL} this month.
+
+=== CLASS RESULTS — SINCE INCEPTION (~3 months) ===
+Top groups:
+${topList(threeMonth.groups, 3, groupFmt)}
+Top funds:
+${topList(threeMonth.funds, 3, fundFmt)}
+Top individual: ${threeMonth.individuals?.[0] ? indFmt(threeMonth.individuals[0]).slice(2) : 'n/a'}
+${inceptBeat} of ${totalGroups} groups beat ${SPY_LABEL} since inception.
+
+=== MARKET NEWS (last ~3 months) ===
+${newsBlock}
+
+Write exactly TWO short paragraphs in plain language (no markdown, no greeting, no sign-off):
+Paragraph 1 — The market backdrop: what actually drove US stocks over the last three months (tie to the news above — e.g. earnings strength, AI/tech leadership, Fed/rate expectations, any notable swings), and where ${SPY_LABEL} landed (cite the 1-month and/or 3-month benchmark numbers).
+Paragraph 2 — The class: call out a FEW specific standout groups and funds BY NAME, distinguishing strong performers over the last month versus standouts since inception, and note how many groups beat ${SPY_LABEL}. Be encouraging and concrete. Use the real names and percentages above.
+
+Always write "${SPY_LABEL}" in full — never just "S&P 500".`
 }
 
 export default async function handler(req) {
@@ -80,9 +148,10 @@ export default async function handler(req) {
       computeLeaderboard({ classId: class_id, windowStart: daysAgoIso(30) })
     ])
 
-    const introPrompt = buildIntroPrompt({ className: klass.class_name, threeMonth })
-    const introText = await generateAIAnalysis(introPrompt, { maxTokens: 220 })
-      || `Over the last three months, the S&P 500 returned ${threeMonth.spyReturnPct >= 0 ? '+' : ''}${threeMonth.spyReturnPct}%. Here's how the class did across our groups, funds, and individual investors.`
+    const headlines = await fetchMarketHeadlines()
+    const introPrompt = buildIntroPrompt({ className: klass.class_name, oneMonth, threeMonth, headlines })
+    const introText = await generateAIAnalysis(introPrompt, { maxTokens: 420 })
+      || `Over the last three months, ${SPY_LABEL} returned ${threeMonth.spyReturnPct >= 0 ? '+' : ''}${threeMonth.spyReturnPct}% (${oneMonth.spyReturnPct >= 0 ? '+' : ''}${oneMonth.spyReturnPct}% in the last month). Here's how the class did across our groups, funds, and individual investors.`
 
     const today = new Date()
     const subject = `${klass.class_name} — Investing Update ${today.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
