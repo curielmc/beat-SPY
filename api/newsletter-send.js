@@ -121,7 +121,11 @@ export default async function handler(req) {
         })
       })
       if (res.ok) sentCount++
-      else errors.push({ email: r.email, status: res.status })
+      else {
+        let errBody = null
+        try { errBody = await res.json() } catch { try { errBody = await res.text() } catch {} }
+        errors.push({ email: r.email, status: res.status, detail: errBody })
+      }
     } catch (e) {
       errors.push({ email: r.email, error: e.message })
     }
