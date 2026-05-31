@@ -264,7 +264,7 @@ async function saveDraft() {
       .from('newsletters')
       .update({
         subject: subject.value,
-        intro_html: `<p>${escapeHtml(introHtml.value).replace(/\n+/g, '</p><p>')}</p>`
+        intro_html: plainTextToHtml(introHtml.value)
       })
       .eq('id', draft.value.id)
     if (error) throw error
@@ -321,7 +321,7 @@ async function send() {
       body: JSON.stringify({
         newsletter_id: draft.value.id,
         subject: subject.value,
-        intro_html: `<p>${escapeHtml(introHtml.value).replace(/\n+/g, '</p><p>')}</p>`
+        intro_html: plainTextToHtml(introHtml.value)
       })
     })
     const data = await res.json()
@@ -359,7 +359,7 @@ async function sendTest() {
       body: JSON.stringify({
         newsletter_id: draft.value.id,
         subject: subject.value,
-        intro_html: `<p>${escapeHtml(introHtml.value).replace(/\n+/g, '</p><p>')}</p>`,
+        intro_html: plainTextToHtml(introHtml.value),
         to: testEmail.value.trim() || undefined
       })
     })
@@ -393,8 +393,28 @@ function nameMapFor(payload) {
 function escapeHtml(s) {
   return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
+function plainTextToHtml(s) {
+  return String(s || '').trim()
+    .split(/\n\n+/)
+    .map(para => {
+      const line = escapeHtml(para.trim())
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\n/g, '<br>')
+      return `<p>${line}</p>`
+    })
+    .join('')
+}
 function stripHtml(s) {
-  return String(s || '').replace(/<\/p>\s*<p>/g, '\n\n').replace(/<[^>]+>/g, '').trim()
+  return String(s || '')
+    .replace(/<\/p>\s*<p>/gi, '\n\n')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<strong>([\s\S]*?)<\/strong>/gi, '**$1**')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .trim()
 }
 
 onMounted(() => {

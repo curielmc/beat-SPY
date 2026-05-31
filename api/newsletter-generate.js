@@ -8,6 +8,21 @@ import { generateAIAnalysis } from './_lib/ai.js'
 // class actually competes against; "(proxy for S&P 500)" explains what it tracks.
 const SPY_LABEL = 'SPY (proxy for S&P 500)'
 
+function markdownToHtml(text) {
+  return text.trim()
+    .split(/\n\n+/)
+    .map(para => {
+      const line = para.trim()
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\n/g, '<br>')
+      return `<p>${line}</p>`
+    })
+    .join('')
+}
+
 function daysAgoIso(days) {
   const d = new Date()
   d.setUTCDate(d.getUTCDate() - days)
@@ -93,11 +108,13 @@ ${inceptBeat} of ${totalGroups} groups beat ${SPY_LABEL} since inception.
 === MARKET NEWS (last ~3 months) ===
 ${newsBlock}
 
-Write exactly TWO short paragraphs in plain language (no markdown, no greeting, no sign-off):
+Write exactly TWO short paragraphs (no greeting, no sign-off). Formatting rules:
+- Use **double asterisks** around: all numbers/percentages, group names, fund names, company names, and ticker symbols (e.g. **+4.2%**, **Finance Bros**, **Discounted Cash Flow Fund**, **Apple**, **AAPL**, **SPY**)
+- Round all percentages to ONE decimal place (e.g. +4.2%, not +4.19%)
 Paragraph 1 — The market backdrop: what actually drove US stocks over the last three months (tie to the news above — e.g. earnings strength, AI/tech leadership, Fed/rate expectations, any notable swings), and where ${SPY_LABEL} landed (cite the 1-month and/or 3-month benchmark numbers).
 Paragraph 2 — The class: call out a FEW specific standout groups and funds BY NAME, distinguishing strong performers over the last month versus standouts since inception, and note how many groups beat ${SPY_LABEL}. Be encouraging and concrete. Use the real names and percentages above.
 
-Always write "${SPY_LABEL}" in full — never just "S&P 500".`
+Always write "${SPY_LABEL}" in full — never abbreviate to just "S&P 500".`
 }
 
 export default async function handler(req) {
@@ -162,7 +179,7 @@ export default async function handler(req) {
       daysRemaining = Math.max(0, Math.ceil((end - today) / (1000 * 60 * 60 * 24)))
     }
     const payload = { allTime, threeMonth, oneMonth, endDate: klass.end_date || null, daysRemaining, generatedAt: today.toISOString() }
-    const introHtml = `<p>${escapeHtml(introText.trim()).replace(/\n+/g, '</p><p>')}</p>`
+    const introHtml = markdownToHtml(introText)
 
     const inserted = await sbFetch(`/newsletters`, {
       method: 'POST',
