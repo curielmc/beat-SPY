@@ -37,3 +37,14 @@ Available gstack skills:
 | `/gstack-upgrade` | Upgrade gstack |
 
 If gstack skills aren't working, run `cd .claude/skills/gstack && ./setup` to build the binary and register skills.
+
+## Design Context (impeccable)
+
+Design source of truth lives in `PRODUCT.md` (strategy: register=product, student trading game, playful+competitive + finance-credible, WCAG AA) and `DESIGN.md` (Vue 3 + Tailwind v4 + DaisyUI v5, dark-first, Inter).
+
+Custom DaisyUI theme in `src/style.css` (themes named `light`/`dark` so `data-theme` stays compatible):
+- **primary** = teal-cyan — actions, selection, active state.
+- **secondary** = gold — achievement only (leaderboard, wins, streaks; the "beat SPY" hook).
+- semantics conventional (success/error/warning/info); gain/loss must pair color with sign/arrow (color-blind a11y).
+
+Improve UI with `/impeccable <command> <target>` (critique, audit, polish, animate, delight, live). Run `/impeccable document` after token changes to refresh DESIGN.md.

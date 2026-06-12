@@ -1,10 +1,98 @@
 @import "tailwindcss";
-@plugin "daisyui" {
-  themes: light --default, dark;
-}
+@plugin "daisyui";
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap');
 
 @theme {
   --font-sans: 'Inter', system-ui, sans-serif;
+}
+
+/*
+  Beat the S&P 500 — custom DaisyUI theme.
+  Strategy: Restrained (product register). Primary owns actions/selection/active state.
+  Brand hue = teal-cyan (energetic, credible, deliberately not reflexive blue/purple).
+  Secondary = gold: reserved for achievement moments (leaderboard, wins, streaks) — the
+  competitive hook. Semantics stay conventional so gain/loss reads instantly; never lean
+  on hue alone (pair with sign/arrow per PRODUCT.md a11y).
+  Neutrals carry a tiny teal chroma for cohesion. Dark surfaces = brand-tinted near-black,
+  depth via lightness (no shadows). OKLCH throughout.
+*/
+
+@plugin "daisyui/theme" {
+  name: "dark";
+  default: true;
+  prefersdark: true;
+  color-scheme: dark;
+
+  /* Surfaces: app bg (200) darkest, cards (100) elevated, 300 borders. Teal-tinted near-black. */
+  --color-base-100: oklch(21% 0.013 215);
+  --color-base-200: oklch(17% 0.013 215);
+  --color-base-300: oklch(27% 0.015 215);
+  --color-base-content: oklch(92% 0.012 215);
+
+  /* Primary: teal-cyan — actions, selection, active nav/toggle, key stats. */
+  --color-primary: oklch(74% 0.135 195);
+  --color-primary-content: oklch(18% 0.03 195);
+
+  /* Secondary: gold — achievement only (leaderboard rank, wins, streaks, "beat SPY"). */
+  --color-secondary: oklch(81% 0.13 85);
+  --color-secondary-content: oklch(24% 0.05 85);
+
+  /* Accent: brighter teal for hover/highlight pop. */
+  --color-accent: oklch(78% 0.13 205);
+  --color-accent-content: oklch(18% 0.03 205);
+
+  --color-neutral: oklch(30% 0.013 215);
+  --color-neutral-content: oklch(92% 0.012 215);
+
+  /* Semantics — gain/loss & status. Distinct from gold primary-accent. */
+  --color-success: oklch(74% 0.15 152);
+  --color-success-content: oklch(18% 0.04 152);
+  --color-error: oklch(66% 0.19 22);
+  --color-error-content: oklch(98% 0.01 22);
+  --color-warning: oklch(80% 0.14 68);
+  --color-warning-content: oklch(24% 0.05 68);
+  --color-info: oklch(72% 0.12 232);
+  --color-info-content: oklch(18% 0.03 232);
+
+  --radius-selector: 0.5rem;
+  --radius-field: 0.5rem;
+  --radius-box: 1rem;
+  --border: 1px;
+}
+
+@plugin "daisyui/theme" {
+  name: "light";
+  color-scheme: light;
+
+  --color-base-100: oklch(99% 0.004 215);
+  --color-base-200: oklch(96.5% 0.006 215);
+  --color-base-300: oklch(91% 0.009 215);
+  --color-base-content: oklch(26% 0.02 215);
+
+  --color-primary: oklch(58% 0.135 195);
+  --color-primary-content: oklch(99% 0.005 195);
+
+  --color-secondary: oklch(70% 0.135 85);
+  --color-secondary-content: oklch(22% 0.05 85);
+
+  --color-accent: oklch(62% 0.13 205);
+  --color-accent-content: oklch(99% 0.005 205);
+
+  --color-neutral: oklch(34% 0.015 215);
+  --color-neutral-content: oklch(98% 0.005 215);
+
+  --color-success: oklch(62% 0.15 152);
+  --color-success-content: oklch(99% 0.01 152);
+  --color-error: oklch(58% 0.2 22);
+  --color-error-content: oklch(99% 0.01 22);
+  --color-warning: oklch(72% 0.15 68);
+  --color-warning-content: oklch(22% 0.05 68);
+  --color-info: oklch(60% 0.13 232);
+  --color-info-content: oklch(99% 0.01 232);
+
+  --radius-selector: 0.5rem;
+  --radius-field: 0.5rem;
+  --radius-box: 1rem;
+  --border: 1px;
 }
