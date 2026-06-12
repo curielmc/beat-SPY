@@ -13,9 +13,9 @@
 import { computed } from 'vue'
 import { Doughnut } from 'vue-chartjs'
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js'
+import { themeColors, chartPalette, withAlpha } from '../../lib/chartTheme'
 
 ChartJS.register(ArcElement, Tooltip, Legend)
-ChartJS.defaults.color = "#ffffff"
 
 const props = defineProps({
   segments: Array,
@@ -23,23 +23,22 @@ const props = defineProps({
   height: { type: String, default: '180px' }
 })
 
-const PALETTE = [
-  '#570df8', '#f000b8', '#37cdbe', '#3abff8', '#36d399',
-  '#fbbd23', '#f87272', '#6366f1', '#f59e0b', '#10b981',
-  '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'
-]
-
-const chartData = computed(() => ({
+const chartData = computed(() => {
+  const PALETTE = chartPalette()
+  return {
   labels: (props.segments || []).map(s => s.label),
   datasets: [{
     data: (props.segments || []).map(s => s.value),
     backgroundColor: (props.segments || []).map((s, i) => s.color || PALETTE[i % PALETTE.length]),
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.5)'
+    borderColor: withAlpha(themeColors().base300, 0.6)
   }]
-}))
+  }
+})
 
-const chartOptions = {
+const chartOptions = computed(() => {
+  const c = themeColors()
+  return {
   responsive: true,
   maintainAspectRatio: false,
   cutout: '55%',
@@ -52,7 +51,7 @@ const chartOptions = {
         boxHeight: 12,
         padding: 8,
         font: { size: 11 },
-        color: "#ffffff",
+        color: c.baseContent,
         generateLabels: (chart) => {
           const data = chart.data
           const total = data.datasets[0].data.reduce((a, b) => a + b, 0)
@@ -62,7 +61,7 @@ const chartOptions = {
             return {
               text: `${label} ${pct}%`,
               fillStyle: data.datasets[0].backgroundColor[i],
-              fontColor: '#ffffff',
+              fontColor: c.baseContent,
               strokeStyle: 'transparent',
               hidden: false,
               index: i
@@ -81,5 +80,6 @@ const chartOptions = {
       }
     }
   }
-}
+  }
+})
 </script>

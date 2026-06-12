@@ -19,9 +19,9 @@ import {
   Filler
 } from 'chart.js'
 import 'chartjs-adapter-date-fns'
+import { themeColors, chartPalette, withAlpha } from '../../lib/chartTheme'
 
 ChartJS.register(LineElement, PointElement, LinearScale, TimeScale, Title, Tooltip, Legend, Filler)
-ChartJS.defaults.color = "#ffffff"
 
 const props = defineProps({
   datasets: Array,
@@ -30,19 +30,25 @@ const props = defineProps({
   height: { type: String, default: '220px' }
 })
 
-const COLORS = {
-  primary: '#570df8',
-  secondary: '#f000b8',
-  accent: '#37cdbe',
-  info: '#3abff8',
-  success: '#36d399',
-  warning: '#fbbd23',
-  error: '#f87272',
-  sp500: '#a0a0a0',
-  neutral1: '#6366f1',
-  neutral2: '#f59e0b',
-  neutral3: '#10b981',
-  neutral4: '#ef4444',
+// Map named series keys to live theme colors; extra/neutral series fall back to the
+// ordered palette so charts track the brand theme instead of hard-coded hex.
+function seriesColors() {
+  const c = themeColors()
+  const pal = chartPalette()
+  return {
+    primary: c.primary,
+    secondary: c.secondary,
+    accent: c.accent,
+    info: c.info,
+    success: c.success,
+    warning: c.warning,
+    error: c.error,
+    sp500: c.sp500,
+    neutral1: pal[7],
+    neutral2: c.warning,
+    neutral3: c.success,
+    neutral4: c.error,
+  }
 }
 
 function getCutoffDate(range) {
@@ -67,7 +73,9 @@ const filteredDatasets = computed(() => {
   })
 })
 
-const chartData = computed(() => ({
+const chartData = computed(() => {
+  const COLORS = seriesColors()
+  return {
   datasets: filteredDatasets.value.map(ds => {
     const colorKey = ds.color || 'primary'
     const color = COLORS[colorKey] || colorKey
@@ -82,7 +90,7 @@ const chartData = computed(() => ({
       label: ds.label,
       data,
       borderColor: color,
-      backgroundColor: color + '18',
+      backgroundColor: withAlpha(color, 0.09),
       borderWidth: ds.color === 'sp500' ? 1.5 : 2,
       pointRadius: 0,
       pointHitRadius: 8,
@@ -91,17 +99,22 @@ const chartData = computed(() => ({
       fill: false
     }
   })
-}))
+  }
+})
 
-const chartOptions = computed(() => ({
+const chartOptions = computed(() => {
+  const c = themeColors()
+  const reduceMotion = typeof window !== 'undefined'
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  return {
   responsive: true,
   maintainAspectRatio: false,
-  animation: { duration: 300 },
+  animation: reduceMotion ? false : { duration: 300 },
   interaction: { mode: 'index', intersect: false },
   plugins: {
     legend: {
       position: 'bottom',
-      labels: { boxWidth: 12, padding: 6, font: { size: 10 }, color: "#ffffff" }
+      labels: { boxWidth: 12, padding: 6, font: { size: 10 }, color: c.baseContent }
     },
     tooltip: {
       callbacks: {
@@ -124,19 +137,20 @@ const chartOptions = computed(() => ({
     x: {
       type: 'time',
       time: { tooltipFormat: 'MMM d, yyyy' },
-      ticks: { maxTicksLimit: 6, font: { size: 10 } },
+      ticks: { maxTicksLimit: 6, font: { size: 10 }, color: c.baseContent },
       grid: { display: false }
     },
     y: {
       ticks: {
-        font: { size: 10 }, color: "#ffffff",
+        font: { size: 10 }, color: c.baseContent,
         callback: (v) => {
           if (props.showPercentage) return `${v > 0 ? '+' : ''}${v.toFixed(1)}%`
           return v >= 1000 ? `$${(v / 1000).toFixed(0)}k` : `$${v}`
         }
       },
-      grid: { color: 'rgba(128,128,128,0.1)' }
+      grid: { color: withAlpha(c.base300, 0.4) }
     }
   }
-}))
+  }
+})
 </script>

@@ -29,6 +29,7 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { createChart, LineSeries, AreaSeries } from 'lightweight-charts'
+import { themeColors, gainLoss, withAlpha } from '../lib/chartTheme'
 
 const props = defineProps({
   ticker: { type: String, required: true },
@@ -76,7 +77,7 @@ const periodLabel = computed(() => {
 })
 
 function getColor() {
-  return displayChange.value >= 0 ? '#22c55e' : '#ef4444'
+  return gainLoss(displayChange.value >= 0)
 }
 
 async function fetchData(period) {
@@ -113,9 +114,8 @@ async function setPeriod(period) {
 
 function applyColor() {
   if (!areaSeries) return
-  const up = displayChange.value >= 0
-  const color = up ? '#22c55e' : '#ef4444'
-  const fillColor = up ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)'
+  const color = gainLoss(displayChange.value >= 0)
+  const fillColor = withAlpha(color, 0.15)
   areaSeries.applyOptions({ lineColor: color, topColor: fillColor, bottomColor: 'rgba(0,0,0,0)' })
 }
 
@@ -136,20 +136,19 @@ async function loadChart() {
 function initChart() {
   if (!chartEl.value) return
 
-  const isDark = document.documentElement.getAttribute('data-theme') === 'dark' ||
-    window.matchMedia('(prefers-color-scheme: dark)').matches
+  const c = themeColors()
 
   chart = createChart(chartEl.value, {
     width: chartEl.value.clientWidth,
     height: 220,
     layout: {
       background: { color: 'transparent' },
-      textColor: isDark ? '#9ca3af' : '#6b7280',
+      textColor: withAlpha(c.baseContent, 0.6),
       fontSize: 11,
     },
     grid: {
       vertLines: { visible: false },
-      horzLines: { color: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' },
+      horzLines: { color: withAlpha(c.baseContent, 0.06) },
     },
     rightPriceScale: {
       borderVisible: false,
@@ -161,16 +160,16 @@ function initChart() {
       fixRightEdge: true,
     },
     crosshair: {
-      vertLine: { color: '#9ca3af', width: 1, style: 3, labelVisible: true },
-      horzLine: { color: '#9ca3af', width: 1, style: 3, labelVisible: true },
+      vertLine: { color: withAlpha(c.baseContent, 0.4), width: 1, style: 3, labelVisible: true },
+      horzLine: { color: withAlpha(c.baseContent, 0.4), width: 1, style: 3, labelVisible: true },
     },
     handleScroll: false,
     handleScale: false,
   })
 
   areaSeries = chart.addSeries(AreaSeries, {
-    lineColor: props.isPositive ? '#22c55e' : '#ef4444',
-    topColor: props.isPositive ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)',
+    lineColor: gainLoss(props.isPositive),
+    topColor: withAlpha(gainLoss(props.isPositive), 0.15),
     bottomColor: 'rgba(0,0,0,0)',
     lineWidth: 2,
     priceLineVisible: false,

@@ -8,6 +8,21 @@
 }
 
 /*
+  Accessibility: respect prefers-reduced-motion (PRODUCT.md a11y requirement).
+  Neutralize transitions/animations for users who opt out, while leaving layout intact.
+*/
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/*
   Beat the S&P 500 — custom DaisyUI theme.
   Strategy: Restrained (product register). Primary owns actions/selection/active state.
   Brand hue = teal-cyan (energetic, credible, deliberately not reflexive blue/purple).
