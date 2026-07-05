@@ -97,10 +97,12 @@ export default async function handler(req) {
 
   const classSignupUrl = klass.public_slug ? `${APP_BASE}/newsletter/subscribe/${klass.public_slug}` : null
 
-  // Send (sequential to avoid bursting AgentMail; could batch in parallel chunks)
+  // Send in parallel chunks — sequential sends hit the 25s Edge timeout on large classes.
   let sentCount = 0
   const errors = []
-  for (const r of recipients) {
+  const CHUNK_SIZE = 10
+
+  async function sendOne(r) {
     const unsubscribeUrl = `${APP_BASE}/api/newsletter-unsubscribe?token=${encodeURIComponent(r.token)}&class_id=${nl.class_id}`
     const html = renderNewsletterHtml({
       subject: finalSubject,
@@ -134,6 +136,10 @@ export default async function handler(req) {
     } catch (e) {
       errors.push({ email: r.email, error: e.message })
     }
+  }
+
+  for (let i = 0; i < recipients.length; i += CHUNK_SIZE) {
+    await Promise.all(recipients.slice(i, i + CHUNK_SIZE).map(sendOne))
   }
 
   // Send a single internal copy so Martin can see what went out.

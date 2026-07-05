@@ -324,8 +324,9 @@ async function send() {
         intro_html: plainTextToHtml(introHtml.value)
       })
     })
-    const data = await res.json()
-    if (!res.ok) throw new Error(data.error || 'Failed to send')
+    const data = await res.json().catch(() => null)
+    if (!res.ok) throw new Error(data?.error || `Send failed (HTTP ${res.status}) — check the sent history before retrying, some emails may have gone out`)
+    if (!data) throw new Error('Send failed — unreadable server response')
     sendResult.value = data
     draft.value = null
     await loadHistory()
