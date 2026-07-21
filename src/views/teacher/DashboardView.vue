@@ -246,6 +246,9 @@
                     <th class="cursor-pointer hover:bg-base-200 transition-colors" @click="togglePositionSort('ticker')">
                       Position <span class="text-[10px] ml-1 opacity-50">{{ getSortIcon('ticker', positionSortKey, positionSortOrder) }}</span>
                     </th>
+                    <th class="text-right cursor-pointer hover:bg-base-200 transition-colors" @click="togglePositionSort('returnPct')">
+                      Return <span class="text-[10px] ml-1 opacity-50">{{ getSortIcon('returnPct', positionSortKey, positionSortOrder) }}</span>
+                    </th>
                     <th class="cursor-pointer hover:bg-base-200 transition-colors" @click="togglePositionSort('groupName')">
                       Group <span class="text-[10px] ml-1 opacity-50">{{ getSortIcon('groupName', positionSortKey, positionSortOrder) }}</span>
                     </th>
@@ -262,9 +265,6 @@
                     <th class="text-right cursor-pointer hover:bg-base-200 transition-colors" @click="togglePositionSort('marketValue')">
                       Market Value <span class="text-[10px] ml-1 opacity-50">{{ getSortIcon('marketValue', positionSortKey, positionSortOrder) }}</span>
                     </th>
-                    <th class="text-right cursor-pointer hover:bg-base-200 transition-colors" @click="togglePositionSort('returnPct')">
-                      Return <span class="text-[10px] ml-1 opacity-50">{{ getSortIcon('returnPct', positionSortKey, positionSortOrder) }}</span>
-                    </th>
                     <th class="text-center">Profile</th>
                   </tr>
                 </thead>
@@ -278,6 +278,9 @@
                       <div v-if="pos.companyName" class="text-xs text-base-content/60 font-normal mt-0.5 line-clamp-1">{{ pos.companyName }}</div>
                       <div v-if="pos.sector" class="mt-1"><SectorLabel :sector="pos.sector" size="xs" /></div>
                     </td>
+                    <td class="text-right font-mono text-sm font-semibold" :class="pos.returnPct >= 0 ? 'text-success' : 'text-error'">
+                      {{ pos.returnPct >= 0 ? '+' : '' }}{{ pos.returnPct.toFixed(2) }}%
+                    </td>
                     <td>
                       <span v-if="pos.groupName" class="badge badge-sm badge-outline whitespace-nowrap">{{ pos.groupName }}</span>
                       <span v-else class="text-xs text-base-content/40">—</span>
@@ -290,9 +293,6 @@
                     <td class="text-right font-mono text-sm text-base-content/60">${{ pos.avgCost.toFixed(2) }}</td>
                     <td class="text-right font-mono text-sm">${{ pos.currentPrice.toFixed(2) }}</td>
                     <td class="text-right font-mono text-sm font-semibold">${{ formatMoney(pos.marketValue) }}</td>
-                    <td class="text-right font-mono text-sm font-semibold" :class="pos.returnPct >= 0 ? 'text-success' : 'text-error'">
-                      {{ pos.returnPct >= 0 ? '+' : '' }}{{ pos.returnPct.toFixed(2) }}%
-                    </td>
                     <td class="text-center">
                       <button type="button" class="btn btn-ghost btn-xs text-[10px] text-primary" @click="openProfileModal(pos)">Profile</button>
                     </td>
