@@ -51,7 +51,7 @@
           <div class="card-body p-4">
             <div class="text-xs uppercase tracking-wide text-base-content/50">Aggregate Return</div>
             <div class="text-3xl font-bold" :class="dashboardSummary.returnPct >= 0 ? 'text-success' : 'text-error'">
-              {{ dashboardSummary.returnPct >= 0 ? '+' : '' }}{{ dashboardSummary.returnPct.toFixed(2) }}%
+              {{ dashboardSummary.returnPct >= 0 ? '+' : '' }}{{ dashboardSummary.returnPct.toFixed(1) }}%
             </div>
           </div>
         </div>
@@ -59,7 +59,7 @@
           <div class="card-body p-4">
             <div class="text-xs uppercase tracking-wide text-base-content/50">S&P 500 Return</div>
             <div class="text-3xl font-bold" :class="leaderboardStats.aggregateBenchmarkReturnPct >= 0 ? 'text-success' : 'text-error'">
-              {{ leaderboardStats.aggregateBenchmarkReturnPct >= 0 ? '+' : '' }}{{ leaderboardStats.aggregateBenchmarkReturnPct.toFixed(2) }}%
+              {{ leaderboardStats.aggregateBenchmarkReturnPct >= 0 ? '+' : '' }}{{ leaderboardStats.aggregateBenchmarkReturnPct.toFixed(1) }}%
             </div>
           </div>
         </div>
@@ -67,7 +67,7 @@
           <div class="card-body p-4">
             <div class="text-xs uppercase tracking-wide text-base-content/50">Alpha</div>
             <div class="text-3xl font-bold" :class="(dashboardSummary.returnPct - leaderboardStats.aggregateBenchmarkReturnPct) >= 0 ? 'text-success' : 'text-error'">
-              {{ (dashboardSummary.returnPct - leaderboardStats.aggregateBenchmarkReturnPct) >= 0 ? '+' : '' }}{{ (dashboardSummary.returnPct - leaderboardStats.aggregateBenchmarkReturnPct).toFixed(2) }}%
+              {{ (dashboardSummary.returnPct - leaderboardStats.aggregateBenchmarkReturnPct) >= 0 ? '+' : '' }}{{ (dashboardSummary.returnPct - leaderboardStats.aggregateBenchmarkReturnPct).toFixed(1) }}%
             </div>
           </div>
         </div>
@@ -213,7 +213,7 @@
                     <td class="text-right font-mono text-sm font-semibold">${{ formatMoney(group.totalValue) }}</td>
                     <td class="text-right font-mono text-sm text-base-content/60">${{ formatMoney(group.cash) }}</td>
                     <td class="text-right font-mono text-sm font-semibold" :class="group.returnPct >= 0 ? 'text-success' : 'text-error'">
-                      {{ group.returnPct >= 0 ? '+' : '' }}{{ group.returnPct.toFixed(2) }}%
+                      {{ group.returnPct >= 0 ? '+' : '' }}{{ group.returnPct.toFixed(1) }}%
                     </td>
                     <td class="text-center">
                       <button type="button" class="btn btn-ghost btn-xs text-[10px] text-primary" @click="openAttributionModal(group)">
@@ -279,7 +279,7 @@
                       <div v-if="pos.sector" class="mt-1"><SectorLabel :sector="pos.sector" size="xs" /></div>
                     </td>
                     <td class="text-right font-mono text-sm font-semibold" :class="pos.returnPct >= 0 ? 'text-success' : 'text-error'">
-                      {{ pos.returnPct >= 0 ? '+' : '' }}{{ pos.returnPct.toFixed(2) }}%
+                      {{ pos.returnPct >= 0 ? '+' : '' }}{{ pos.returnPct.toFixed(1) }}%
                     </td>
                     <td>
                       <span v-if="pos.groupName" class="badge badge-sm badge-outline whitespace-nowrap">{{ pos.groupName }}</span>
@@ -336,7 +336,7 @@
                     <td class="text-right font-mono text-sm font-semibold">${{ formatMoney(student.totalValue) }}</td>
                     <td class="text-right font-mono text-sm text-base-content/60">${{ formatMoney(student.cash) }}</td>
                     <td class="text-right font-mono text-sm font-semibold" :class="student.returnPct >= 0 ? 'text-success' : 'text-error'">
-                      {{ student.returnPct >= 0 ? '+' : '' }}{{ student.returnPct.toFixed(2) }}%
+                      {{ student.returnPct >= 0 ? '+' : '' }}{{ student.returnPct.toFixed(1) }}%
                     </td>
                     <td class="text-center">
                       <button type="button" class="btn btn-ghost btn-xs text-[10px] text-primary" @click="openAttributionModal(student)">
@@ -410,13 +410,13 @@
                     <tr v-for="group in benchmarkGroupsSorted" :key="group.id" class="hover">
                       <td class="font-semibold">{{ group.name }}</td>
                       <td class="text-right font-mono text-sm font-semibold" :class="group.returnPct >= 0 ? 'text-success' : 'text-error'">
-                        {{ group.returnPct >= 0 ? '+' : '' }}{{ group.returnPct.toFixed(2) }}%
+                        {{ group.returnPct >= 0 ? '+' : '' }}{{ group.returnPct.toFixed(1) }}%
                       </td>
                       <td class="text-right font-mono text-sm text-base-content/60">
-                        {{ (group.benchmarkReturnPct || 0) >= 0 ? '+' : '' }}{{ (group.benchmarkReturnPct || 0).toFixed(2) }}%
+                        {{ (group.benchmarkReturnPct || 0) >= 0 ? '+' : '' }}{{ (group.benchmarkReturnPct || 0).toFixed(1) }}%
                       </td>
                       <td class="text-right font-mono text-sm font-semibold" :class="(group.returnPct - (group.benchmarkReturnPct || 0)) >= 0 ? 'text-success' : 'text-error'">
-                        {{ (group.returnPct - (group.benchmarkReturnPct || 0)) >= 0 ? '+' : '' }}{{ (group.returnPct - (group.benchmarkReturnPct || 0)).toFixed(2) }}%
+                        {{ (group.returnPct - (group.benchmarkReturnPct || 0)) >= 0 ? '+' : '' }}{{ (group.returnPct - (group.benchmarkReturnPct || 0)).toFixed(1) }}%
                       </td>
                       <td class="text-center">
                         <div class="flex flex-col items-center gap-1.5">
@@ -487,13 +487,13 @@
                         <span v-else class="text-xs text-base-content/40">—</span>
                       </td>
                       <td class="text-right font-mono text-sm font-semibold" :class="student.returnPct >= 0 ? 'text-success' : 'text-error'">
-                        {{ student.returnPct >= 0 ? '+' : '' }}{{ student.returnPct.toFixed(2) }}%
+                        {{ student.returnPct >= 0 ? '+' : '' }}{{ student.returnPct.toFixed(1) }}%
                       </td>
                       <td class="text-right font-mono text-sm text-base-content/60">
-                        {{ (student.benchmarkReturnPct || 0) >= 0 ? '+' : '' }}{{ (student.benchmarkReturnPct || 0).toFixed(2) }}%
+                        {{ (student.benchmarkReturnPct || 0) >= 0 ? '+' : '' }}{{ (student.benchmarkReturnPct || 0).toFixed(1) }}%
                       </td>
                       <td class="text-right font-mono text-sm font-semibold" :class="(student.returnPct - (student.benchmarkReturnPct || 0)) >= 0 ? 'text-success' : 'text-error'">
-                        {{ (student.returnPct - (student.benchmarkReturnPct || 0)) >= 0 ? '+' : '' }}{{ (student.returnPct - (student.benchmarkReturnPct || 0)).toFixed(2) }}%
+                        {{ (student.returnPct - (student.benchmarkReturnPct || 0)) >= 0 ? '+' : '' }}{{ (student.returnPct - (student.benchmarkReturnPct || 0)).toFixed(1) }}%
                       </td>
                       <td class="text-center">
                         <div class="flex flex-col items-center gap-1.5">
@@ -561,13 +561,13 @@
                       <td class="text-sm">{{ row.groupName }}</td>
                       <td class="font-semibold text-sm">{{ row.fundName }}</td>
                       <td class="text-right font-mono text-sm font-semibold" :class="row.returnPct >= 0 ? 'text-success' : 'text-error'">
-                        {{ row.returnPct >= 0 ? '+' : '' }}{{ row.returnPct.toFixed(2) }}%
+                        {{ row.returnPct >= 0 ? '+' : '' }}{{ row.returnPct.toFixed(1) }}%
                       </td>
                       <td class="text-right font-mono text-sm text-base-content/60">
-                        {{ row.benchmarkReturnPct >= 0 ? '+' : '' }}{{ row.benchmarkReturnPct.toFixed(2) }}%
+                        {{ row.benchmarkReturnPct >= 0 ? '+' : '' }}{{ row.benchmarkReturnPct.toFixed(1) }}%
                       </td>
                       <td class="text-right font-mono text-sm font-semibold" :class="(row.returnPct - row.benchmarkReturnPct) >= 0 ? 'text-success' : 'text-error'">
-                        {{ (row.returnPct - row.benchmarkReturnPct) >= 0 ? '+' : '' }}{{ (row.returnPct - row.benchmarkReturnPct).toFixed(2) }}%
+                        {{ (row.returnPct - row.benchmarkReturnPct) >= 0 ? '+' : '' }}{{ (row.returnPct - row.benchmarkReturnPct).toFixed(1) }}%
                       </td>
                       <td class="text-center">
                         <div class="flex flex-col items-center gap-1.5">
@@ -766,10 +766,10 @@
                   <td class="text-right font-mono">${{ Number(fund.cash_balance || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</td>
                   <td class="text-right font-mono font-semibold">${{ Number(fund.totalValue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</td>
                   <td class="text-right font-mono" :class="fund.returnPct >= 0 ? 'text-success' : 'text-error'">
-                    {{ fund.returnPct >= 0 ? '+' : '' }}{{ fund.returnPct.toFixed(2) }}%
+                    {{ fund.returnPct >= 0 ? '+' : '' }}{{ fund.returnPct.toFixed(1) }}%
                   </td>
                   <td class="text-right">
-                    <div v-if="fund.benchmarkReturnPct !== undefined" class="flex items-center justify-end gap-1.5 tooltip tooltip-left" :data-tip="`S&P 500 Return: ${fund.benchmarkReturnPct.toFixed(2)}%`">
+                    <div v-if="fund.benchmarkReturnPct !== undefined" class="flex items-center justify-end gap-1.5 tooltip tooltip-left" :data-tip="`S&P 500 Return: ${fund.benchmarkReturnPct.toFixed(1)}%`">
                       <span class="text-[10px] text-base-content/40 font-mono">{{ fund.benchmarkReturnPct.toFixed(1) }}%</span>
                       <span v-if="fund.isBeatingSP500" class="text-success font-bold" title="Beating S&P 500">✓</span>
                       <span v-else class="text-error font-bold" title="Trailing S&P 500">✕</span>
@@ -830,7 +830,7 @@
                     <td class="text-right font-mono text-xs font-semibold">${{ Number(holding.marketValue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</td>
                     <td class="text-right font-mono text-xs" :class="holding.gainLoss >= 0 ? 'text-success' : 'text-error'">
                       <div class="font-semibold">{{ holding.gainLoss >= 0 ? '+' : '-' }}${{ Math.abs(Number(holding.gainLoss || 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</div>
-                      <div class="text-[10px] opacity-60">{{ (holding.gainLossPct || 0) >= 0 ? '+' : '' }}{{ (holding.gainLossPct || 0).toFixed(2) }}%</div>
+                      <div class="text-[10px] opacity-60">{{ (holding.gainLossPct || 0) >= 0 ? '+' : '' }}{{ (holding.gainLossPct || 0).toFixed(1) }}%</div>
                     </td>
                   </tr>
                 </tbody>

@@ -18,13 +18,13 @@
           <div class="stat py-2 px-4">
             <div class="stat-title text-xs">1-Day Change</div>
             <div class="stat-value text-lg" :class="spyQuote.changesPercentage >= 0 ? 'text-success' : 'text-error'">
-              {{ spyQuote.changesPercentage >= 0 ? '+' : '' }}{{ spyQuote.changesPercentage?.toFixed(2) }}%
+              {{ spyQuote.changesPercentage >= 0 ? '+' : '' }}{{ spyQuote.changesPercentage?.toFixed(1) }}%
             </div>
           </div>
           <div class="stat py-2 px-4">
             <div class="stat-title text-xs">YTD Return</div>
             <div class="stat-value text-lg" :class="ytdReturn >= 0 ? 'text-success' : 'text-error'">
-              {{ ytdReturn >= 0 ? '+' : '' }}{{ ytdReturn?.toFixed(2) }}%
+              {{ ytdReturn >= 0 ? '+' : '' }}{{ ytdReturn?.toFixed(1) }}%
             </div>
           </div>
           <div class="stat py-2 px-4">
@@ -237,10 +237,10 @@
                   </button>
                   <span v-else>—</span>
                 </td>
-                <td class="text-right font-mono">{{ stock.weightPercentage?.toFixed(2) }}%</td>
+                <td class="text-right font-mono">{{ stock.weightPercentage?.toFixed(1) }}%</td>
                 <td class="text-right font-mono">${{ stock.price?.toFixed(2) || '—' }}</td>
                 <td class="text-right font-mono" :class="(stock.changesPercentage || 0) >= 0 ? 'text-success' : 'text-error'">
-                  {{ stock.changesPercentage != null ? ((stock.changesPercentage >= 0 ? '+' : '') + stock.changesPercentage.toFixed(2) + '%') : '—' }}
+                  {{ stock.changesPercentage != null ? ((stock.changesPercentage >= 0 ? '+' : '') + stock.changesPercentage.toFixed(1) + '%') : '—' }}
                 </td>
                 <td class="text-right font-mono">{{ formatMarketCap(stock.marketCap) }}</td>
               </tr>

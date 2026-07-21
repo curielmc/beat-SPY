@@ -61,7 +61,7 @@
                 </td>
                 <td class="text-right">
                   <div class="font-semibold" :class="fund._returnPct >= 0 ? 'text-success' : 'text-error'">
-                    {{ fund._returnPct >= 0 ? '+' : '' }}{{ fund._returnPct.toFixed(2) }}%
+                    {{ fund._returnPct >= 0 ? '+' : '' }}{{ fund._returnPct.toFixed(1) }}%
                   </div>
                 </td>
                 <td class="text-right">
@@ -70,7 +70,7 @@
                       {{ fund._vsSpy >= 0 ? '✓' : '⚠' }}
                     </span>
                     <span class="font-mono font-semibold" :class="fund._vsSpy >= 0 ? 'text-success' : 'text-error'">
-                      {{ fund._vsSpy >= 0 ? '+' : '' }}{{ fund._vsSpy.toFixed(2) }}%
+                      {{ fund._vsSpy >= 0 ? '+' : '' }}{{ fund._vsSpy.toFixed(1) }}%
                     </span>
                   </div>
                 </td>
@@ -113,7 +113,7 @@
               <div class="rounded-lg bg-base-100/50 p-2.5 text-center">
                 <div class="text-xs uppercase tracking-wide text-base-content/45 mb-1">Return</div>
                 <div class="font-semibold text-sm" :class="fund._returnPct >= 0 ? 'text-success' : 'text-error'">
-                  {{ fund._returnPct >= 0 ? '+' : '' }}{{ fund._returnPct.toFixed(2) }}%
+                  {{ fund._returnPct >= 0 ? '+' : '' }}{{ fund._returnPct.toFixed(1) }}%
                 </div>
               </div>
               <div class="rounded-lg bg-base-100/50 p-2.5 text-center">
@@ -123,7 +123,7 @@
                     {{ fund._vsSpy >= 0 ? '✓' : '⚠' }}
                   </span>
                   <span class="font-semibold text-xs" :class="fund._vsSpy >= 0 ? 'text-success' : 'text-error'">
-                    {{ fund._vsSpy >= 0 ? '+' : '' }}{{ fund._vsSpy.toFixed(2) }}%
+                    {{ fund._vsSpy >= 0 ? '+' : '' }}{{ fund._vsSpy.toFixed(1) }}%
                   </span>
                 </div>
               </div>
@@ -186,7 +186,7 @@
             <div class="rounded-xl border border-base-300 bg-base-200/40 p-3">
               <div class="text-xs uppercase tracking-wide text-base-content/45">Return</div>
               <div class="mt-1 font-mono text-lg font-semibold" :class="selectedFundCard._returnPct >= 0 ? 'text-success' : 'text-error'">
-                {{ selectedFundCard._returnPct >= 0 ? '+' : '' }}{{ selectedFundCard._returnPct.toFixed(2) }}%
+                {{ selectedFundCard._returnPct >= 0 ? '+' : '' }}{{ selectedFundCard._returnPct.toFixed(1) }}%
               </div>
             </div>
           </div>
@@ -248,7 +248,7 @@
                     <td class="text-right font-mono">${{ holding.currentPrice.toFixed(2) }}</td>
                     <td class="text-right font-mono font-semibold">${{ holding.marketValue.toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</td>
                     <td class="text-right font-mono" :class="holding.gainLoss >= 0 ? 'text-success' : 'text-error'">
-                      {{ holding.gainLoss >= 0 ? '+' : '' }}{{ holding.gainLossPct.toFixed(2) }}%
+                      {{ holding.gainLoss >= 0 ? '+' : '' }}{{ holding.gainLossPct.toFixed(1) }}%
                     </td>
                     <td class="text-center">
                       <div class="flex items-center justify-center gap-1">
@@ -295,7 +295,7 @@
                   <div>
                     <div class="text-xs uppercase tracking-wide text-base-content/45">Gain/Loss</div>
                     <div class="mt-1 font-mono" :class="holding.gainLoss >= 0 ? 'text-success' : 'text-error'">
-                      {{ holding.gainLoss >= 0 ? '+' : '' }}{{ holding.gainLossPct.toFixed(2) }}%
+                      {{ holding.gainLoss >= 0 ? '+' : '' }}{{ holding.gainLossPct.toFixed(1) }}%
                     </div>
                   </div>
                 </div>
@@ -347,10 +347,10 @@
                 <td v-for="p in periods" :key="p.key" class="text-right">
                   <template v-if="row[p.key] != null">
                     <div class="font-mono text-sm" :class="row[p.key] >= 0 ? 'text-success' : 'text-error'">
-                      {{ row[p.key] >= 0 ? '+' : '' }}{{ row[p.key].toFixed(2) }}%
+                      {{ row[p.key] >= 0 ? '+' : '' }}{{ row[p.key].toFixed(1) }}%
                     </div>
                     <div class="font-mono text-xs" :class="row[p.key + '_vs'] >= 0 ? 'text-success/60' : 'text-error/60'">
-                      {{ row[p.key + '_vs'] >= 0 ? '+' : '' }}{{ row[p.key + '_vs']?.toFixed(2) }}% vs SPY
+                      {{ row[p.key + '_vs'] >= 0 ? '+' : '' }}{{ row[p.key + '_vs']?.toFixed(1) }}% vs SPY
                     </div>
                   </template>
                   <span v-else class="text-base-content/30 text-xs">—</span>
@@ -361,7 +361,7 @@
                 <td class="font-semibold">S&P 500 (SPY)</td>
                 <td v-for="p in periods" :key="p.key" class="text-right">
                   <div v-if="spyPeriodReturns[p.key] != null" class="font-mono text-sm" :class="spyPeriodReturns[p.key] >= 0 ? 'text-success' : 'text-error'">
-                    {{ spyPeriodReturns[p.key] >= 0 ? '+' : '' }}{{ spyPeriodReturns[p.key].toFixed(2) }}%
+                    {{ spyPeriodReturns[p.key] >= 0 ? '+' : '' }}{{ spyPeriodReturns[p.key].toFixed(1) }}%
                   </div>
                   <span v-else class="text-base-content/30 text-xs">—</span>
                 </td>

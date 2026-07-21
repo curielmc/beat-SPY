@@ -135,7 +135,7 @@
           <div class="text-right" v-if="stock.price">
             <p class="font-semibold">${{ Number(stock.price).toFixed(2) }}</p>
             <p v-if="stock.changesPercentage != null" class="text-sm" :class="stock.changesPercentage >= 0 ? 'text-success' : 'text-error'">
-              {{ stock.changesPercentage >= 0 ? '+' : '' }}{{ Number(stock.changesPercentage).toFixed(2) }}%
+              {{ stock.changesPercentage >= 0 ? '+' : '' }}{{ Number(stock.changesPercentage).toFixed(1) }}%
             </p>
           </div>
         </div>
@@ -327,7 +327,7 @@
                 <div class="text-right" v-if="stock.price">
                   <p class="font-semibold">${{ Number(stock.price).toFixed(2) }}</p>
                   <p v-if="stock.changesPercentage != null" class="text-sm" :class="stock.changesPercentage >= 0 ? 'text-success' : 'text-error'">
-                    {{ stock.changesPercentage >= 0 ? '+' : '' }}{{ Number(stock.changesPercentage).toFixed(2) }}%
+                    {{ stock.changesPercentage >= 0 ? '+' : '' }}{{ Number(stock.changesPercentage).toFixed(1) }}%
                   </p>
                 </div>
               </div>

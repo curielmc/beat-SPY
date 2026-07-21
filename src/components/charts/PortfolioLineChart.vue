@@ -126,7 +126,7 @@ const chartOptions = computed(() => {
         label: (ctx) => {
           const val = ctx.parsed.y
           if (props.showPercentage) {
-            return `${ctx.dataset.label}: ${val >= 0 ? '+' : ''}${val.toFixed(2)}%`
+            return `${ctx.dataset.label}: ${val >= 0 ? '+' : ''}${val.toFixed(1)}%`
           }
           return `${ctx.dataset.label}: $${val.toLocaleString('en-US', { maximumFractionDigits: 0 })}`
         }

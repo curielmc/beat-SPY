@@ -140,7 +140,7 @@
                         <span v-else class="text-base-content/20">-</span>
                       </td>
                       <td class="text-right font-mono" :class="group.returnPct > 0 ? 'text-success' : group.returnPct < 0 ? 'text-error' : ''">
-                        <template v-if="leaderboards[cls.id]">{{ group.returnPct >= 0 ? '+' : '' }}{{ group.returnPct.toFixed(2) }}%</template>
+                        <template v-if="leaderboards[cls.id]">{{ group.returnPct >= 0 ? '+' : '' }}{{ group.returnPct.toFixed(1) }}%</template>
                         <span v-else-if="leaderboardLoading[cls.id]" class="loading loading-spinner loading-xs"></span>
                         <span v-else class="text-base-content/20">-</span>
                       </td>
@@ -178,7 +178,7 @@
                               <span>Starting: <strong class="font-mono">${{ fund.startingCash.toLocaleString('en-US', { minimumFractionDigits: 0 }) }}</strong></span>
                               <span>Value: <strong class="font-mono">${{ fund.totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</strong></span>
                               <span :class="fund.returnPct >= 0 ? 'text-success' : 'text-error'">
-                                {{ fund.returnPct >= 0 ? '+' : '' }}{{ fund.returnPct.toFixed(2) }}%
+                                {{ fund.returnPct >= 0 ? '+' : '' }}{{ fund.returnPct.toFixed(1) }}%
                               </span>
                             </div>
                             <div v-if="fund.holdings.length === 0" class="text-sm text-base-content/40">All cash — no holdings</div>
@@ -201,7 +201,7 @@
                                   <td class="text-right font-mono">${{ h.price.toFixed(2) }}</td>
                                   <td class="text-right font-mono">${{ h.marketValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</td>
                                   <td class="text-right font-mono" :class="(h.price - h.avgCost) >= 0 ? 'text-success' : 'text-error'">
-                                    {{ ((h.price - h.avgCost) / h.avgCost * 100).toFixed(2) }}%
+                                    {{ ((h.price - h.avgCost) / h.avgCost * 100).toFixed(1) }}%
                                   </td>
                                 </tr>
                               </tbody>

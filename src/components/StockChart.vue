@@ -5,7 +5,7 @@
       <p class="text-3xl font-bold tabular-nums">${{ displayPrice }}</p>
       <p class="text-sm font-medium" :class="displayChange >= 0 ? 'text-success' : 'text-error'">
         {{ displayChange >= 0 ? '+' : '' }}{{ displayChange.toFixed(2) }}
-        ({{ displayChangePct >= 0 ? '+' : '' }}{{ displayChangePct.toFixed(2) }}%)
+        ({{ displayChangePct >= 0 ? '+' : '' }}{{ displayChangePct.toFixed(1) }}%)
         <span class="text-base-content/40 font-normal ml-1">{{ hoverDate || periodLabel }}</span>
       </p>
     </div>

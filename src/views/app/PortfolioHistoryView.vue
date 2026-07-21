@@ -46,7 +46,7 @@
             <div>
               <p class="text-xs text-base-content/50">Return</p>
               <p class="text-sm font-mono" :class="getReturnPct(p) >= 0 ? 'text-success' : 'text-error'">
-                {{ getReturnPct(p) >= 0 ? '+' : '' }}{{ getReturnPct(p).toFixed(2) }}%
+                {{ getReturnPct(p) >= 0 ? '+' : '' }}{{ getReturnPct(p).toFixed(1) }}%
               </p>
             </div>
           </div>
@@ -77,7 +77,7 @@
                 <div>
                   <p class="text-xs text-base-content/50">Return</p>
                   <p class="font-mono" :class="Number(s.return_pct) >= 0 ? 'text-success' : 'text-error'">
-                    {{ Number(s.return_pct) >= 0 ? '+' : '' }}{{ Number(s.return_pct).toFixed(2) }}%
+                    {{ Number(s.return_pct) >= 0 ? '+' : '' }}{{ Number(s.return_pct).toFixed(1) }}%
                   </p>
                 </div>
               </div>

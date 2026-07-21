@@ -165,7 +165,7 @@
                   <td class="text-right font-mono">${{ fund.cashBalance.toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</td>
                   <td class="text-right font-mono font-semibold">${{ fund.totalValue.toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</td>
                   <td class="text-right font-mono" :class="fund.returnPct >= 0 ? 'text-success' : 'text-error'">
-                    {{ fund.returnPct >= 0 ? '+' : '' }}{{ fund.returnPct.toFixed(2) }}%
+                    {{ fund.returnPct >= 0 ? '+' : '' }}{{ fund.returnPct.toFixed(1) }}%
                   </td>
                   <td class="text-right">
                     <button
@@ -241,7 +241,7 @@
                   <td class="text-right font-mono text-xs">${{ holding.currentPrice.toFixed(2) }}</td>
                   <td class="text-right font-mono text-xs font-semibold">${{ holding.marketValue.toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</td>
                   <td class="text-right font-mono text-xs" :class="holding.gainLoss >= 0 ? 'text-success' : 'text-error'">
-                    {{ holding.gainLoss >= 0 ? '+' : '' }}{{ holding.gainLossPct.toFixed(2) }}%
+                    {{ holding.gainLoss >= 0 ? '+' : '' }}{{ holding.gainLossPct.toFixed(1) }}%
                   </td>
                   <td class="text-center">
                     <div class="flex items-center justify-center gap-1">
@@ -395,7 +395,7 @@
             {{ portfolioStore.totalReturnDollar >= 0 ? '+' : '-' }}${{ Math.abs(portfolioStore.totalReturnDollar).toLocaleString('en-US', { maximumFractionDigits: 0 }) }}
           </p>
           <p class="text-xs" :class="portfolioStore.totalReturnPct >= 0 ? 'text-success' : 'text-error'">
-            {{ portfolioStore.totalReturnPct >= 0 ? '+' : '' }}{{ portfolioStore.totalReturnPct.toFixed(2) }}%
+            {{ portfolioStore.totalReturnPct >= 0 ? '+' : '' }}{{ portfolioStore.totalReturnPct.toFixed(1) }}%
           </p>
         </div>
       </div>
@@ -405,7 +405,7 @@
             <div>
               <p class="text-xs text-base-content/60">vs S&P 500 ({{ portfolioStore.benchmarkTicker }} proxy)</p>
               <p class="text-xl font-bold" :class="vsSP500 >= 0 ? 'text-success' : 'text-error'">
-                {{ vsSP500 >= 0 ? '+' : '' }}{{ vsSP500.toFixed(2) }}%
+                {{ vsSP500 >= 0 ? '+' : '' }}{{ vsSP500.toFixed(1) }}%
               </p>
               <p class="text-xs text-base-content/50">
                 {{ portfolioStore.isBeatingSP500 ? 'Beating the market' : 'Behind the market' }}
@@ -436,7 +436,7 @@
       <div class="stat py-2">
         <div class="stat-title text-xs">S&P 500 (via {{ portfolioStore.benchmarkTicker }})</div>
         <div class="stat-value text-lg" :class="portfolioStore.benchmarkReturnPct >= 0 ? 'text-success' : 'text-error'">
-          {{ portfolioStore.benchmarkReturnPct >= 0 ? '+' : '' }}{{ portfolioStore.benchmarkReturnPct.toFixed(2) }}%
+          {{ portfolioStore.benchmarkReturnPct >= 0 ? '+' : '' }}{{ portfolioStore.benchmarkReturnPct.toFixed(1) }}%
         </div>
       </div>
     </div>
@@ -490,7 +490,7 @@
                 <td class="text-right font-mono text-xs">${{ h.currentPrice.toFixed(2) }}</td>
                 <td class="text-right font-mono text-xs font-semibold">${{ h.marketValue.toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</td>
                 <td class="text-right font-mono text-xs" :class="h.gainLoss >= 0 ? 'text-success' : 'text-error'">
-                  {{ h.gainLoss >= 0 ? '+' : '' }}{{ h.gainLossPct.toFixed(2) }}%
+                  {{ h.gainLoss >= 0 ? '+' : '' }}{{ h.gainLossPct.toFixed(1) }}%
                 </td>
                 <td class="text-center">
                   <div class="flex items-center justify-center gap-1">

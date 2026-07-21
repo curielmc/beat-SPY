@@ -51,7 +51,7 @@
               </template>
               <template v-else>
                 <span class="text-2xl font-black" :class="activeBenchmarkValue >= 0 ? 'text-success' : 'text-error'">
-                  {{ activeBenchmarkValue >= 0 ? '+' : '' }}{{ activeBenchmarkValue.toFixed(2) }}%
+                  {{ activeBenchmarkValue >= 0 ? '+' : '' }}{{ activeBenchmarkValue.toFixed(1) }}%
                 </span>
               </template>
             </div>
@@ -70,7 +70,7 @@
             </div>
             <p class="text-success font-bold text-lg whitespace-nowrap">
               <template v-if="highlights.topFund?.metrics?.[highlights.activeMetric] !== undefined">
-                {{ highlights.topFund.metrics[highlights.activeMetric] >= 0 ? '+' : '' }}{{ highlights.topFund.metrics[highlights.activeMetric]?.toFixed(2) }}%
+                {{ highlights.topFund.metrics[highlights.activeMetric] >= 0 ? '+' : '' }}{{ highlights.topFund.metrics[highlights.activeMetric]?.toFixed(1) }}%
               </template>
               <template v-else>—</template>
             </p>
@@ -87,7 +87,7 @@
               <p class="text-xs text-base-content/40 truncate">{{ highlights.bestStockGroup }}</p>
             </div>
             <p class="text-warning font-bold text-lg whitespace-nowrap">
-              {{ highlights.bestStockReturn >= 0 ? '+' : '' }}{{ highlights.bestStockReturn?.toFixed(2) }}%
+              {{ highlights.bestStockReturn >= 0 ? '+' : '' }}{{ highlights.bestStockReturn?.toFixed(1) }}%
             </p>
           </div>
         </div>

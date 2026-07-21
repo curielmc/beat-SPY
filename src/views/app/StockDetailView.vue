@@ -61,7 +61,7 @@
                 <span class="text-3xl font-bold">${{ Number(quote.price).toFixed(2) }}</span>
                 <span class="text-sm font-medium" :class="quote.change >= 0 ? 'text-success' : 'text-error'">
                   {{ quote.change >= 0 ? '+' : '' }}{{ Number(quote.change).toFixed(2) }} 
-                  ({{ Number(quote.changesPercentage).toFixed(2) }}%) 
+                  ({{ Number(quote.changesPercentage).toFixed(1) }}%) 
                   <span class="text-base-content/40 text-xs ml-1 font-normal">Today</span>
                 </span>
               </div>

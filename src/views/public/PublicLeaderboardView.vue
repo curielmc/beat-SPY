@@ -67,7 +67,7 @@
                 </template>
                 <template v-else>
                   <span class="text-2xl font-black" :class="activeBenchmarkValue >= 0 ? 'text-success' : 'text-error'">
-                    {{ activeBenchmarkValue >= 0 ? '+' : '' }}{{ activeBenchmarkValue.toFixed(2) }}%
+                    {{ activeBenchmarkValue >= 0 ? '+' : '' }}{{ activeBenchmarkValue.toFixed(1) }}%
                   </span>
                 </template>
               </div>

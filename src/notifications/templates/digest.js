@@ -5,8 +5,8 @@ export default {
   email({ lang, data }) {
     const isEs = lang === 'es'
     const rank = data.rank != null ? `#${data.rank}` : '—'
-    const ret = data.return != null ? `${(data.return * 100).toFixed(2)}%` : '—'
-    const spy = data.spyReturn != null ? `${(data.spyReturn * 100).toFixed(2)}%` : '—'
+    const ret = data.return != null ? `${(data.return * 100).toFixed(1)}%` : '—'
+    const spy = data.spyReturn != null ? `${(data.spyReturn * 100).toFixed(1)}%` : '—'
     const days = data.daysRemaining != null ? data.daysRemaining : '—'
     return {
       subject: isEs

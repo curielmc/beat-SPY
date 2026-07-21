@@ -45,7 +45,7 @@
           <div class="card bg-base-100 border border-base-300 p-4 text-center">
             <div class="text-xs text-base-content/60 mb-1">Your Return ({{ selectedRange }})</div>
             <div class="text-3xl font-bold" :class="totalReturn >= 0 ? 'text-success' : 'text-error'">
-              {{ totalReturn >= 0 ? '+' : '' }}{{ totalReturn.toFixed(2) }}%
+              {{ totalReturn >= 0 ? '+' : '' }}{{ totalReturn.toFixed(1) }}%
             </div>
             <div class="mt-2 flex items-center justify-center gap-2">
               <span :class="isBeating ? 'badge badge-success' : 'badge badge-warning'">
@@ -53,7 +53,7 @@
               </span>
             </div>
             <div class="text-sm font-semibold mt-2" :class="spyReturn >= 0 ? 'text-success' : 'text-error'">
-              vs SPY: {{ spyReturn >= 0 ? '+' : '' }}{{ spyReturn.toFixed(2) }}%
+              vs SPY: {{ spyReturn >= 0 ? '+' : '' }}{{ spyReturn.toFixed(1) }}%
             </div>
           </div>
           <div class="card bg-error/10 border border-error/20 p-4 text-center">
@@ -114,10 +114,10 @@
                 <td class="text-right font-mono text-sm">{{ a.currentValue.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }) }}</td>
                 <td class="text-right font-mono">{{ a.weight.toFixed(1) }}%</td>
                 <td class="text-right font-mono" :class="a.stockReturn >= 0 ? 'text-success' : 'text-error'">
-                  {{ a.stockReturn >= 0 ? '+' : '' }}{{ a.stockReturn.toFixed(2) }}%
+                  {{ a.stockReturn >= 0 ? '+' : '' }}{{ a.stockReturn.toFixed(1) }}%
                 </td>
                 <td class="text-right font-mono font-bold" :class="a.contribution >= 0 ? 'text-success' : 'text-error'">
-                  {{ a.contribution >= 0 ? '+' : '' }}{{ a.contribution.toFixed(2) }}%
+                  {{ a.contribution >= 0 ? '+' : '' }}{{ a.contribution.toFixed(1) }}%
                 </td>
                 <td class="text-xs">{{ a.funds.join(', ') }}</td>
               </tr>
@@ -205,7 +205,7 @@ function getSortIcon(col) {
 function formatSignedPct(value) {
   const num = Number(value)
   if (!Number.isFinite(num)) return '—'
-  return `${num >= 0 ? '+' : ''}${num.toFixed(2)}%`
+  return `${num >= 0 ? '+' : ''}${num.toFixed(1)}%`
 }
 
 function selectPeriod(range) {
@@ -520,7 +520,7 @@ async function explainPortfolio(rows = attributions.value) {
     const changes = Object.fromEntries(rows.map(a => [a.ticker, a.stockReturn]))
     const best = rows[0]?.ticker || 'N/A'
     const worst = [...rows].sort((a, b) => a.contribution - b.contribution)[0]?.ticker || 'N/A'
-    const summary = `Group portfolio return (${selectedRange.value}): ${totalReturn.value.toFixed(2)}%. Best: ${best}. Worst: ${worst}. vs SPY: ${(totalReturn.value - spyReturn.value).toFixed(2)}%.`
+    const summary = `Group portfolio return (${selectedRange.value}): ${totalReturn.value.toFixed(1)}%. Best: ${best}. Worst: ${worst}. vs SPY: ${(totalReturn.value - spyReturn.value).toFixed(1)}%.`
     
     const res = await fetch('/api/explain-attribution', {
       method: 'POST',

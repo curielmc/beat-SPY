@@ -299,7 +299,7 @@
                 <button class="btn btn-ghost btn-xs px-1" @click.stop.prevent="startEditingName(group)" title="Rename group">✏️</button>
               </span>
               <span class="badge badge-sm" :class="group.returnPct >= 0 ? 'badge-success' : 'badge-error'">
-                {{ group.returnPct >= 0 ? '+' : '' }}{{ group.returnPct.toFixed(2) }}%
+                {{ group.returnPct >= 0 ? '+' : '' }}{{ group.returnPct.toFixed(1) }}%
               </span>
               <!-- Student configure toggle -->
               <label class="flex items-center gap-1 ml-2" @click.stop>
@@ -365,7 +365,7 @@
             </div>
             <div class="stat py-2">
               <div class="stat-title text-xs">Return</div>
-              <div class="stat-value text-lg" :class="group.returnPct >= 0 ? 'text-success' : 'text-error'">{{ group.returnPct >= 0 ? '+' : '' }}{{ group.returnPct.toFixed(2) }}%</div>
+              <div class="stat-value text-lg" :class="group.returnPct >= 0 ? 'text-success' : 'text-error'">{{ group.returnPct >= 0 ? '+' : '' }}{{ group.returnPct.toFixed(1) }}%</div>
             </div>
           </div>
 

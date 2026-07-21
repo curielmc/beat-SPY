@@ -147,7 +147,7 @@
                     <span v-else>{{ entry.profiles?.full_name || 'Unknown' }}</span>
                   </td>
                   <td class="text-right font-mono" :class="entry.returnPct >= 0 ? 'text-success' : 'text-error'">
-                    {{ entry.returnPct >= 0 ? '+' : '' }}{{ entry.returnPct.toFixed(2) }}%
+                    {{ entry.returnPct >= 0 ? '+' : '' }}{{ entry.returnPct.toFixed(1) }}%
                   </td>
                   <td class="text-right font-mono">${{ entry.totalValue.toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</td>
                   <td class="text-right">{{ entry.holdingsCount }}</td>

@@ -31,7 +31,7 @@
           <td class="text-right font-mono">${{ Number(h.currentPrice).toFixed(2) }}</td>
           <td class="text-right font-mono">${{ Number(h.marketValue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</td>
           <td class="text-right font-mono" :class="h.gainLoss >= 0 ? 'text-success' : 'text-error'">
-            {{ h.gainLoss >= 0 ? '+' : '' }}{{ h.gainLossPct.toFixed(2) }}%
+            {{ h.gainLoss >= 0 ? '+' : '' }}{{ h.gainLossPct.toFixed(1) }}%
           </td>
         </tr>
       </tbody>

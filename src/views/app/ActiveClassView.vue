@@ -133,7 +133,7 @@
                 </template>
                 <template v-else>
                   <span class="text-lg font-bold text-primary">
-                    {{ activeBenchmarkValue >= 0 ? '+' : '' }}{{ activeBenchmarkValue.toFixed(2) }}%
+                    {{ activeBenchmarkValue >= 0 ? '+' : '' }}{{ activeBenchmarkValue.toFixed(1) }}%
                   </span>
                 </template>
               </div>

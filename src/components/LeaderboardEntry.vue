@@ -35,7 +35,7 @@
           </template>
           <template v-else>
             <p class="font-bold" :class="metricValue >= 0 ? 'text-success' : 'text-error'">
-              {{ metricValue >= 0 ? '+' : '' }}{{ metricValue.toFixed(2) }}%
+              {{ metricValue >= 0 ? '+' : '' }}{{ metricValue.toFixed(1) }}%
             </p>
           </template>
           <p class="text-xs text-base-content/50">${{ totalValue.toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</p>

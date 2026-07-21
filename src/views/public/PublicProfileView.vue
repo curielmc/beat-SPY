@@ -73,7 +73,7 @@
                 </div>
                 <div class="text-right">
                   <p class="font-bold text-lg" :class="p.returnPct >= 0 ? 'text-success' : 'text-error'">
-                    {{ p.returnPct >= 0 ? '+' : '' }}{{ p.returnPct.toFixed(2) }}%
+                    {{ p.returnPct >= 0 ? '+' : '' }}{{ p.returnPct.toFixed(1) }}%
                   </p>
                   <p class="text-xs text-base-content/50">${{ p.totalValue.toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</p>
                 </div>
@@ -162,7 +162,7 @@
                 </div>
                 <div class="text-right">
                   <p class="font-bold" :class="Number(reset.final_return_pct) >= 0 ? 'text-success' : 'text-error'">
-                    {{ Number(reset.final_return_pct) >= 0 ? '+' : '' }}{{ Number(reset.final_return_pct).toFixed(2) }}%
+                    {{ Number(reset.final_return_pct) >= 0 ? '+' : '' }}{{ Number(reset.final_return_pct).toFixed(1) }}%
                   </p>
                   <p class="text-xs text-base-content/50">${{ Number(reset.final_value).toLocaleString('en-US', { maximumFractionDigits: 0 }) }}</p>
                 </div>

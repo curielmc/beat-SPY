@@ -13,9 +13,9 @@
       <div class="text-right">
         <div class="text-xs text-base-content/50">Portfolio return ({{ periodLabel }})</div>
         <div class="text-2xl font-bold" :class="totalReturn >= 0 ? 'text-success' : 'text-error'">
-          {{ totalReturn >= 0 ? '+' : '' }}{{ totalReturn.toFixed(2) }}%
+          {{ totalReturn >= 0 ? '+' : '' }}{{ totalReturn.toFixed(1) }}%
         </div>
-        <div class="text-xs text-base-content/50">vs SPY {{ spyReturn >= 0 ? '+' : '' }}{{ spyReturn.toFixed(2) }}%</div>
+        <div class="text-xs text-base-content/50">vs SPY {{ spyReturn >= 0 ? '+' : '' }}{{ spyReturn.toFixed(1) }}%</div>
       </div>
     </div>
 
@@ -51,20 +51,20 @@
         <div class="card bg-success/10 border border-success/20 p-4 text-center">
           <div class="text-xs text-base-content/60 mb-1">Biggest Help</div>
           <div class="font-mono font-bold text-lg text-success">{{ topHelper?.ticker }}</div>
-          <div class="text-success font-semibold">{{ topHelper?.contribution >= 0 ? '+' : '' }}{{ topHelper?.contribution.toFixed(2) }}%</div>
+          <div class="text-success font-semibold">{{ topHelper?.contribution >= 0 ? '+' : '' }}{{ topHelper?.contribution.toFixed(1) }}%</div>
           <div class="text-xs text-base-content/50">added to return</div>
         </div>
         <div class="card bg-base-100 border border-base-300 p-4 text-center">
           <div class="text-xs text-base-content/60 mb-1">Beat SPY by</div>
           <div class="text-2xl font-bold" :class="alpha >= 0 ? 'text-success' : 'text-error'">
-            {{ alpha >= 0 ? '+' : '' }}{{ alpha.toFixed(2) }}%
+            {{ alpha >= 0 ? '+' : '' }}{{ alpha.toFixed(1) }}%
           </div>
           <div class="text-xs text-base-content/50">selection effect</div>
         </div>
         <div class="card bg-error/10 border border-error/20 p-4 text-center">
           <div class="text-xs text-base-content/60 mb-1">Biggest Drag</div>
           <div class="font-mono font-bold text-lg text-error">{{ topDrag?.ticker }}</div>
-          <div class="text-error font-semibold">{{ topDrag?.contribution >= 0 ? '+' : '' }}{{ topDrag?.contribution.toFixed(2) }}%</div>
+          <div class="text-error font-semibold">{{ topDrag?.contribution >= 0 ? '+' : '' }}{{ topDrag?.contribution.toFixed(1) }}%</div>
           <div class="text-xs text-base-content/50">from return</div>
         </div>
       </div>
@@ -108,14 +108,14 @@
                 >
                   <span class="text-xs font-bold text-white px-1 whitespace-nowrap"
                     :class="a.contribution >= 0 ? 'text-right' : 'text-left'">
-                    {{ a.contribution >= 0 ? '+' : '' }}{{ a.contribution.toFixed(2) }}%
+                    {{ a.contribution >= 0 ? '+' : '' }}{{ a.contribution.toFixed(1) }}%
                   </span>
                 </div>
               </div>
               <!-- Stock return + weight -->
               <div class="w-24 shrink-0 text-right">
                 <div class="text-sm font-semibold" :class="a.stockReturn >= 0 ? 'text-success' : 'text-error'">
-                  {{ a.stockReturn >= 0 ? '+' : '' }}{{ a.stockReturn.toFixed(2) }}%
+                  {{ a.stockReturn >= 0 ? '+' : '' }}{{ a.stockReturn.toFixed(1) }}%
                 </div>
                 <div class="text-xs text-base-content/40">{{ a.weight.toFixed(1) }}% wt</div>
               </div>
@@ -176,13 +176,13 @@
                 </td>
                 <td class="text-right font-mono">{{ a.weight.toFixed(1) }}%</td>
                 <td class="text-right font-mono" :class="a.stockReturn >= 0 ? 'text-success' : 'text-error'">
-                  {{ a.stockReturn >= 0 ? '+' : '' }}{{ a.stockReturn.toFixed(2) }}%
+                  {{ a.stockReturn >= 0 ? '+' : '' }}{{ a.stockReturn.toFixed(1) }}%
                 </td>
                 <td class="text-right font-mono font-bold" :class="a.contribution >= 0 ? 'text-success' : 'text-error'">
-                  {{ a.contribution >= 0 ? '+' : '' }}{{ a.contribution.toFixed(2) }}%
+                  {{ a.contribution >= 0 ? '+' : '' }}{{ a.contribution.toFixed(1) }}%
                 </td>
                 <td class="text-right font-mono" :class="a.vsSpy >= 0 ? 'text-success' : 'text-error'">
-                  {{ a.vsSpy >= 0 ? '+' : '' }}{{ a.vsSpy.toFixed(2) }}%
+                  {{ a.vsSpy >= 0 ? '+' : '' }}{{ a.vsSpy.toFixed(1) }}%
                 </td>
                 <td class="text-right font-mono" :class="a.dollarGain >= 0 ? 'text-success' : 'text-error'">
                   {{ a.dollarGain >= 0 ? '+' : '' }}${{ Math.abs(a.dollarGain).toLocaleString('en-US', {maximumFractionDigits: 0}) }}
@@ -195,10 +195,10 @@
                 <td class="text-right font-mono">100%</td>
                 <td class="text-right"></td>
                 <td class="text-right font-mono" :class="totalReturn >= 0 ? 'text-success' : 'text-error'">
-                  {{ totalReturn >= 0 ? '+' : '' }}{{ totalReturn.toFixed(2) }}%
+                  {{ totalReturn >= 0 ? '+' : '' }}{{ totalReturn.toFixed(1) }}%
                 </td>
                 <td class="text-right font-mono" :class="alpha >= 0 ? 'text-success' : 'text-error'">
-                  {{ alpha >= 0 ? '+' : '' }}{{ alpha.toFixed(2) }}%
+                  {{ alpha >= 0 ? '+' : '' }}{{ alpha.toFixed(1) }}%
                 </td>
                 <td class="text-right font-mono" :class="totalDollarGain >= 0 ? 'text-success' : 'text-error'">
                   {{ totalDollarGain >= 0 ? '+' : '' }}${{ Math.abs(totalDollarGain).toLocaleString('en-US', {maximumFractionDigits: 0}) }}
@@ -222,7 +222,7 @@
               <span class="font-mono font-bold">{{ a.ticker }}</span>
               <span class="text-base-content/60">, your return would be </span>
               <span class="font-bold" :class="a.returnWithout >= 0 ? 'text-success' : 'text-error'">
-                {{ a.returnWithout >= 0 ? '+' : '' }}{{ a.returnWithout.toFixed(2) }}%
+                {{ a.returnWithout >= 0 ? '+' : '' }}{{ a.returnWithout.toFixed(1) }}%
               </span>
             </div>
             <div class="badge" :class="a.contribution < 0 ? 'badge-error' : 'badge-success'">
@@ -640,7 +640,7 @@ async function explainPortfolio() {
     if (!accessToken) throw new Error('Login required')
     const tickers = attributions.value.map(a => a.ticker)
     const changes = Object.fromEntries(attributions.value.map(a => [a.ticker, a.stockReturn]))
-    const summary = `Portfolio return (${periodLabel.value}): ${totalReturn.value.toFixed(2)}%. Best: ${topHelper.value?.ticker}. Worst: ${topDrag.value?.ticker}. vs SPY: ${alpha.value.toFixed(2)}%.`
+    const summary = `Portfolio return (${periodLabel.value}): ${totalReturn.value.toFixed(1)}%. Best: ${topHelper.value?.ticker}. Worst: ${topDrag.value?.ticker}. vs SPY: ${alpha.value.toFixed(1)}%.`
     const res = await fetch('/api/explain-attribution', {
       method: 'POST',
       headers: {
