@@ -331,9 +331,10 @@ async function loadLeaderboard(classId) {
       const fromStr = new Date(benchmarkStartDate).toISOString().slice(0, 10)
       const toStr = new Date().toISOString().slice(0, 10)
       const spyHistory = await getHistoricalDaily('SPY', fromStr, toStr)
+      // FMP returns newest-first — findLast picks the oldest close (the inception baseline)
       const firstValidClose = spyHistory
         ?.map(point => Number(point.close ?? point.adjClose ?? point.price))
-        .find(price => Number.isFinite(price) && price > 0)
+        .findLast(price => Number.isFinite(price) && price > 0)
 
       if (firstValidClose) {
         spySinceInception = ((spyQuote.price - firstValidClose) / firstValidClose) * 100
