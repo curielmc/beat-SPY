@@ -16,6 +16,14 @@ function escapeHtml(input) {
     .replace(/'/g, '&#39;')
 }
 
+// AI-generated content uses **bold** markers; escape first, then honor them.
+// ponytail: bold + line breaks only — that is all the model is prompted to emit.
+function richText(input) {
+  return escapeHtml(input)
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\n/g, '<br>')
+}
+
 export default async function handler(req) {
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 })
 
@@ -109,17 +117,17 @@ export default async function handler(req) {
 
       analysisHtml = `
         <div style="background: white; border-left: 4px solid #6366f1; padding: 16px; border-radius: 6px; margin-bottom: 20px;">
-          <p style="margin: 0; font-size: 15px; color: #111827;">${escapeHtml(analysis)}</p>
+          <p style="margin: 0; font-size: 15px; color: #111827;">${richText(analysis)}</p>
         </div>
         <div style="background: #fefce8; border-left: 4px solid #eab308; padding: 16px; border-radius: 6px; margin-bottom: 24px;">
           <p style="margin: 0 0 6px; font-size: 14px; font-weight: bold; color: #854d0e;">💡 Quick Insight: ${escapeHtml(insightTitle)}</p>
-          <p style="margin: 0; font-size: 14px; color: #713f12;">${escapeHtml(insightBody)}</p>
+          <p style="margin: 0; font-size: 14px; color: #713f12;">${richText(insightBody)}</p>
           ${difficultyButtons}
         </div>`
     } else {
       analysisHtml = `
         <div style="background: white; border-left: 4px solid #6366f1; padding: 16px; border-radius: 6px; margin-bottom: 24px;">
-          <p style="margin: 0; font-size: 15px; color: #111827;">${escapeHtml(content)}</p>
+          <p style="margin: 0; font-size: 15px; color: #111827;">${richText(content)}</p>
         </div>`
     }
 
@@ -149,7 +157,7 @@ export default async function handler(req) {
     return fetch(`https://api.agentmail.to/v0/inboxes/${INBOX_ID}/messages/send`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${AGENTMAIL_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ to: [email], subject, html })
+      body: JSON.stringify({ to: [email], subject, html, text: String(msg.content || '').replace(/\*\*/g, '') })
     }).then(r => r.json())
   }))
 
