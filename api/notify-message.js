@@ -28,7 +28,7 @@ export default async function handler(req) {
   const SUPABASE_URL = process.env.SUPABASE_URL || 'https://omrfqisqsqgidcqellzy.supabase.co'
   const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY
   const AGENTMAIL_KEY = process.env.AGENTMAIL_API_KEY
-  const INBOX_ID = 'beat-snp@agentmail.to' // Your AgentMail inbox
+  const INBOX_ID = 'hello@mail.beat-snp.com' // Your AgentMail inbox
 
   if (!SUPABASE_KEY || !AGENTMAIL_KEY) {
     return new Response('Server not configured', { status: 500 })

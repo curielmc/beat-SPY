@@ -49,7 +49,7 @@
         <span class="text-warning font-bold">!</span>
         <p class="flex-1 text-base-content/70">
           Not getting email notifications? Check your <strong>spam/junk folder</strong> for messages from
-          <code class="bg-base-200 px-1 rounded text-xs">beat-snp@agentmail.to</code>
+          <code class="bg-base-200 px-1 rounded text-xs">hello@mail.beat-snp.com</code>
           and mark them as "Not Spam."
         </p>
         <button class="btn btn-ghost btn-xs" @click="dismissEmailTip">Dismiss</button>

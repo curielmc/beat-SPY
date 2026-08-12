@@ -6,7 +6,7 @@ export const config = { runtime: 'edge' }
 
 import { sbFetch } from './_lib/supabase.js'
 
-const AGENTMAIL_INBOX = 'beat-snp@agentmail.to'
+const AGENTMAIL_INBOX = 'hello@mail.beat-snp.com'
 const APP_BASE = process.env.APP_BASE_URL || 'https://beat-snp.com'
 const REMINDER_INTERVAL_DAYS = 90
 const COOLDOWN_DAYS = 7

@@ -1,7 +1,7 @@
 // Lightweight email helper. Wraps AgentMail (the project's existing transactional provider).
 // Used by serverless API routes; safe to import in edge runtimes.
 
-const AGENTMAIL_INBOX = process.env.AGENTMAIL_INBOX || 'beat-snp@agentmail.to'
+const AGENTMAIL_INBOX = process.env.AGENTMAIL_INBOX || 'hello@mail.beat-snp.com'
 const AGENTMAIL_KEY = process.env.AGENTMAIL_API_KEY
 
 export async function sendEmail({ to, subject, text, html }) {

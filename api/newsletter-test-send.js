@@ -3,7 +3,7 @@ export const config = { runtime: 'edge' }
 import { SUPABASE_URL, SUPABASE_SERVICE_KEY, sbFetch, jsonResponse } from './_lib/supabase.js'
 import { renderNewsletterHtml } from './_lib/newsletterRender.js'
 
-const AGENTMAIL_INBOX = 'beat-snp@agentmail.to'
+const AGENTMAIL_INBOX = 'hello@mail.beat-snp.com'
 const APP_BASE = process.env.APP_BASE_URL || 'https://beat-snp.com'
 
 function isEmail(s) {

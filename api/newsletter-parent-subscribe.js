@@ -3,7 +3,7 @@ export const config = { runtime: 'edge' }
 import { sbFetch, jsonResponse } from './_lib/supabase.js'
 
 const APP_BASE = process.env.APP_BASE_URL || 'https://beat-snp.com'
-const AGENTMAIL_INBOX = 'beat-snp@agentmail.to'
+const AGENTMAIL_INBOX = 'hello@mail.beat-snp.com'
 
 function isEmail(s) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(s || ''))
