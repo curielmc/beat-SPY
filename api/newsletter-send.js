@@ -1,7 +1,7 @@
 export const config = { runtime: 'edge' }
 
 import { SUPABASE_URL, SUPABASE_SERVICE_KEY, sbFetch, jsonResponse } from './_lib/supabase.js'
-import { renderNewsletterHtml } from './_lib/newsletterRender.js'
+import { renderNewsletterHtml, htmlToText } from './_lib/newsletterRender.js'
 
 const AGENTMAIL_INBOX = 'beat-snp@agentmail.to'
 const APP_BASE = process.env.APP_BASE_URL || 'https://beat-snp.com'
@@ -117,7 +117,12 @@ export default async function handler(req) {
           to: [r.email],
           reply_to: replyTo ? [replyTo] : undefined,
           subject: finalSubject,
-          html
+          html,
+          text: htmlToText(html),
+          headers: {
+            'List-Unsubscribe': `<${unsubscribeUrl}>`,
+            'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click'
+          }
         })
       })
       if (res.ok) sentCount++

@@ -91,3 +91,16 @@ export function renderNewsletterHtml({ subject, introHtml, payload, unsubscribeU
     </div>
   </div>`
 }
+
+// ponytail: regex de-tagger, not a real HTML parser — our own templates are the only input.
+export function htmlToText(html) {
+  return String(html)
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<a[^>]+href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi, '$2 ($1)')
+    .replace(/<(br|\/p|\/div|\/h[1-6]|\/tr)[^>]*>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&nbsp;/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .split('\n').map(l => l.trim()).join('\n')
+    .trim()
+}
