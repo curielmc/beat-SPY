@@ -2,6 +2,14 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import tailwindcss from '@tailwindcss/vite'
 
+// vite 8 / rolldown only accepts the function form of manualChunks
+const CHUNKS = {
+  'vendor-vue': ['vue', 'vue-router', 'pinia'],
+  'vendor-supabase': ['@supabase/supabase-js'],
+  'vendor-charts': ['lightweight-charts', 'chart.js', 'vue-chartjs', 'chartjs-adapter-date-fns'],
+  'vendor-dates': ['date-fns'],
+}
+
 export default defineConfig({
   plugins: [vue(), tailwindcss()],
   resolve: {
@@ -10,19 +18,14 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          // Core framework — cached across all pages
-          'vendor-vue': ['vue', 'vue-router', 'pinia'],
-          // Supabase
-          'vendor-supabase': ['@supabase/supabase-js'],
-          // Charts — only loaded on pages that use them
-          'vendor-charts': ['lightweight-charts', 'chart.js', 'vue-chartjs', 'chartjs-adapter-date-fns'],
-          // Date utils
-          'vendor-dates': ['date-fns'],
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return
+          for (const [chunk, pkgs] of Object.entries(CHUNKS)) {
+            if (pkgs.some(p => id.includes(`node_modules/${p}/`))) return chunk
+          }
         }
       }
     },
-    // Increase chunk size warning limit
     chunkSizeWarningLimit: 600
   }
 })
