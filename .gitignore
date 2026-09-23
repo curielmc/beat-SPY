@@ -8,3 +8,7 @@ dist
 .mcp.json
 .gstack/
 .env.agentmail
+.env.production
+.env.vercel
+.env.*
+!.env.example

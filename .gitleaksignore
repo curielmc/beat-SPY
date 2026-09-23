@@ -1,0 +1,20 @@
+# gitleaks false positives — each entry is path:rule-id:line, reason above
+
+# Supabase publishable/anon key (sb_publishable_ prefix): designed to ship to browsers, RLS-guarded, not a secret
+.claude/skills/gstack/supabase/config.sh:generic-api-key:8
+# gstack vendored test fixture: obviously fake "sk-1234567890abcdef..." API key
+.claude/skills/gstack/test/skill-e2e-cso.test.ts:generic-api-key:45
+# gstack vendored test fixture: fake "ghp_abc123def456" token used to exercise storage set
+.claude/skills/gstack/browse/test/commands.test.ts:generic-api-key:412
+# README example: truncated JWT header placeholder ending in "..." — not a real token
+agent-harness/README.md:generic-api-key:17
+# SKILL.md docs example: truncated JWT header placeholder ending in "..." — not a real token
+agent-harness/cli_anything/beatspy/skills/SKILL.md:generic-api-key:35
+# SKILL.md docs example: truncated JWT header shown as sample CLI output
+agent-harness/cli_anything/beatspy/skills/SKILL.md:generic-api-key:204
+# SKILL.md docs example: curl against placeholder host your-project.supabase.co, no real header value
+agent-harness/cli_anything/beatspy/skills/SKILL.md:curl-auth-header:233
+# SKILL.md docs example: truncated JWT header placeholder ending in "..." — not a real token
+agent-harness/cli_anything/beatspy/skills/SKILL.md:generic-api-key:250
+# SKILL.md docs example: truncated JWT header placeholder ending in "..." — not a real token
+agent-harness/cli_anything/beatspy/skills/SKILL.md:generic-api-key:258
