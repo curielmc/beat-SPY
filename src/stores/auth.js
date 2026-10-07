@@ -538,13 +538,17 @@ export const useAuthStore = defineStore('auth', () => {
 
   // Validate a class code (for signup flow)
   async function validateClassCode(code) {
-    const { data, error } = await supabase
-      .from('classes')
-      .select('*, teacher:profiles!classes_teacher_id_fkey(full_name)')
-      .eq('code', code.toUpperCase())
-      .single()
+    // RPC, not a table read: signup calls this before the student has a session
+    const { data, error } = await supabase.rpc('class_by_code', { lookup_code: code })
     if (error || !data) return null
     return data
+  }
+
+  // Groups for the signup group step (pre-login, so via RPC keyed by class code)
+  async function getGroupsForClassCode(code) {
+    const { data, error } = await supabase.rpc('class_groups_by_code', { lookup_code: code })
+    if (error) return []
+    return data || []
   }
 
   // Get groups for a class
@@ -647,7 +651,7 @@ export const useAuthStore = defineStore('auth', () => {
     allMemberships, activeClassId, membership, setActiveClass,
     init, fetchProfile, signup, login, signInWithOAuth,
     updateProfile, joinClass, validateClassCode, checkEmailInvite,
-    startMasquerade, stopMasquerade, isMasquerading, masqueradeUser, effectiveUserId,
+    getGroupsForClassCode, startMasquerade, stopMasquerade, isMasquerading, masqueradeUser, effectiveUserId,
     masqueradeActor,
     getGroupsForClass, getCurrentMembership, getGroupMembers,
     fetchPublicProfile, fetchPublicPortfolios, logout

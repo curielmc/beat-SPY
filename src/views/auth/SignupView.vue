@@ -387,7 +387,7 @@ function validateInfo() {
 async function loadGroups() {
   if (!validClass.value) return
   loadingGroups.value = true
-  availableGroups.value = await auth.getGroupsForClass(validClass.value.id)
+  availableGroups.value = await auth.getGroupsForClassCode(validClass.value.code)
   loadingGroups.value = false
 }
 
