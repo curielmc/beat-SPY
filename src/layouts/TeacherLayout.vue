@@ -3,7 +3,7 @@
     <!-- Admin preview banner -->
     <div v-if="auth.isAdmin" class="bg-error text-error-content text-center py-2 px-4 text-sm font-semibold flex items-center justify-center gap-3">
       <span>Viewing as Teacher</span>
-      <RouterLink to="/admin/classes" class="btn btn-xs btn-ghost bg-error-content/20 hover:bg-error-content/30">Back to Admin</RouterLink>
+      <button class="btn btn-xs btn-ghost bg-error-content/20 hover:bg-error-content/30" @click="backToAdmin">Back to Admin</button>
     </div>
 
     <div class="navbar bg-base-100 shadow-sm">
@@ -58,6 +58,12 @@ import LogoIcon from '../components/LogoIcon.vue'
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
+
+// Masquerading as a teacher makes userType 'teacher', so the router bounces /admin — restore the admin session first.
+async function backToAdmin() {
+  if (auth.isMasquerading) await auth.stopMasquerade()
+  router.push({ name: 'admin-classes' })
+}
 
 const currentPrimarySection = computed(() => {
   if (route.path === '/teacher') return 'overview'
