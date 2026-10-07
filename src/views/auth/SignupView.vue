@@ -321,6 +321,12 @@ async function validateCode() {
   }
 }
 
+// Shareable signup link: /signup?class=CODE prefills and validates the class code
+if (route.query.class) {
+  teacherCode.value = String(route.query.class).toUpperCase()
+  onMounted(validateCode)
+}
+
 function startIndependent() {
   isIndependent.value = true
   validClass.value = null
