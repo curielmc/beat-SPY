@@ -39,6 +39,7 @@
       :users="users"
       :search="search"
       @view-as="masqueradeAs"
+      @change-role="changeRole"
       @message="showSuccess"
       @error="msg => { errorMsg = msg }"
       @roles-changed="fetchUsers"
@@ -536,7 +537,11 @@ async function applyBulkRole() {
 }
 
 async function changeRole(userId, newRole) {
-  await supabase.from('profiles').update({ role: newRole }).eq('id', userId)
+  const { error } = await supabase.from('profiles').update({ role: newRole }).eq('id', userId)
+  if (error) {
+    errorMsg.value = `Couldn't change role: ${error.message}`
+    return
+  }
   const user = users.value.find(u => u.id === userId)
   if (user) user.role = newRole
   showSuccess(`Role updated to ${newRole}`)

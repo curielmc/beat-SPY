@@ -26,9 +26,10 @@
                 <tr>
                   <th>Name</th>
                   <th>Email</th>
-                  <th>Role in class</th>
+                  <th>In this class</th>
                   <th>Group</th>
-                  <th class="text-right">Actions</th>
+                  <th>Role</th>
+                  <th class="w-8"><span class="sr-only">More</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -38,11 +39,22 @@
                   <td class="text-sm">{{ cls.teacherProfile?.email || '' }}</td>
                   <td><span class="badge badge-secondary badge-sm">Teacher</span></td>
                   <td class="text-base-content/40">—</td>
-                  <td class="text-right">
-                    <select class="select select-bordered select-xs max-w-[12rem]" :disabled="busy" @change="changeTeacher(cls, $event.target.value); $event.target.value = ''">
-                      <option value="">Change teacher…</option>
-                      <option v-for="u in activeUsers" :key="u.id" :value="u.id" :disabled="u.id === cls.teacher_id">{{ u.full_name || u.email }}</option>
+                  <td>
+                    <select :value="cls.teacherProfile.role" class="select select-bordered select-xs" :disabled="cls.teacherProfile.is_disabled" @change="$emit('change-role', cls.teacherProfile.id, $event.target.value)">
+                      <option v-for="r in ROLES" :key="r.value" :value="r.value">{{ r.label }}</option>
                     </select>
+                  </td>
+                  <td>
+                    <div class="dropdown dropdown-end">
+                      <label tabindex="0" class="btn btn-ghost btn-xs" aria-label="More actions">⋯</label>
+                      <div tabindex="0" class="dropdown-content z-20 mt-1 w-64 rounded-box bg-base-100 p-3 shadow-lg border border-base-200 space-y-2">
+                        <button class="btn btn-ghost btn-xs w-full justify-start text-primary" :disabled="busy" @click="$emit('view-as', cls.teacherProfile)">View as {{ firstName(cls.teacherProfile) }}</button>
+                        <select class="select select-bordered select-xs w-full" :disabled="busy" @change="changeTeacher(cls, $event.target.value); $event.target.value = ''">
+                          <option value="">Replace teacher with…</option>
+                          <option v-for="u in activeUsers" :key="u.id" :value="u.id" :disabled="u.id === cls.teacher_id">{{ u.full_name || u.email }}</option>
+                        </select>
+                      </div>
+                    </div>
                   </td>
                 </tr>
 
@@ -57,19 +69,30 @@
                       <option v-for="g in cls.groups" :key="g.id" :value="g.id">{{ g.name }}</option>
                     </select>
                   </td>
-                  <td class="text-right whitespace-nowrap">
-                    <button v-if="m.profile" class="btn btn-ghost btn-xs text-primary" :disabled="busy" @click="$emit('view-as', m.profile)">View as</button>
-                    <button
-                      class="btn btn-ghost btn-xs"
-                      :class="confirmRemoveId === m.id ? 'btn-error' : 'text-error'"
-                      :disabled="busy"
-                      @click="removeMember(m)"
-                    >{{ confirmRemoveId === m.id ? 'Confirm remove' : 'Remove' }}</button>
+                  <td>
+                    <select :value="m.profile.role" class="select select-bordered select-xs" :disabled="m.profile.is_disabled" @change="$emit('change-role', m.profile.id, $event.target.value)">
+                      <option v-for="r in ROLES" :key="r.value" :value="r.value">{{ r.label }}</option>
+                    </select>
+                  </td>
+                  <td>
+                    <div class="dropdown dropdown-end">
+                      <label tabindex="0" class="btn btn-ghost btn-xs" aria-label="More actions">⋯</label>
+                      <div tabindex="0" class="dropdown-content z-20 mt-1 w-56 rounded-box bg-base-100 p-2 shadow-lg border border-base-200 flex flex-col gap-1">
+                        <button class="btn btn-ghost btn-xs justify-start text-primary" :disabled="busy" @click="$emit('view-as', m.profile)">View as {{ firstName(m.profile) }}</button>
+                        <button class="btn btn-ghost btn-xs justify-start text-secondary" :disabled="busy" @click="changeTeacher(cls, m.profile.id)">Make teacher of this class</button>
+                        <button
+                          class="btn btn-xs justify-start"
+                          :class="confirmRemoveId === m.id ? 'btn-error' : 'btn-ghost text-error'"
+                          :disabled="busy"
+                          @click="removeMember(m)"
+                        >{{ confirmRemoveId === m.id ? 'Click again to remove' : 'Remove from class' }}</button>
+                      </div>
+                    </div>
                   </td>
                 </tr>
 
                 <tr v-if="!cls.teacherProfile && !cls.students.length">
-                  <td colspan="5" class="text-center text-base-content/50">Nobody in this class yet</td>
+                  <td colspan="6" class="text-center text-base-content/50">Nobody in this class yet</td>
                 </tr>
               </tbody>
             </table>
@@ -115,12 +138,16 @@
         </div>
         <div class="collapse-content">
           <table class="table table-sm">
-            <thead><tr><th>Name</th><th>Email</th><th>Account role</th></tr></thead>
+            <thead><tr><th>Name</th><th>Email</th><th>Role</th></tr></thead>
             <tbody>
               <tr v-for="u in unplacedUsers" :key="u.id">
                 <td class="font-medium">{{ u.full_name }}</td>
                 <td class="text-sm">{{ u.email }}</td>
-                <td class="capitalize text-sm">{{ u.role }}</td>
+                <td>
+                  <select :value="u.role" class="select select-bordered select-xs" @change="$emit('change-role', u.id, $event.target.value)">
+                    <option v-for="r in ROLES" :key="r.value" :value="r.value">{{ r.label }}</option>
+                  </select>
+                </td>
               </tr>
             </tbody>
           </table>
@@ -140,7 +167,15 @@ const props = defineProps({
   users: { type: Array, required: true },
   search: { type: String, default: '' }
 })
-const emit = defineEmits(['view-as', 'message', 'error', 'roles-changed'])
+const emit = defineEmits(['view-as', 'change-role', 'message', 'error', 'roles-changed'])
+
+// Same account roles as the All users table.
+const ROLES = [
+  { value: 'student', label: 'Student' },
+  { value: 'teacher', label: 'Teacher' },
+  { value: 'admin', label: 'Admin' }
+]
+const firstName = profile => profile?.full_name?.split(' ')[0] || 'user'
 
 const loading = ref(true)
 const busy = ref(false)
