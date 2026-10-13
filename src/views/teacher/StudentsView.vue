@@ -528,7 +528,7 @@ const createGroupError = ref('')
 
 async function handleCreateGroup() {
   createGroupError.value = ''
-  const currentClass = teacher.classes[0]
+  const currentClass = teacher.resolveClass()
   if (!currentClass) return
   const result = await teacher.createGroup(currentClass.id, createGroupName.value.trim())
   if (result.error) {
@@ -676,7 +676,7 @@ async function handleDeleteGroup() {
 const classFunds = ref([])
 
 async function loadClassFunds() {
-  const currentClass = teacher.classes[0]
+  const currentClass = teacher.resolveClass()
   if (!currentClass) return
   // Get distinct fund_number/fund_name combinations for this class
   const groupIds = rankedGroups.value.map(g => g.id)
@@ -720,7 +720,7 @@ const openingFund = ref(false)
 const openFundForm = ref({ name: '', thesis: '', cash: 100000 })
 
 async function handleOpenClassFund() {
-  const currentClass = teacher.classes[0]
+  const currentClass = teacher.resolveClass()
   if (!currentClass) return
   openingFund.value = true
   try {
@@ -849,7 +849,7 @@ async function handleAssign(student) {
   if (target === '__new__') {
     const name = newGroupNames[student.id]?.trim()
     if (!name) return
-    const currentClass = teacher.classes[0]
+    const currentClass = teacher.resolveClass()
     if (!currentClass) return
     const result = await teacher.createGroup(currentClass.id, name)
     if (result.error) { assignError.value = result.error; return }

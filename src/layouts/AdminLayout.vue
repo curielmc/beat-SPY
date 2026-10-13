@@ -192,7 +192,8 @@ async function viewAsTeacher(cls) {
   }
   // Set the active class for the teacher view
   auth.setActiveClass(cls.id)
-  router.push('/teacher')
+  showTeacherModal.value = false
+  router.push({ path: '/teacher', query: { class_id: cls.id } })
 }
 
 async function handleLogout() {

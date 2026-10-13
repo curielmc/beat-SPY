@@ -364,7 +364,7 @@ async function runAiAnalysis() {
 
 onMounted(async () => {
   await teacherStore.loadTeacherData()
-  const CLASS_ID = teacherStore.classes[0]?.id
+  const CLASS_ID = teacherStore.resolveClass()?.id
   if (!CLASS_ID) {
     loading.value = false
     return

@@ -110,9 +110,7 @@ async function loadData() {
 
 onMounted(async () => {
   await teacherStore.loadTeacherData()
-  if (teacherStore.classes.length > 0) {
-    selectedClassId.value = teacherStore.classes[0].id
-  }
+  selectedClassId.value = teacherStore.resolveClass()?.id || null
   await loadData()
 })
 

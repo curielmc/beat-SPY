@@ -355,7 +355,7 @@ const restoringFundNum = ref(null)
 
 onMounted(async () => {
   await teacher.loadTeacherData()
-  currentClass.value = teacher.classes[0] || null
+  currentClass.value = teacher.resolveClass()
 
   if (currentClass.value) {
     groupModeLocal.value = currentClass.value.group_mode || 'student_choice'

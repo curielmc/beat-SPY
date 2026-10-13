@@ -1104,14 +1104,7 @@ const positionSearch = ref('')
 const positionSortKey = ref('returnPct')
 const positionSortOrder = ref('desc')
 
-const currentClass = computed(() => {
-  const qid = route.query.class_id
-  if (qid) {
-    const match = teacher.classes.find(c => c.id === qid)
-    if (match) return match
-  }
-  return teacher.classes[0] || null
-})
+const currentClass = computed(() => teacher.resolveClass(route.query.class_id))
 
 function openAttributionModal(group) {
   selectedGroup.value = group

@@ -77,6 +77,13 @@ export const useTeacherStore = defineStore('teacher', () => {
     }
   }
 
+  // The class the teacher is working in: an explicit id (e.g. ?class_id=),
+  // else the one picked via auth.setActiveClass (View as Teacher), else the first.
+  function resolveClass(classId = null) {
+    const id = classId || auth.activeClassId
+    return classes.value.find(c => c.id === id) || classes.value[0] || null
+  }
+
   // Get ranked groups with portfolio data
   async function getRankedGroups(classId = null) {
     const market = useMarketDataStore()
@@ -690,7 +697,7 @@ export const useTeacherStore = defineStore('teacher', () => {
 
   return {
     classes, groups, students, unassignedStudents, loading,
-    loadTeacherData, getRankedGroups, createClass, generateClassCode,
+    loadTeacherData, resolveClass, getRankedGroups, createClass, generateClassCode,
     createGroup, assignStudentToGroup, moveStudentToGroup,
     kickFromGroup, kickStudent, awardBonusCash,
     updateRestrictions, updateGroupMode, setApprovalCode,
