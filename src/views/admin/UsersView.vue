@@ -6,7 +6,7 @@
           <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
           Users
         </h1>
-        <p class="text-base-content/70">Manage all platform users</p>
+        <p class="text-base-content/70">Manage all platform users and who is in each class</p>
       </div>
       <div class="flex gap-2">
         <button class="btn btn-sm btn-outline" @click="exportEmails">Export Emails</button>
@@ -14,10 +14,15 @@
       </div>
     </div>
 
+    <div role="tablist" class="tabs tabs-boxed w-fit">
+      <button role="tab" class="tab" :class="{ 'tab-active': view === 'classes' }" @click="setView('classes')">By class</button>
+      <button role="tab" class="tab" :class="{ 'tab-active': view === 'all' }" @click="setView('all')">All users</button>
+    </div>
+
     <!-- Search & Filter -->
     <div class="flex gap-3 flex-wrap">
       <input v-model="search" type="text" placeholder="Search by name or email..." class="input input-bordered flex-1 min-w-[200px]" />
-      <select v-model="roleFilter" class="select select-bordered">
+      <select v-if="view === 'all'" v-model="roleFilter" class="select select-bordered">
         <option value="">All Roles</option>
         <option value="student">Students</option>
         <option value="teacher">Teachers</option>
@@ -29,8 +34,18 @@
       <span>{{ errorMsg }}</span>
     </div>
 
+    <UsersByClass
+      v-if="view === 'classes' && users.length"
+      :users="users"
+      :search="search"
+      @view-as="masqueradeAs"
+      @message="showSuccess"
+      @error="msg => { errorMsg = msg }"
+      @roles-changed="fetchUsers"
+    />
+
     <!-- Bulk Action Bar -->
-    <div v-if="selectedIds.size > 0" class="flex items-center gap-3 bg-primary/10 rounded-lg px-4 py-2">
+    <div v-if="view === 'all' && selectedIds.size > 0" class="flex items-center gap-3 bg-primary/10 rounded-lg px-4 py-2">
       <span class="font-semibold text-sm">{{ selectedIds.size }} selected</span>
       <select v-model="bulkRole" class="select select-bordered select-sm">
         <option value="" disabled>Change role to...</option>
@@ -51,7 +66,7 @@
       <span class="loading loading-spinner loading-lg"></span>
     </div>
 
-    <div v-else class="card bg-base-100 shadow border border-base-200">
+    <div v-else-if="view === 'all'" class="card bg-base-100 shadow border border-base-200">
       <div class="card-body p-0">
         <div class="overflow-x-auto">
           <table class="table table-zebra">
@@ -261,8 +276,16 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
 import { supabase, getAccessToken } from '../../lib/supabase'
 import { downloadCSV, downloadText } from '../../utils/csvExport'
+import UsersByClass from '../../components/admin/UsersByClass.vue'
 
 const users = ref([])
+
+// 'classes' = one banner per class with everyone in it; 'all' = flat account list.
+const view = ref((() => { try { return localStorage.getItem('admin_users_view') || 'classes' } catch { return 'classes' } })())
+function setView(next) {
+  view.value = next
+  try { localStorage.setItem('admin_users_view', next) } catch { /* storage unavailable */ }
+}
 const search = ref('')
 const roleFilter = ref('')
 const loading = ref(true)
