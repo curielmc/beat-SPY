@@ -24,9 +24,18 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function startMasquerade(user) {
+    // Already viewing as someone in this tab: go back to the admin session first,
+    // otherwise we'd save (and later "restore") the masqueraded user's session.
+    if (isMasquerading.value) await stopMasquerade()
+
     // Save the admin's current session so we can restore it later
     const { data: { session: adminSession } } = await supabase.auth.getSession()
     if (!adminSession) return { error: 'No active session' }
+
+    // The session is shared by every tab; another tab's View as can switch it underneath us.
+    if (currentUser.value?.id && adminSession.user?.id !== currentUser.value.id) {
+      return { error: `This browser's session was switched to ${adminSession.user?.email || 'another user'} (probably View as in another tab). Click Back to Admin in that tab, or sign out and back in, then try again.` }
+    }
 
     const accessToken = await getAccessToken()
     if (!accessToken) return { error: 'Your admin session expired. Please sign in again.' }
@@ -55,7 +64,10 @@ export const useAuthStore = defineStore('auth', () => {
       })
 
       if (!res.ok) {
-        const err = await res.json().catch(async () => ({ error: await res.text().catch(() => 'Masquerade failed') }))
+        // Read the body once: it's JSON from our API but may be plain text from the platform.
+        const raw = await res.text().catch(() => '')
+        let err
+        try { err = JSON.parse(raw) } catch { err = { error: raw.trim() || `Server error (${res.status})` } }
         _originalSession.value = null
         sessionStorage.removeItem('masquerade_original')
         return { error: err.error || 'Masquerade failed' }

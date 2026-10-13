@@ -5,20 +5,25 @@ import { OWNER_EMAIL } from './_lib/constants.js'
 
 const SUPABASE_KEY = SUPABASE_SERVICE_KEY
 
+// Always JSON so the client can show the real reason instead of a generic failure.
+function jsonError(error, status) {
+  return new Response(JSON.stringify({ error }), { status, headers: { 'Content-Type': 'application/json' } })
+}
+
 export default async function handler(req) {
   if (req.method !== 'POST') {
-    return new Response('Method not allowed', { status: 405 })
+    return jsonError('Method not allowed', 405)
   }
 
   // Verify caller is admin
   const authHeader = req.headers.get('authorization')
-  if (!authHeader) return new Response('Unauthorized', { status: 401 })
+  if (!authHeader) return jsonError('Not signed in. Please sign in again.', 401)
 
   const token = authHeader.replace('Bearer ', '')
   const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
     headers: { Authorization: `Bearer ${token}`, apikey: SUPABASE_KEY }
   })
-  if (!userRes.ok) return new Response('Unauthorized', { status: 401 })
+  if (!userRes.ok) return jsonError('Your sign-in has expired. Please sign out and back in.', 401)
 
   const caller = await userRes.json()
 
@@ -31,7 +36,7 @@ export default async function handler(req) {
   const callerEmail = profiles?.[0]?.email?.toLowerCase()
 
   if (!['admin', 'teacher'].includes(callerRole) && callerEmail !== OWNER_EMAIL) {
-    return new Response('Forbidden', { status: 403 })
+    return jsonError(`This browser is signed in as ${caller.email || 'a student account'}, which can't use View as. If you're viewing as someone in another tab, click Back to Admin there (or sign in again).`, 403)
   }
 
   const { target_user_id } = await req.json()
