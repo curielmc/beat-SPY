@@ -41,6 +41,8 @@
           Admin Dashboard
         </RouterLink>
 
+        <ClassSwitcher class="mb-3" />
+
         <RouterLink v-if="auth.userType === 'teacher'" to="/teacher" class="btn btn-outline btn-secondary btn-sm justify-start w-full gap-2 mb-4" @click="sidebarOpen = false">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422A12.083 12.083 0 0112 20.055a12.083 12.083 0 01-6.16-9.477L12 14zm0 0v6" /></svg>
           Teacher View
@@ -106,7 +108,8 @@
         </button>
       </div>
       <div class="p-3 sm:p-4">
-        <RouterView />
+        <!-- Remount the page when the active class changes so it reloads that class's data -->
+        <RouterView :key="auth.activeClassId || 'no-class'" />
       </div>
     </div>
     </div>
@@ -116,6 +119,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { RouterView, RouterLink, useRoute, useRouter } from 'vue-router'
+import ClassSwitcher from '../components/ClassSwitcher.vue'
 import { useAuthStore } from '../stores/auth'
 import { supabase } from '../lib/supabase'
 import LogoIcon from '../components/LogoIcon.vue'

@@ -38,14 +38,16 @@
             </ul>
           </div>
         </div>
-        <div class="ml-auto flex flex-none gap-1">
+        <div class="ml-auto flex flex-none items-center gap-1">
+          <ClassSwitcher compact />
           <RouterLink v-if="auth.allMemberships.length" to="/leaderboard" class="btn btn-ghost btn-sm" title="Switch to the classes you're enrolled in as a student">Student view</RouterLink>
           <button class="btn btn-ghost btn-sm" @click="logout">Logout</button>
         </div>
       </div>
     </div>
     <div class="max-w-6xl mx-auto p-4">
-      <RouterView />
+      <!-- Remount the page when the class changes so it reloads that class's data -->
+      <RouterView :key="String(route.query.class_id || auth.activeClassId || '')" />
     </div>
   </div>
 </template>
@@ -55,6 +57,7 @@ import { computed, onMounted } from 'vue'
 import { RouterView, RouterLink, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import LogoIcon from '../components/LogoIcon.vue'
+import ClassSwitcher from '../components/ClassSwitcher.vue'
 
 const route = useRoute()
 const router = useRouter()
