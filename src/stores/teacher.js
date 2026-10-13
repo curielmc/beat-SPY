@@ -36,10 +36,13 @@ export const useTeacherStore = defineStore('teacher', () => {
     if (!auth.currentUser) return
     loading.value = true
     try {
-      // Fetch all classes (any teacher can manage any class)
-      const { data: classData } = await supabase
-        .from('classes')
-        .select('*')
+      // Teachers only see classes they teach. RLS also returns classes the user
+      // is a student in, so filter explicitly. Admins (not masquerading) see all.
+      let classQuery = supabase.from('classes').select('*')
+      if (!auth.isAdmin || auth.isMasquerading) {
+        classQuery = classQuery.eq('teacher_id', auth.currentUser.id)
+      }
+      const { data: classData } = await classQuery
       classes.value = classData || []
 
       if (classes.value.length === 0) {
