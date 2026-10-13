@@ -4,12 +4,12 @@
       <div>
         <h1 class="text-xl font-bold flex items-center gap-2">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
-          Student Progress
+          Students &amp; Groups
         </h1>
-        <p class="text-base-content/70">View each group's performance, holdings, and allocation</p>
+        <p class="text-base-content/70">Set up groups, place students, and track each group's performance</p>
       </div>
       <div class="flex gap-2">
-        <button class="btn btn-outline btn-sm gap-2" @click="showCreateGroupModal = true">
+        <button class="btn btn-outline btn-sm gap-2" @click="openCreateGroupModal">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
           Create Group
         </button>
@@ -17,6 +17,59 @@
           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
           Open New Fund for Class
         </button>
+      </div>
+    </div>
+
+    <!-- Group Setup -->
+    <div v-if="!loading && currentClass" class="card bg-base-100 shadow-sm border border-base-300">
+      <div class="card-body p-4 gap-4">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 class="font-bold">Group setup</h2>
+            <p class="text-sm text-base-content/60">
+              {{ classGroups.length }} group{{ classGroups.length === 1 ? '' : 's' }}
+              · {{ classStudentCount }} student{{ classStudentCount === 1 ? '' : 's' }}
+              <template v-if="classUnassigned.length"> · <span class="text-warning font-medium">{{ classUnassigned.length }} waiting for a group</span></template>
+            </p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <select v-if="teacher.classes.length > 1" class="select select-bordered select-sm" :value="currentClass.id" @change="switchClass($event.target.value)" aria-label="Class">
+              <option v-for="c in teacher.classes" :key="c.id" :value="c.id">{{ c.class_name }}</option>
+            </select>
+            <span v-else class="font-medium text-sm">{{ currentClass.class_name }}</span>
+            <span class="badge badge-outline font-mono" title="Class code">{{ currentClass.code }}</span>
+          </div>
+        </div>
+
+        <ClassInviteLink :code="currentClass.code" :class-name="currentClass.class_name" />
+
+        <div>
+          <p class="text-sm font-medium mb-2">How do students get into a group?</p>
+          <div class="grid gap-2 sm:grid-cols-2">
+            <label
+              v-for="opt in groupModeOptions" :key="opt.value"
+              class="flex gap-3 items-start rounded-lg border p-3 cursor-pointer transition-colors"
+              :class="groupMode === opt.value ? 'border-primary bg-primary/5' : 'border-base-300 hover:bg-base-200'"
+            >
+              <input type="radio" class="radio radio-primary radio-sm mt-0.5" name="group-mode" :value="opt.value" :checked="groupMode === opt.value" @change="saveGroupMode(opt.value)" />
+              <span>
+                <span class="font-medium text-sm block">{{ opt.label }}</span>
+                <span class="text-xs text-base-content/60">{{ opt.help }}</span>
+              </span>
+            </label>
+          </div>
+          <p v-if="groupModeSaved" class="text-xs text-success mt-1">{{ groupModeSaved }}</p>
+        </div>
+
+        <!-- First-time guide -->
+        <ol v-if="!classGroups.length" class="steps steps-vertical sm:steps-horizontal text-sm">
+          <li class="step step-primary">Create groups<span class="text-xs text-base-content/60 block">Use "Create groups" — you can make several at once</span></li>
+          <li class="step">Send the invite link<span class="text-xs text-base-content/60 block">Copy it above and email it to your students</span></li>
+          <li class="step">{{ groupMode === 'teacher_assign' ? 'Assign students' : 'Students pick a group' }}<span class="text-xs text-base-content/60 block">{{ groupMode === 'teacher_assign' ? 'New sign-ups appear below, ready to place' : 'Anyone left over appears below for you to place' }}</span></li>
+        </ol>
+        <div v-if="!classGroups.length">
+          <button class="btn btn-primary btn-sm" @click="openCreateGroupModal">Create groups</button>
+        </div>
       </div>
     </div>
 
@@ -46,22 +99,22 @@
 
     <template v-else>
       <!-- Unassigned Students -->
-      <div v-if="teacher.unassignedStudents.length > 0" class="card bg-warning/10 shadow border border-warning/30">
+      <div v-if="classUnassigned.length > 0" class="card bg-warning/10 shadow border border-warning/30">
         <div class="card-body">
           <h2 class="card-title text-lg flex items-center gap-2">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /></svg>
-            Unassigned Students ({{ teacher.unassignedStudents.length }})
+            Students waiting for a group ({{ classUnassigned.length }})
           </h2>
-          <p class="text-sm text-base-content/60 mb-3">These students signed up but haven't been assigned to a group yet.</p>
+          <p class="text-sm text-base-content/60 mb-3">These students joined the class but aren't in a group yet. Pick a group for each one, or create a new group for them.</p>
           <div v-if="assignError" class="alert alert-error text-sm mb-3">⚠️ {{ assignError }}</div>
 
           <div class="space-y-2">
-            <div v-for="student in teacher.unassignedStudents" :key="student.id" class="flex items-center gap-3 bg-base-100 rounded-lg p-3">
+            <div v-for="student in classUnassigned" :key="student.id" class="flex items-center gap-3 bg-base-100 rounded-lg p-3">
               <span class="font-medium flex-1">{{ student.name }}</span>
               <button class="btn btn-ghost btn-sm text-primary" @click="viewAsStudent({ id: student.userId || student.id, name: student.name, email: student.email })">View as Student</button>
               <select v-model="assignTargets[student.id]" class="select select-bordered select-sm w-48">
                 <option value="">Select group...</option>
-                <option v-for="group in teacher.groups" :key="group.id" :value="group.id">{{ group.name }}</option>
+                <option v-for="group in classGroups" :key="group.id" :value="group.id">{{ group.name }}</option>
                 <option value="__new__">+ Create new group</option>
               </select>
               <input
@@ -164,15 +217,34 @@
       <!-- Create Group Modal -->
       <dialog class="modal" :class="{ 'modal-open': showCreateGroupModal }">
         <div class="modal-box">
-          <h3 class="font-bold text-lg mb-4">Create New Group</h3>
-          <div class="form-control mb-4">
+          <h3 class="font-bold text-lg mb-1">Create groups</h3>
+          <p class="text-sm text-base-content/60 mb-4">For {{ currentClass?.class_name }}. Each group gets its own portfolio with the class starting cash.</p>
+          <div role="tablist" class="tabs tabs-boxed mb-4">
+            <button role="tab" class="tab" :class="{ 'tab-active': createMode === 'several' }" @click="createMode = 'several'">Several at once</button>
+            <button role="tab" class="tab" :class="{ 'tab-active': createMode === 'one' }" @click="createMode = 'one'">One named group</button>
+          </div>
+          <div v-if="createMode === 'several'" class="flex gap-3 mb-4">
+            <div class="form-control w-28">
+              <label class="label"><span class="label-text">How many</span></label>
+              <input v-model.number="createGroupCount" type="number" min="1" max="30" class="input input-bordered w-full" />
+            </div>
+            <div class="form-control flex-1">
+              <label class="label"><span class="label-text">Name prefix</span></label>
+              <input v-model="createGroupPrefix" type="text" placeholder="Group" class="input input-bordered w-full" />
+            </div>
+          </div>
+          <p v-if="createMode === 'several'" class="text-xs text-base-content/60 -mt-2 mb-4">Creates {{ plannedGroupNames.join(', ') || '—' }}. You can rename any group later.</p>
+          <div v-else class="form-control mb-4">
             <label class="label"><span class="label-text">Group Name</span></label>
             <input v-model="createGroupName" type="text" placeholder="e.g. Team Alpha" class="input input-bordered w-full" @keydown.enter="handleCreateGroup" />
           </div>
           <p v-if="createGroupError" class="text-error text-sm mb-2">{{ createGroupError }}</p>
           <div class="modal-action">
             <button class="btn btn-ghost" @click="showCreateGroupModal = false">Cancel</button>
-            <button class="btn btn-primary" :disabled="!createGroupName.trim()" @click="handleCreateGroup">Create</button>
+            <button class="btn btn-primary" :disabled="creatingGroups || (createMode === 'one' ? !createGroupName.trim() : !plannedGroupNames.length)" @click="handleCreateGroup">
+              <span v-if="creatingGroups" class="loading loading-spinner loading-sm"></span>
+              {{ createMode === 'one' ? 'Create' : `Create ${plannedGroupNames.length} group${plannedGroupNames.length === 1 ? '' : 's'}` }}
+            </button>
           </div>
         </div>
         <form method="dialog" class="modal-backdrop" @click="showCreateGroupModal = false"><button>close</button></form>
@@ -447,17 +519,48 @@
 </template>
 
 <script setup>
-import { reactive, ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { reactive, ref, computed, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useTeacherStore } from '../../stores/teacher'
 import { useAuthStore } from '../../stores/auth'
 import { supabase } from '../../lib/supabase'
+import ClassInviteLink from '../../components/ClassInviteLink.vue'
 
 const teacher = useTeacherStore()
 const auth = useAuthStore()
 const router = useRouter()
+const route = useRoute()
 
 const loading = ref(true)
+
+// Everything on this page is scoped to one class (?class_id=, else the active class).
+const currentClass = computed(() => teacher.resolveClass(route.query.class_id))
+const classGroups = computed(() => teacher.groups.filter(g => g.class_id === currentClass.value?.id))
+const classUnassigned = computed(() => teacher.unassignedStudents.filter(s => s.class_id === currentClass.value?.id))
+const classStudentCount = computed(() => teacher.students.filter(s => s.class_id === currentClass.value?.id).length)
+
+async function refreshGroups() {
+  rankedGroups.value = currentClass.value ? await teacher.getRankedGroups(currentClass.value.id) : []
+}
+
+function switchClass(classId) {
+  auth.setActiveClass(classId)
+  router.replace({ query: { ...route.query, class_id: classId } })
+}
+
+
+const groupModeOptions = [
+  { value: 'student_choice', label: 'Students choose', help: 'When they sign up with the class code, students join an existing group or start a new one.' },
+  { value: 'teacher_assign', label: 'I assign them', help: 'Students sign up without a group and wait here until you place them.' }
+]
+const groupMode = computed(() => currentClass.value?.group_mode || 'student_choice')
+const groupModeSaved = ref('')
+async function saveGroupMode(mode) {
+  if (!currentClass.value || mode === groupMode.value) return
+  const result = await teacher.updateGroupMode(currentClass.value.id, mode)
+  groupModeSaved.value = result?.error ? `Couldn't save: ${result.error}` : 'Saved'
+  setTimeout(() => { groupModeSaved.value = '' }, 2500)
+}
 const rankedGroups = ref([])
 const groupHoldings = reactive({})
 const studentFunds = reactive({})
@@ -487,7 +590,7 @@ async function saveGroupName(group) {
   const newName = editingGroupName.value.trim()
   if (newName && newName !== group.name) {
     await supabase.from('groups').update({ name: newName }).eq('id', group.id)
-    rankedGroups.value = await teacher.getRankedGroups()
+    await refreshGroups()
   }
   editingGroupId.value = null
 }
@@ -525,19 +628,50 @@ const awardFundOptions = ref([])
 const showCreateGroupModal = ref(false)
 const createGroupName = ref('')
 const createGroupError = ref('')
+const createMode = ref('several')
+const createGroupCount = ref(4)
+const createGroupPrefix = ref('Group')
+const creatingGroups = ref(false)
+
+// "Group 1".."Group N", skipping names already used in this class.
+const plannedGroupNames = computed(() => {
+  const count = Math.min(Math.max(Number(createGroupCount.value) || 0, 0), 30)
+  const prefix = createGroupPrefix.value.trim() || 'Group'
+  const taken = new Set(classGroups.value.map(g => g.name.toLowerCase()))
+  const names = []
+  for (let i = 1; names.length < count && i < count + 100; i++) {
+    const name = `${prefix} ${i}`
+    if (!taken.has(name.toLowerCase())) names.push(name)
+  }
+  return names
+})
+
+function openCreateGroupModal() {
+  createGroupError.value = ''
+  createMode.value = classGroups.value.length ? 'one' : 'several'
+  showCreateGroupModal.value = true
+}
 
 async function handleCreateGroup() {
   createGroupError.value = ''
-  const currentClass = teacher.resolveClass()
-  if (!currentClass) return
-  const result = await teacher.createGroup(currentClass.id, createGroupName.value.trim())
-  if (result.error) {
-    createGroupError.value = result.error
-    return
+  if (!currentClass.value || creatingGroups.value) return
+  const names = createMode.value === 'one' ? [createGroupName.value.trim()] : plannedGroupNames.value
+  if (!names.length || !names[0]) return
+  creatingGroups.value = true
+  try {
+    for (const name of names) {
+      const result = await teacher.createGroup(currentClass.value.id, name)
+      if (result.error) {
+        createGroupError.value = `Couldn't create "${name}": ${result.error}`
+        return
+      }
+    }
+    showCreateGroupModal.value = false
+    createGroupName.value = ''
+  } finally {
+    creatingGroups.value = false
+    await refreshGroups()
   }
-  showCreateGroupModal.value = false
-  createGroupName.value = ''
-  rankedGroups.value = await teacher.getRankedGroups()
 }
 
 // Send Lesson
@@ -666,7 +800,7 @@ async function handleDeleteGroup() {
 
     showDeleteGroupModal.value = false
     await teacher.loadTeacherData()
-    rankedGroups.value = await teacher.getRankedGroups()
+    await refreshGroups()
   } finally {
     deletingGroup.value = false
   }
@@ -676,10 +810,11 @@ async function handleDeleteGroup() {
 const classFunds = ref([])
 
 async function loadClassFunds() {
-  const currentClass = teacher.resolveClass()
-  if (!currentClass) return
+  const cls = currentClass.value
+  if (!cls) return
   // Get distinct fund_number/fund_name combinations for this class
   const groupIds = rankedGroups.value.map(g => g.id)
+  classFunds.value = []
   if (!groupIds.length) return
   const { data } = await supabase
     .from('portfolios')
@@ -720,12 +855,12 @@ const openingFund = ref(false)
 const openFundForm = ref({ name: '', thesis: '', cash: 100000 })
 
 async function handleOpenClassFund() {
-  const currentClass = teacher.resolveClass()
-  if (!currentClass) return
+  const cls = currentClass.value
+  if (!cls) return
   openingFund.value = true
   try {
     const { error } = await supabase.rpc('open_class_fund', {
-      p_class_id: currentClass.id,
+      p_class_id: cls.id,
       p_fund_name: openFundForm.value.name.trim(),
       p_thesis: openFundForm.value.thesis.trim() || null,
       p_starting_cash: openFundForm.value.cash || 100000
@@ -740,16 +875,15 @@ async function handleOpenClassFund() {
     awardSuccess.value = 'New fund opened for all groups!'
     setTimeout(() => { awardSuccess.value = '' }, 5000)
     // Reload data
-    rankedGroups.value = await teacher.getRankedGroups()
+    await refreshGroups()
     loadClassFunds()
   } finally {
     openingFund.value = false
   }
 }
 
-onMounted(async () => {
-  await teacher.loadTeacherData()
-  rankedGroups.value = await teacher.getRankedGroups()
+async function loadGroupDetails() {
+  await refreshGroups()
   loadClassFunds()
 
   // Load holdings and student funds for each group
@@ -772,7 +906,19 @@ onMounted(async () => {
     }
     studentFunds[group.id] = funds
   }
+}
 
+onMounted(async () => {
+  await teacher.loadTeacherData()
+  await loadGroupDetails()
+  loading.value = false
+})
+
+watch(() => currentClass.value?.id, async (next, prev) => {
+  if (!prev || next === prev) return
+  loading.value = true
+  expandedGroups.value = new Set()
+  await loadGroupDetails()
   loading.value = false
 })
 
@@ -785,7 +931,7 @@ function openKickModal(student) {
 async function confirmKickFromGroup() {
   if (kickTarget.value) {
     await teacher.kickFromGroup(kickTarget.value.id)
-    rankedGroups.value = await teacher.getRankedGroups()
+    await refreshGroups()
   }
   showKickModal.value = false
   kickTarget.value = null
@@ -794,7 +940,7 @@ async function confirmKickFromGroup() {
 async function confirmKick() {
   if (kickTarget.value) {
     await teacher.kickStudent(kickTarget.value.id, kickTarget.value.class_id, kickTarget.value.email)
-    rankedGroups.value = await teacher.getRankedGroups()
+    await refreshGroups()
   }
   showKickModal.value = false
   kickTarget.value = null
@@ -837,7 +983,7 @@ async function confirmAward() {
     awardSuccess.value = `${awardType.value === 'add' ? 'Added' : 'Subtracted'} $${awardAmount.value.toLocaleString()} ${awardType.value === 'add' ? 'to' : 'from'} ${awardGroupName.value}!`
   }
   showAwardModal.value = false
-  rankedGroups.value = await teacher.getRankedGroups()
+  await refreshGroups()
   setTimeout(() => { awardSuccess.value = '' }, 5000)
 }
 
@@ -849,9 +995,9 @@ async function handleAssign(student) {
   if (target === '__new__') {
     const name = newGroupNames[student.id]?.trim()
     if (!name) return
-    const currentClass = teacher.resolveClass()
-    if (!currentClass) return
-    const result = await teacher.createGroup(currentClass.id, name)
+    const cls = currentClass.value
+    if (!cls) return
+    const result = await teacher.createGroup(cls.id, name)
     if (result.error) { assignError.value = result.error; return }
     const r2 = await teacher.assignStudentToGroup(student.id, result.group.id)
     if (r2?.error) { assignError.value = r2.error; return }
@@ -866,16 +1012,16 @@ async function handleAssign(student) {
   }
 
   delete assignTargets[student.id]
-  rankedGroups.value = await teacher.getRankedGroups()
+  await refreshGroups()
 }
 
 function otherGroups(currentGroupId) {
-  return teacher.groups.filter(g => g.id !== currentGroupId)
+  return classGroups.value.filter(g => g.id !== currentGroupId)
 }
 
 async function handleTransfer(student, fromGroupId, toGroupId) {
   if (!toGroupId) return
   await teacher.moveStudentToGroup(student.id, toGroupId)
-  rankedGroups.value = await teacher.getRankedGroups()
+  await refreshGroups()
 }
 </script>

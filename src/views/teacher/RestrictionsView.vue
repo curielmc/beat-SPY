@@ -90,6 +90,10 @@
                   <option value="student_choice">Students choose own group</option>
                   <option value="teacher_assign">I assign groups</option>
                 </select>
+                <p class="text-xs text-base-content/60 mt-1">
+                  Create groups and place students on the
+                  <RouterLink :to="{ name: 'teacher-students', query: currentClass ? { class_id: currentClass.id } : {} }" class="link link-primary">Students &amp; Groups</RouterLink> page.
+                </p>
               </div>
 
               <div class="form-control">

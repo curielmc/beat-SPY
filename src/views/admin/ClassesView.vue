@@ -30,6 +30,20 @@
         </div>
         <div class="collapse-content">
           <div class="space-y-4">
+            <!-- Invite + groups -->
+            <div class="card bg-base-200 p-4 border border-base-300 shadow-sm gap-3">
+              <ClassInviteLink :code="cls.code" :class-name="cls.class_name" />
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <p class="text-sm text-base-content/70">
+                  {{ cls.groups?.length || 0 }} group{{ cls.groups?.length === 1 ? '' : 's' }} ·
+                  {{ (cls.group_mode || 'student_choice') === 'teacher_assign' ? 'Teacher assigns students to groups' : 'Students choose their own group' }}
+                </p>
+                <RouterLink :to="{ name: 'teacher-students', query: { class_id: cls.id } }" class="btn btn-primary btn-sm">
+                  {{ cls.groups?.length ? 'Manage groups' : 'Set up groups' }}
+                </RouterLink>
+              </div>
+            </div>
+
             <!-- Inline Settings -->
             <div class="card bg-base-200 p-4 border border-base-300 shadow-sm">
               <h3 class="font-semibold mb-3 flex items-center gap-2">
@@ -48,10 +62,10 @@
                   <input type="number" v-model.number="editState[cls.id].max_portfolios" class="input input-bordered input-sm" />
                 </div>
                 <div class="form-control">
-                  <label class="label label-text text-xs">Group Mode</label>
+                  <label class="label label-text text-xs">How students join groups</label>
                   <select v-model="editState[cls.id].group_mode" class="select select-bordered select-sm">
-                    <option value="individual">Individual</option>
-                    <option value="group">Group</option>
+                    <option value="student_choice">Students choose their group</option>
+                    <option value="teacher_assign">Teacher assigns groups</option>
                   </select>
                 </div>
                 <div class="form-control">
@@ -274,6 +288,9 @@
       <form method="dialog" class="modal-backdrop" @click="showDeleteModal = false"><button>close</button></form>
     </dialog>
 
+    <div v-if="saveError" class="alert alert-error fixed bottom-4 right-4 w-auto z-50">
+      <span>{{ saveError }}</span>
+    </div>
     <div v-if="successMsg" class="alert alert-success fixed bottom-4 right-4 w-auto z-50">
       <span>{{ successMsg }}</span>
     </div>
@@ -282,8 +299,9 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 import { supabase } from '../../lib/supabase'
+import ClassInviteLink from '../../components/ClassInviteLink.vue'
 import { useMarketDataStore } from '../../stores/marketData'
 
 const router = useRouter()
@@ -295,6 +313,7 @@ const showDeleteModal = ref(false)
 const deleteTarget = ref(null)
 const savingClass = ref(null)
 const successMsg = ref('')
+const saveError = ref('')
 const editState = reactive({})
 const invites = reactive({})
 const invitesLoaded = reactive({})
@@ -357,7 +376,7 @@ async function fetchClasses() {
       starting_cash: cls.starting_cash,
       allow_reset: cls.allow_reset ?? false,
       max_portfolios: cls.max_portfolios ?? 1,
-      group_mode: cls.group_mode || 'individual',
+      group_mode: cls.group_mode || 'student_choice',
       approval_code: cls.approval_code || '',
       restrictions: {
         requireRationale: restrictions.requireRationale ?? false,
@@ -393,7 +412,10 @@ async function saveClassSettings(cls) {
   }).eq('id', cls.id)
 
   savingClass.value = null
-  if (!error) {
+  if (error) {
+    saveError.value = `Couldn't save ${cls.class_name}: ${error.message}`
+    setTimeout(() => { saveError.value = '' }, 6000)
+  } else {
     showSuccess('Settings saved')
     // Update local data
     Object.assign(cls, {

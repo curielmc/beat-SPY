@@ -24,10 +24,14 @@
               </h2>
               <p class="text-sm text-base-content/60">{{ cls.school || 'No school' }} &middot; {{ cls.groupCount }} groups &middot; {{ cls.studentCount }} students</p>
             </div>
-            <button class="btn btn-sm btn-ghost" @click="toggleClassSettings(cls.id)">
-              {{ expandedClass === cls.id ? 'Hide Settings' : 'Settings' }}
-            </button>
+            <div class="flex gap-1">
+              <RouterLink :to="{ name: 'teacher-students', query: { class_id: cls.id } }" class="btn btn-sm btn-ghost">Groups</RouterLink>
+              <button class="btn btn-sm btn-ghost" @click="toggleClassSettings(cls.id)">
+                {{ expandedClass === cls.id ? 'Hide Settings' : 'Settings' }}
+              </button>
+            </div>
           </div>
+          <ClassInviteLink class="mt-2" :code="cls.code" :class-name="cls.class_name" />
 
           <div v-if="expandedClass === cls.id" class="mt-4 space-y-3 border-t pt-4">
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -182,7 +186,9 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { RouterLink } from 'vue-router'
 import { useTeacherStore } from '../../stores/teacher'
+import ClassInviteLink from '../../components/ClassInviteLink.vue'
 import { supabase } from '../../lib/supabase'
 
 const teacher = useTeacherStore()
