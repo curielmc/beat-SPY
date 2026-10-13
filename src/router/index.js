@@ -142,8 +142,11 @@ router.beforeEach(async (to) => {
     return { name: 'leaderboard' }
   }
 
+  // Teachers who are also enrolled in a class (e.g. a student who teaches a club)
+  // can use the student app for those classes.
   if (to.matched.some(r => r.meta.role === 'student') && userRole === 'teacher') {
-    return { name: 'teacher-dashboard' }
+    await auth.getCurrentMembership()
+    if (!auth.allMemberships.length) return { name: 'teacher-dashboard' }
   }
 
   // Admins can access student routes (for viewing student experience)

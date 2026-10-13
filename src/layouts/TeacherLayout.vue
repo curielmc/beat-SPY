@@ -38,7 +38,8 @@
             </ul>
           </div>
         </div>
-        <div class="ml-auto flex-none">
+        <div class="ml-auto flex flex-none gap-1">
+          <RouterLink v-if="auth.allMemberships.length" to="/leaderboard" class="btn btn-ghost btn-sm" title="Switch to the classes you're enrolled in as a student">Student view</RouterLink>
           <button class="btn btn-ghost btn-sm" @click="logout">Logout</button>
         </div>
       </div>
@@ -50,7 +51,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { RouterView, RouterLink, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import LogoIcon from '../components/LogoIcon.vue'
@@ -58,6 +59,9 @@ import LogoIcon from '../components/LogoIcon.vue'
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
+
+// Loads the user's student enrollments so the "Student view" link can appear.
+onMounted(() => { auth.getCurrentMembership() })
 
 // Masquerading as a teacher makes userType 'teacher', so the router bounces /admin — restore the admin session first.
 async function backToAdmin() {

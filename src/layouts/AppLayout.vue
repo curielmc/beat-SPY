@@ -41,6 +41,11 @@
           Admin Dashboard
         </RouterLink>
 
+        <RouterLink v-if="auth.userType === 'teacher'" to="/teacher" class="btn btn-outline btn-secondary btn-sm justify-start w-full gap-2 mb-4" @click="sidebarOpen = false">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422A12.083 12.083 0 0112 20.055a12.083 12.083 0 01-6.16-9.477L12 14zm0 0v6" /></svg>
+          Teacher View
+        </RouterLink>
+
         <RouterLink to="/leaderboard" class="btn btn-sm justify-start w-full gap-2" :class="route.path === '/leaderboard' ? 'btn-primary' : 'btn-ghost'" @click="sidebarOpen = false">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
           Leaderboard
