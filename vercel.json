@@ -8,35 +8,5 @@
   ],
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
-  ],
-  "crons": [
-    {
-      "path": "/api/weekly-ai-insights",
-      "schedule": "0 0 1 * *"
-    },
-    {
-      "path": "/api/daily-snapshot",
-      "schedule": "0 21 * * 1-5"
-    },
-    {
-      "path": "/api/process-pending-orders",
-      "schedule": "*/5 * * * 1-5"
-    },
-    {
-      "path": "/api/cron/fetch-daily-prices",
-      "schedule": "15 20 * * *"
-    },
-    {
-      "path": "/api/newsletter-reminder-check",
-      "schedule": "0 14 * * *"
-    },
-    {
-      "path": "/api/cron/fetch-spy-constituents",
-      "schedule": "0 22 * * 1-5"
-    },
-    {
-      "path": "/api/cron/challenge-lifecycle",
-      "schedule": "5 13 * * 1-5"
-    }
   ]
 }
