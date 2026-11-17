@@ -2,8 +2,8 @@ export const config = { runtime: 'edge' }
 
 import { SUPABASE_URL, SUPABASE_SERVICE_KEY, sbFetch, jsonResponse } from './_lib/supabase.js'
 import { renderNewsletterHtml } from './_lib/newsletterRender.js'
+import { sendMail, mailConfigured } from './_lib/mail.js'
 
-const AGENTMAIL_INBOX = 'hello@mail.beat-snp.com'
 const APP_BASE = process.env.APP_BASE_URL || 'https://beat-snp.com'
 
 function isEmail(s) {
@@ -45,8 +45,7 @@ export default async function handler(req) {
   const teacherProfile = await sbFetch(`/profiles?id=eq.${klass.teacher_id}&select=email`)
   const replyTo = teacherProfile?.[0]?.email || null
 
-  const AGENTMAIL_KEY = process.env.AGENTMAIL_API_KEY
-  if (!AGENTMAIL_KEY) return jsonResponse({ error: 'AgentMail not configured' }, 500)
+  if (!mailConfigured()) return jsonResponse({ error: 'Email not configured' }, 500)
 
   const finalSubject = `[TEST] ${(subject || nl.subject || '').trim()}`
   const finalIntro = intro_html || nl.intro_html || ''
@@ -64,20 +63,16 @@ export default async function handler(req) {
     classSignupUrl
   })
 
-  const res = await fetch(`https://api.agentmail.to/v0/inboxes/${AGENTMAIL_INBOX}/messages/send`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${AGENTMAIL_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+  const res = await sendMail({
       to: [targetEmail],
       reply_to: replyTo ? [replyTo] : undefined,
       subject: finalSubject,
       html
     })
-  })
 
   if (!res.ok) {
     const errText = await res.text().catch(() => '')
-    return jsonResponse({ error: `AgentMail rejected: ${errText || res.status}` }, 502)
+    return jsonResponse({ error: `Email provider rejected: ${errText || res.status}` }, 502)
   }
 
   return jsonResponse({ ok: true, sent_to: targetEmail })

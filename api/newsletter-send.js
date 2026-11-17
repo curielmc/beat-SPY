@@ -2,8 +2,8 @@ export const config = { runtime: 'edge' }
 
 import { SUPABASE_URL, SUPABASE_SERVICE_KEY, sbFetch, jsonResponse } from './_lib/supabase.js'
 import { renderNewsletterHtml, htmlToText } from './_lib/newsletterRender.js'
+import { sendMail, mailConfigured } from './_lib/mail.js'
 
-const AGENTMAIL_INBOX = 'hello@mail.beat-snp.com'
 const APP_BASE = process.env.APP_BASE_URL || 'https://beat-snp.com'
 
 export default async function handler(req) {
@@ -48,8 +48,7 @@ export default async function handler(req) {
 
   if (nl.status === 'sent') return jsonResponse({ error: 'Newsletter already sent' }, 409)
 
-  const AGENTMAIL_KEY = process.env.AGENTMAIL_API_KEY
-  if (!AGENTMAIL_KEY) return jsonResponse({ error: 'AgentMail not configured' }, 500)
+  if (!mailConfigured()) return jsonResponse({ error: 'Email not configured' }, 500)
 
   // Apply edits
   const finalSubject = (subject || nl.subject || '').trim()
@@ -112,10 +111,7 @@ export default async function handler(req) {
       classSignupUrl
     })
     try {
-      const res = await fetch(`https://api.agentmail.to/v0/inboxes/${AGENTMAIL_INBOX}/messages/send`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${AGENTMAIL_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const res = await sendMail({
           to: [r.email],
           reply_to: replyTo ? [replyTo] : undefined,
           subject: finalSubject,
@@ -126,7 +122,6 @@ export default async function handler(req) {
             'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click'
           }
         })
-      })
       if (res.ok) sentCount++
       else {
         let errBody = null
@@ -153,16 +148,12 @@ export default async function handler(req) {
     })
     const internalSubject = `[copy] ${finalSubject} — sent to ${sentCount} of ${recipients.length}`
     for (const internalTo of ccList) {
-      await fetch(`https://api.agentmail.to/v0/inboxes/${AGENTMAIL_INBOX}/messages/send`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${AGENTMAIL_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      await sendMail({
           to: [internalTo],
           reply_to: replyTo ? [replyTo] : undefined,
           subject: internalSubject,
           html: internalHtml
-        })
-      }).catch(() => null)
+        }).catch(() => null)
     }
   }
 

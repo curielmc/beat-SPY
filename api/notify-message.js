@@ -1,3 +1,4 @@
+import { sendMail, mailConfigured } from './_lib/mail.js'
 export const config = { runtime: 'edge' }
 
 async function hashToken(userId) {
@@ -35,10 +36,8 @@ export default async function handler(req) {
 
   const SUPABASE_URL = process.env.SUPABASE_URL || 'https://omrfqisqsqgidcqellzy.supabase.co'
   const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY
-  const AGENTMAIL_KEY = process.env.AGENTMAIL_API_KEY
-  const INBOX_ID = 'hello@mail.beat-snp.com' // Your AgentMail inbox
 
-  if (!SUPABASE_KEY || !AGENTMAIL_KEY) {
+  if (!SUPABASE_KEY || !mailConfigured()) {
     return new Response('Server not configured', { status: 500 })
   }
 
@@ -154,11 +153,7 @@ export default async function handler(req) {
 
   const results = await Promise.all(emails.map(async ({ email, user_id }) => {
     const html = await buildEmailHtml(msg.content, recipientLabel, user_id)
-    return fetch(`https://api.agentmail.to/v0/inboxes/${INBOX_ID}/messages/send`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${AGENTMAIL_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ to: [email], subject, html, text: String(msg.content || '').replace(/\*\*/g, '') })
-    }).then(r => r.json())
+    return sendMail({ to: [email], subject, html, text: String(msg.content || '').replace(/\*\*/g, '') }).then(r => r.json())
   }))
 
   return new Response(JSON.stringify({ sent: emails.length, results }), {

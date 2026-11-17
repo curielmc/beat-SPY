@@ -5,8 +5,8 @@ export const config = { runtime: 'edge' }
 // if none have been sent), and the last reminder for this class was >7 days ago.
 
 import { sbFetch } from './_lib/supabase.js'
+import { sendMail, mailConfigured } from './_lib/mail.js'
 
-const AGENTMAIL_INBOX = 'hello@mail.beat-snp.com'
 const APP_BASE = process.env.APP_BASE_URL || 'https://beat-snp.com'
 const REMINDER_INTERVAL_DAYS = 90
 const COOLDOWN_DAYS = 7
@@ -27,8 +27,7 @@ export default async function handler(req) {
     return new Response('Unauthorized', { status: 401 })
   }
 
-  const AGENTMAIL_KEY = process.env.AGENTMAIL_API_KEY
-  if (!AGENTMAIL_KEY) return new Response('AgentMail not configured', { status: 500 })
+  if (!mailConfigured()) return new Response('Email not configured', { status: 500 })
 
   const today = new Date()
   const todayDate = today.toISOString().split('T')[0]
@@ -98,15 +97,11 @@ export default async function handler(req) {
     </div>`
 
     try {
-      const res = await fetch(`https://api.agentmail.to/v0/inboxes/${AGENTMAIL_INBOX}/messages/send`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${AGENTMAIL_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const res = await sendMail({
           to: [teacherEmail],
           subject: `Reminder: send a newsletter for ${c.class_name}`,
           html
         })
-      })
       if (res.ok) {
         await sbFetch(`/classes?id=eq.${c.id}`, {
           method: 'PATCH',
@@ -115,7 +110,7 @@ export default async function handler(req) {
         })
         sent.push({ class_id: c.id, teacher: teacherEmail })
       } else {
-        skipped.push({ class_id: c.id, reason: 'agentmail_error', status: res.status })
+        skipped.push({ class_id: c.id, reason: 'email_error', status: res.status })
       }
     } catch (e) {
       skipped.push({ class_id: c.id, reason: 'exception', error: e.message })

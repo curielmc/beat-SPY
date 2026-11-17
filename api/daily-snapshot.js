@@ -1,20 +1,17 @@
 export const config = { runtime: 'edge' }
 
 import { FMP_KEY, SUPABASE_URL, SUPABASE_SERVICE_KEY, sbFetch as _sbFetch } from './_lib/supabase.js'
-import { OWNER_EMAIL, AGENTMAIL_INBOX } from './_lib/constants.js'
+import { OWNER_EMAIL } from './_lib/constants.js'
+import { sendMail, mailConfigured } from './_lib/mail.js'
 
 async function sbFetch(path) {
   return _sbFetch(path).catch(() => null)
 }
 
 async function notifyAdmin(subject, body) {
-  const AGENTMAIL_KEY = process.env.AGENTMAIL_API_KEY
-  if (!AGENTMAIL_KEY) return
+  if (!mailConfigured()) return
   try {
-    await fetch(`https://api.agentmail.to/v0/inboxes/${AGENTMAIL_INBOX}/messages/send`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${AGENTMAIL_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    await sendMail({
         to: [OWNER_EMAIL],
         subject,
         html: `<div style="font-family:sans-serif;padding:20px;">
@@ -23,7 +20,6 @@ async function notifyAdmin(subject, body) {
           <p style="color:#9ca3af;font-size:12px;margin-top:16px;">Automated alert from Beat the S&amp;P 500 daily snapshot cron.</p>
         </div>`
       })
-    })
   } catch (e) { /* best effort */ }
 }
 
